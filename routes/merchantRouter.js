@@ -3,6 +3,7 @@ const router=express.Router()
 const {isAuthorized,roleAuthorize,}=require("../middlewares/auth");
 const merchantController=require('../controllers/merchantController')
 const propertyController = require('../controllers/propertyController');
+const adminController = require('../controllers/adminController');
 router.route("/register").post(merchantController.register);
 router.route("/login").post(merchantController.login);
 // router.route("/forgotpassword").post(merchantController.forgotPassword);
@@ -16,4 +17,7 @@ router.get('/properties',isAuthorized,roleAuthorize('merchant'), propertyControl
 router.get('/properties/:id',isAuthorized,roleAuthorize('merchant'), propertyController.getPropertyById);
 router.put('/properties/:id',isAuthorized,roleAuthorize('merchant'), propertyController.updateProperty);
 router.delete('/properties/:id',isAuthorized,roleAuthorize('merchant'), propertyController.deleteProperty);
+// amenity routes with merchant role
+router.get('/amenities',isAuthorized,roleAuthorize('merchant'), adminController.getAmenitiesByCategory);
+router.get('/roomamenities',isAuthorized,roleAuthorize('merchant'), adminController.getRoomAmenitiesByCategory);
 module.exports = router;

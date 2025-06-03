@@ -62,6 +62,27 @@ exports.deleteAmenity = asyncHandler(async (req, res, next) => {
     });
 });
 
+exports.getAmenitiesByCategory = asyncHandler(async (req, res, next) => {
+    try {
+      // Fetch distinct categories from Amenity collection
+      const categories = await Amenity.distinct("category");
+      const result = {};
+  
+      for (const category of categories) {
+        const amenities = await Amenity.find({ category });
+        result[category] = amenities;
+      }
+  
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+
 // --- Policy Controllers ---
 
 // @desc    Create New Policy
@@ -177,3 +198,25 @@ exports.deleteRoomAmenity = asyncHandler(async (req, res, next) => {
         message: "Room Amenity deleted successfully",
     });
 });
+
+
+exports.getRoomAmenitiesByCategory = asyncHandler(async (req, res, next) => {
+    try {
+      // Fetch distinct categories from RoomAmenity collection
+      const categories = await RoomAmenity.distinct("category");
+      const result = {};
+  
+      for (const category of categories) {
+        const roomAmenities = await RoomAmenity.find({ category });
+        result[category] = roomAmenities;
+      }
+  
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
