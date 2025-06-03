@@ -11,7 +11,7 @@ app.use(cookieParser());
 app.use(logger("tiny"));
 app.use(express.json());
 app.use("/api/merchant", merchant);
-app.use('/api/v1', admin);
+app.use('/api/admin', admin);
 
 app.use(errorMiddleware);
 

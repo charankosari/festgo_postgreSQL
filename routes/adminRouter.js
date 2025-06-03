@@ -5,23 +5,23 @@ const adminController = require('../controllers/adminController');
 const router = express.Router();
 
 // Amenity Routes
-router.route('/admin/amenity/new').post(isAuthorized, roleAuthorize('admin'), adminController.createAmenity);
-router.route('/admin/amenities').get(isAuthorized, roleAuthorize('admin'), adminController.getAllAmenities);
-router.route('/admin/amenity/:id')
+router.route('/amenity/new').post(isAuthorized, roleAuthorize('admin'), adminController.createAmenity);
+router.route('/amenities').get(isAuthorized, roleAuthorize('admin'), adminController.getAllAmenities);
+router.route('/amenity/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updateAmenity)
     .delete(isAuthenticatedUser, roleAuthorize('admin'), adminController.deleteAmenity);
 
 // Policy Routes
-router.route('/admin/policy/new').post(isAuthorized, roleAuthorize('admin'), adminController.createPolicy);
-router.route('/admin/policies').get(isAuthorized, roleAuthorize('admin'), adminController.getAllPolicies);
-router.route('/admin/policy/:id')
+router.route('/policy/new').post(isAuthorized, roleAuthorize('admin'), adminController.createPolicy);
+router.route('/policies').get(isAuthorized, roleAuthorize('admin'), adminController.getAllPolicies);
+router.route('/policy/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updatePolicy)
     .delete(isAuthorized, roleAuthorize('admin'), deletePolicy);
 
 // Room Amenity Routes
-router.route('/admin/roomamenity/new').post(isAuthorized, roleAuthorize('admin'), adminController.createRoomAmenity);
-router.route('/admin/roomamenities').get(isAuthorized, roleAuthorize('admin'), adminController.getAllRoomAmenities);
-router.route('/admin/roomamenity/:id')
+router.route('/roomamenity/new').post(isAuthorized, roleAuthorize('admin'), adminController.createRoomAmenity);
+router.route('/roomamenities').get(isAuthorized, roleAuthorize('admin'), adminController.getAllRoomAmenities);
+router.route('/roomamenity/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updateRoomAmenity)
     .delete(isAuthorized, roleAuthorize('admin'), adminController.deleteRoomAmenity);
 
