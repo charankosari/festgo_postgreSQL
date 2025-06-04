@@ -24,5 +24,7 @@ router.route('/roomamenities').get(isAuthorized, roleAuthorize('admin'), adminCo
 router.route('/roomamenity/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updateRoomAmenity)
     .delete(isAuthorized, roleAuthorize('admin'), adminController.deleteRoomAmenity);
-
+// merchant management routes
+router.route('/merchants').get(isAuthorized, roleAuthorize('admin'), adminController.getAllMerchants);
+router.route('/merchant/:id/authorize').put(isAuthorized, roleAuthorize('admin'), adminController.authorizeMerchant);
 module.exports = router;

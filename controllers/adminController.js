@@ -2,6 +2,7 @@ const asyncHandler = require("../middlewares/asynchandler");
 const errorHandler = require("../utils/errorHandler");
 const Amenity = require("../models/amenityModel");
 const Policy = require("../models/policyModel");
+const Merchant = require("../models/merchantModel");
 const RoomAmenity = require("../models/roomAmenityModel");
 
 // --- Amenity Controllers ---
@@ -219,4 +220,37 @@ exports.getRoomAmenitiesByCategory = asyncHandler(async (req, res, next) => {
       next(error);
     }
   });
-  
+
+
+// @desc    Get all merchants with role 'merchant'
+// @route   GET /api/v1/admin/merchants
+// @access  Private (Admin only)
+exports.getAllMerchants = asyncHandler(async (req, res, next) => {
+  const merchants = await Merchant.find({ role: 'merchant' });
+
+  res.status(200).json({
+    success: true,
+    count: merchants.length,
+    data: merchants,
+  });
+});
+
+// @desc    Authorize a merchant (set is_authorized to true)
+// @route   PUT /api/v1/admin/merchant/:id/authorize
+// @access  Private (Admin only)
+exports.authorizeMerchant = asyncHandler(async (req, res, next) => {
+  const merchant = await Merchant.findById(req.params.id);
+
+  if (!merchant) {
+    return next(new errorHandler(`Merchant not found with id of ${req.params.id}`, 404));
+  }
+
+  merchant.is_authorized = true;
+  await merchant.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    data: merchant,
+    message: 'Merchant authorized successfully',
+  });
+});
