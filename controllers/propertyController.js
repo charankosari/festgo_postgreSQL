@@ -7,6 +7,11 @@ exports.createProperty = async (req, res) => {
     const merchantId = req.merchant.id; // From isAuthorized middleware
 
     // Attach the merchantId to the property data
+    const merchant = await Merchant.findById(merchantId);
+    if (!merchant || !merchant.is_authorized) {
+      return res.status(403).json({ error: "Merchant is not authorized to create properties." });
+    }
+
     propertyData.merchant = merchantId;
     const totalSteps = 7;
     const currentStep = propertyData.current_step || 0; // Use provided step or default to 0
