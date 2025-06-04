@@ -1,11 +1,6 @@
 // creating token and saving cookie
 
 const sendJwt = async (user, statusCode, message, res) => {
-  console.log('User:', user);
-  console.log('Status Code:', statusCode);
-  console.log('Message:', message);
-  console.log('Response Object:', res);
-
   const jwtToken = user.getSignedJwtToken();
   // options for cookie
   const options = {

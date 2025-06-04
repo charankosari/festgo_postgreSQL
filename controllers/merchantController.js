@@ -9,46 +9,46 @@ const crypto = require("crypto"); // Node.js built-in crypto module
 // @route   POST /api/v1/merchant/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
-    const { username, email, number, password, image_url } = req.body;
+  const { username, email, number, password, image_url } = req.body;
 
-    const merchant = await Merchant.create({
-        username,
-        email,
-        number,
-        password,
-        image_url
-    });
-    const message="Account created successfully"
+  const merchant = await Merchant.create({
+    username,
+    email,
+    number,
+    password,
+    image_url,
+  });
+  const message = "Account created successfully";
 
-    sendToken(merchant, 201,message, res);
+  sendToken(merchant, 201, message, res);
 });
 
 // @desc    Login Merchant
 // @route   POST /api/v1/merchant/login
 // @access  Public
 exports.login = asyncHandler(async (req, res, next) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    // Check if email and password are entered
-    if (!email || !password) {
-        return next(new errorHandler("Please enter Email & Password", 400));
-    }
+  // Check if email and password are entered
+  if (!email || !password) {
+    return next(new errorHandler("Please enter Email & Password", 400));
+  }
 
-    // Find merchant by email and select password
-    const merchant = await Merchant.findOne({ email }).select('+password');
+  // Find merchant by email and select password
+  const merchant = await Merchant.findOne({ email }).select("+password");
 
-    if (!merchant) {
-        return next(new errorHandler("Invalid email or password", 401));
-    }
+  if (!merchant) {
+    return next(new errorHandler("Invalid email or password", 401));
+  }
 
-    // Check if password is correct
-    const isMatch = await merchant.comparePassword(password);
+  // Check if password is correct
+  const isMatch = await merchant.comparePassword(password);
 
-    if (!isMatch) {
-        return next(new errorHandler("Invalid email or password", 401));
-    }
-
-    sendToken(merchant, 200, res);
+  if (!isMatch) {
+    return next(new errorHandler("Invalid email or password", 401));
+  }
+  const message = "Account fetched successfully";
+  sendToken(merchant, 200, message, res);
 });
 
 // @desc    Forgot Password
@@ -95,82 +95,88 @@ exports.login = asyncHandler(async (req, res, next) => {
 // @route   PUT /api/v1/merchant/resetpassword/:token
 // @access  Public
 exports.resetPassword = asyncHandler(async (req, res, next) => {
-    // Get hashed token
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.id).digest('hex');
+  // Get hashed token
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(req.params.id)
+    .digest("hex");
 
-    const merchant = await Merchant.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() }
-    });
+  const merchant = await Merchant.findOne({
+    resetPasswordToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  });
 
-    if (!merchant) {
-        return next(new errorHandler("Invalid or expired token", 400));
-    }
+  if (!merchant) {
+    return next(new errorHandler("Invalid or expired token", 400));
+  }
 
-    // Set new password
-    merchant.password = req.body.password;
-    merchant.resetPasswordToken = undefined;
-    merchant.resetPasswordExpire = undefined;
+  // Set new password
+  merchant.password = req.body.password;
+  merchant.resetPasswordToken = undefined;
+  merchant.resetPasswordExpire = undefined;
 
-    await merchant.save();
+  await merchant.save();
 
-    sendToken(merchant, 200, res);
+  sendToken(merchant, 200, res);
 });
-
 
 // @desc    Get logged in merchant details
 // @route   GET /api/v1/merchant/me
 // @access  Private
 exports.userDetails = asyncHandler(async (req, res, next) => {
-    // req.merchant is set by the isAuthorized middleware
-    const merchant = await Merchant.findById(req.merchant.id);
+  // req.merchant is set by the isAuthorized middleware
+  const merchant = await Merchant.findById(req.merchant.id);
 
-    res.status(200).json({
-        success: true,
-        data: merchant
-    });
+  res.status(200).json({
+    success: true,
+    data: merchant,
+  });
 });
 
 // @desc    Update Merchant Password
 // @route   PUT /api/v1/merchant/password/update
 // @access  Private
 exports.updatePassword = asyncHandler(async (req, res, next) => {
-    const merchant = await Merchant.findById(req.merchant.id).select('+password');
+  const merchant = await Merchant.findById(req.merchant.id).select("+password");
 
-    // Check current password
-    const isMatch = await merchant.comparePassword(req.body.currentPassword);
+  // Check current password
+  const isMatch = await merchant.comparePassword(req.body.currentPassword);
 
-    if (!isMatch) {
-        return next(new errorHandler("Current password is incorrect", 401));
-    }
+  if (!isMatch) {
+    return next(new errorHandler("Current password is incorrect", 401));
+  }
 
-    // Set new password
-    merchant.password = req.body.newPassword;
-    await merchant.save();
+  // Set new password
+  merchant.password = req.body.newPassword;
+  await merchant.save();
 
-    sendToken(merchant, 200, res);
+  sendToken(merchant, 200, res);
 });
 
 // @desc    Update Merchant Profile
 // @route   PUT /api/v1/merchant/me/profileupdate
 // @access  Private
 exports.profileUpdate = asyncHandler(async (req, res, next) => {
-    const newProfileData = {
-        username: req.body.username,
-        email: req.body.email,
-        number: req.body.number,
-        image_url: req.body.image_url
-        // Add other updatable fields here
-    };
+  const newProfileData = {
+    username: req.body.username,
+    email: req.body.email,
+    number: req.body.number,
+    image_url: req.body.image_url,
+    // Add other updatable fields here
+  };
 
-    const merchant = await Merchant.findByIdAndUpdate(req.merchant.id, newProfileData, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false
-    });
+  const merchant = await Merchant.findByIdAndUpdate(
+    req.merchant.id,
+    newProfileData,
+    {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    }
+  );
 
-    res.status(200).json({
-        success: true,
-        data: merchant
-    });
+  res.status(200).json({
+    success: true,
+    data: merchant,
+  });
 });
