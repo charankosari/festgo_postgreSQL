@@ -15,12 +15,48 @@ router
 router
   .route("/me/profileupdate")
   .put(isAuthorized, merchantController.profileUpdate);
-router.route("/verify/mobile").post(merchantController.verifyMobile);
-router.route("/check/mobile/otp").post(merchantController.checkMobileOtp);
-router.route("/verify/email").post(merchantController.verifyEmail);
-router.route("/check/email/otp").post(merchantController.checkEmailOtp);
-router.route("/login/otp").post(merchantController.loginViaOtp);
-router.route("/login/otp/verify").post(merchantController.verifyLoginViaOtp);
+router
+  .route("/verify/mobile")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.verifyMobile
+  );  
+router
+  .route("/check/mobile/otp")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.checkMobileOtp
+  );
+router
+  .route("/verify/email")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.verifyEmail
+  );
+router
+  .route("/check/email/otp")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.checkEmailOtp
+  );
+router
+  .route("/login/otp")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.loginViaOtp
+  );
+router
+  .route("/login/otp/verify")
+  .post(
+    isAuthorized,
+    roleAuthorize("merchant"),
+    merchantController.verifyLoginViaOtp
+  );
 // property routes
 router.post(
   "/properties",
@@ -56,13 +92,13 @@ router.delete(
 router.get(
   "/amenities",
   isAuthorized,
-  roleAuthorize("merchant","admin"),
+  roleAuthorize("merchant", "admin"),
   adminController.getAmenitiesByCategory
 );
 router.get(
   "/roomamenities",
   isAuthorized,
-  roleAuthorize("merchant","admin"),
+  roleAuthorize("merchant", "admin"),
   adminController.getRoomAmenitiesByCategory
 );
 module.exports = router;

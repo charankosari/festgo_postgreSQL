@@ -1,12 +1,16 @@
-const mongoose = require('mongoose');
-const roomAmenitySchema = new mongoose.Schema({
+const mongoose = require("mongoose");
+const roomAmenitySchema = new mongoose.Schema(
+  {
     category: { type: String, required: true },
     name: { type: String, required: true },
-    type: { type: String, enum: ['BOOLEAN', 'MULTI'], required: true },
+    type: { type: String, enum: ["BOOLEAN", "MULTI"], required: true },
     options: [String],
-    value: mongoose.Schema.Types.Mixed
-  }, { _id: false });
-  const roomSchema = new mongoose.Schema({
+    value: mongoose.Schema.Types.Mixed,
+  },
+  { _id: false }
+);
+const roomSchema = new mongoose.Schema(
+  {
     room_type: String,
     view: String,
     area: String,
@@ -21,23 +25,36 @@ const roomAmenitySchema = new mongoose.Schema({
     inventory_details: String,
     amenities: [roomAmenitySchema],
     photos: [String],
-    videos: [String]
-  }, { _id: false });
-  const amenitySchema = new mongoose.Schema({
+    videos: [String],
+  },
+  { _id: false }
+);
+const amenitySchema = new mongoose.Schema(
+  {
     category: { type: String, required: true },
     name: { type: String, required: true },
-    type: { type: String, enum: ['BOOLEAN', 'MULTI'], required: true },
+    type: { type: String, enum: ["BOOLEAN", "MULTI"], required: true },
     options: [String],
-    value: mongoose.Schema.Types.Mixed
-  }, { _id: false });
-  const policySchema = new mongoose.Schema({
+    value: mongoose.Schema.Types.Mixed,
+  },
+  { _id: false }
+);
+const policySchema = new mongoose.Schema(
+  {
     name: { type: String, required: true },
-    type: { type: String, enum: ['BOOLEAN', 'MULTI'], required: true },
+    type: { type: String, enum: ["BOOLEAN", "MULTI"], required: true },
     options: [String],
-    value: mongoose.Schema.Types.Mixed
-  }, { _id: false });
-const propertySchema = new mongoose.Schema({
-    merchant: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true },
+    value: mongoose.Schema.Types.Mixed,
+  },
+  { _id: false }
+);
+const propertySchema = new mongoose.Schema(
+  {
+    merchant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Merchant",
+      required: true,
+    },
     property_type: String,
     email: String,
     name: String,
@@ -51,16 +68,16 @@ const propertySchema = new mongoose.Schema({
     in_progress: { type: Boolean, default: false },
     is_completed: { type: Boolean, default: false },
     location: {
-        latitude: Number,
-        longitude: Number,
-        gmaps_url: String,
-        address_line1: String,
-        address_line2: String,
-        pincode: String,
-        country: String,
-        state: String,
-        city: String,
-        landmark: String
+      latitude: Number,
+      longitude: Number,
+      gmaps_url: String,
+      address_line1: String,
+      address_line2: String,
+      pincode: String,
+      country: String,
+      state: String,
+      city: String,
+      landmark: String,
     },
     amenities: [amenitySchema],
     policies: [policySchema],
@@ -68,11 +85,13 @@ const propertySchema = new mongoose.Schema({
     photos: [String],
     videos: [String],
     ownership_details: {
-        ownership_type: String,
-        documents: [String]
-    }
-}, {
-    timestamps: true // Add this line
-});
+      ownership_type: String,
+      documents: [String],
+    },
+  },
+  {
+    timestamps: true, // Add this line
+  }
+);
 
-module.exports = mongoose.model('Property', propertySchema);
+module.exports = mongoose.model("Property", propertySchema);

@@ -31,27 +31,25 @@ exports.login = asyncHandler(async (req, res, next) => {
 
   // Check if email/number and password are entered
   if ((!email && !number) || !password) {
-    return next(new errorHandler("Please enter Email/Mobile Number & Password", 400));
+    return next(
+      new errorHandler("Please enter Email/Mobile Number & Password", 400)
+    );
   }
 
   let merchant;
   if (email) {
     merchant = await Merchant.findOne({ email }).select("+password");
-    if (merchant && !merchant.email_verified) {
-      return next(new errorHandler("Email not verified. Please verify your email to log in.", 401));
-    }
   } else if (number) {
     merchant = await Merchant.findOne({ number }).select("+password");
-    if (merchant && !merchant.mobile_verified) {
-      return next(new errorHandler("Mobile number not verified. Please verify your mobile number to log in.", 401));
-    }
   }
 
   // Check if password is correct
   const isMatch = await merchant.comparePassword(password);
 
   if (!isMatch) {
-    return next(new errorHandler("Invalid email/mobile number or password", 401));
+    return next(
+      new errorHandler("Invalid email/mobile number or password", 401)
+    );
   }
   const message = "Account fetched successfully";
   sendToken(merchant, 200, message, res);
@@ -122,8 +120,8 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   merchant.resetPasswordExpire = undefined;
 
   await merchant.save();
-
-  sendToken(merchant, 200, res);
+const message = "password updated successfully";
+  sendToken(merchant, 200, message, res);
 });
 
 // @desc    Get logged in merchant details
@@ -144,19 +142,20 @@ exports.userDetails = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.updatePassword = asyncHandler(async (req, res, next) => {
   const merchant = await Merchant.findById(req.merchant.id).select("+password");
+  const { currentPassword,newPassword } = req.body;
 
   // Check current password
-  const isMatch = await merchant.comparePassword(req.body.currentPassword);
-
+  const isMatch = await merchant.comparePassword(currentPassword);
+  console.log(isMatch);
   if (!isMatch) {
     return next(new errorHandler("Current password is incorrect", 401));
   }
 
   // Set new password
-  merchant.password = req.body.newPassword;
+  merchant.password = newPassword;
   await merchant.save();
-
-  sendToken(merchant, 200, res);
+  const message = "password updated successfully";
+  sendToken(merchant, 200, message, res);
 });
 
 // @desc    Update Merchant Profile
@@ -217,12 +216,13 @@ exports.verifyMobile = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.checkMobileOtp = asyncHandler(async (req, res, next) => {
   const { otp } = req.body;
-  const merchant = await Merchant.findById(req.merchant.id);
+  const merchant = await Merchant.findById(req.merchant.id).select(
+    "+mobile_otp"
+  );
 
   if (!merchant) {
     return next(new errorHandler("Merchant not found", 404));
   }
-
   if (merchant.mobile_otp === otp) {
     merchant.mobile_verified = true;
     merchant.mobile_otp = null; // Clear OTP after successful verification
@@ -266,7 +266,9 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.checkEmailOtp = asyncHandler(async (req, res, next) => {
   const { otp } = req.body;
-  const merchant = await Merchant.findById(req.merchant.id);
+  const merchant = await Merchant.findById(req.merchant.id).select(
+    "+email_otp"
+  );
 
   if (!merchant) {
     return next(new errorHandler("Merchant not found", 404));
@@ -290,7 +292,9 @@ exports.loginViaOtp = asyncHandler(async (req, res, next) => {
   const { email, number } = req.body;
 
   if (!email && !number) {
-    return next(new errorHandler("Please provide either email or mobile number", 400));
+    return next(
+      new errorHandler("Please provide either email or mobile number", 400)
+    );
   }
 
   let merchant;
@@ -314,7 +318,9 @@ exports.loginViaOtp = asyncHandler(async (req, res, next) => {
   } else if (number) {
     merchant = await Merchant.findOne({ number });
     if (!merchant) {
-      return next(new errorHandler("Merchant not found with that mobile number", 404));
+      return next(
+        new errorHandler("Merchant not found with that mobile number", 404)
+      );
     }
     // Generate and save OTP for mobile
     const mobileOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -336,7 +342,9 @@ exports.verifyLoginViaOtp = asyncHandler(async (req, res, next) => {
   const { email, number, otp } = req.body;
 
   if ((!email && !number) || !otp) {
-    return next(new errorHandler("Please provide email/mobile number and OTP", 400));
+    return next(
+      new errorHandler("Please provide email/mobile number and OTP", 400)
+    );
   }
 
   let merchant;
@@ -354,7 +362,9 @@ exports.verifyLoginViaOtp = asyncHandler(async (req, res, next) => {
   } else if (number) {
     merchant = await Merchant.findOne({ number });
     if (!merchant) {
-      return next(new errorHandler("Merchant not found with that mobile number", 404));
+      return next(
+        new errorHandler("Merchant not found with that mobile number", 404)
+      );
     }
     if (merchant.mobile_otp !== otp) {
       return next(new errorHandler("Invalid Mobile OTP", 400));
