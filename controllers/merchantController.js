@@ -27,25 +27,29 @@ exports.register = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/merchant/login
 // @access  Public
 exports.login = asyncHandler(async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, number, password } = req.body;
 
-  // Check if email and password are entered
-  if (!email || !password) {
-    return next(new errorHandler("Please enter Email & Password", 400));
+  // Check if email/number and password are entered
+  if ((!email && !number) || !password) {
+    return next(new errorHandler("Please enter Email/Mobile Number & Password", 400));
   }
 
-  // Find merchant by email and select password
-  const merchant = await Merchant.findOne({ email }).select("+password");
+  let merchant;
+  if (email) {
+    merchant = await Merchant.findOne({ email }).select("+password");
+  } else if (number) {
+    merchant = await Merchant.findOne({ number }).select("+password");
+  }
 
   if (!merchant) {
-    return next(new errorHandler("Invalid email or password", 401));
+    return next(new errorHandler("Invalid email/mobile number or password", 401));
   }
 
   // Check if password is correct
   const isMatch = await merchant.comparePassword(password);
 
   if (!isMatch) {
-    return next(new errorHandler("Invalid email or password", 401));
+    return next(new errorHandler("Invalid email/mobile number or password", 401));
   }
   const message = "Account fetched successfully";
   sendToken(merchant, 200, message, res);
