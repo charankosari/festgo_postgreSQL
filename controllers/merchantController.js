@@ -37,12 +37,14 @@ exports.login = asyncHandler(async (req, res, next) => {
   let merchant;
   if (email) {
     merchant = await Merchant.findOne({ email }).select("+password");
+    if (merchant && !merchant.email_verified) {
+      return next(new errorHandler("Email not verified. Please verify your email to log in.", 401));
+    }
   } else if (number) {
     merchant = await Merchant.findOne({ number }).select("+password");
-  }
-
-  if (!merchant) {
-    return next(new errorHandler("Invalid email/mobile number or password", 401));
+    if (merchant && !merchant.mobile_verified) {
+      return next(new errorHandler("Mobile number not verified. Please verify your mobile number to log in.", 401));
+    }
   }
 
   // Check if password is correct
@@ -281,4 +283,91 @@ exports.checkEmailOtp = asyncHandler(async (req, res, next) => {
   } else {
     return next(new errorHandler("Invalid Email OTP", 400));
   }
+});
+
+// Login via OTP
+exports.loginViaOtp = asyncHandler(async (req, res, next) => {
+  const { email, number } = req.body;
+
+  if (!email && !number) {
+    return next(new errorHandler("Please provide either email or mobile number", 400));
+  }
+
+  let merchant;
+  if (email) {
+    merchant = await Merchant.findOne({ email });
+    if (!merchant) {
+      return next(new errorHandler("Merchant not found with that email", 404));
+    }
+    // Generate and save OTP for email
+    const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    merchant.email_otp = emailOtp;
+    await merchant.save({ validateBeforeSave: false });
+
+    // TODO: Send email with OTP
+    console.log(`Email OTP for ${email}: ${emailOtp}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Email OTP sent successfully",
+    });
+  } else if (number) {
+    merchant = await Merchant.findOne({ number });
+    if (!merchant) {
+      return next(new errorHandler("Merchant not found with that mobile number", 404));
+    }
+    // Generate and save OTP for mobile
+    const mobileOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    merchant.mobile_otp = mobileOtp;
+    await merchant.save({ validateBeforeSave: false });
+
+    // TODO: Send SMS with OTP
+    console.log(`Mobile OTP for ${number}: ${mobileOtp}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Mobile OTP sent successfully",
+    });
+  }
+});
+
+// Verify Login via OTP
+exports.verifyLoginViaOtp = asyncHandler(async (req, res, next) => {
+  const { email, number, otp } = req.body;
+
+  if ((!email && !number) || !otp) {
+    return next(new errorHandler("Please provide email/mobile number and OTP", 400));
+  }
+
+  let merchant;
+  if (email) {
+    merchant = await Merchant.findOne({ email });
+    if (!merchant) {
+      return next(new errorHandler("Merchant not found with that email", 404));
+    }
+    if (merchant.email_otp !== otp) {
+      return next(new errorHandler("Invalid Email OTP", 400));
+    }
+    merchant.email_otp = null; // Clear OTP after successful verification
+    merchant.email_verified = true;
+    await merchant.save({ validateBeforeSave: false });
+  } else if (number) {
+    merchant = await Merchant.findOne({ number });
+    if (!merchant) {
+      return next(new errorHandler("Merchant not found with that mobile number", 404));
+    }
+    if (merchant.mobile_otp !== otp) {
+      return next(new errorHandler("Invalid Mobile OTP", 400));
+    }
+    merchant.mobile_otp = null; // Clear OTP after successful verification
+    merchant.mobile_verified = true;
+    await merchant.save({ validateBeforeSave: false });
+  }
+
+  if (!merchant) {
+    return next(new errorHandler("Invalid request", 400));
+  }
+
+  const message = "Login successful via OTP";
+  sendToken(merchant, 200, message, res);
 });

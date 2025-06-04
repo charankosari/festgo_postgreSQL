@@ -15,6 +15,12 @@ router
 router
   .route("/me/profileupdate")
   .put(isAuthorized, merchantController.profileUpdate);
+router.route("/verify/mobile").post(merchantController.verifyMobile);
+router.route("/check/mobile/otp").post(merchantController.checkMobileOtp);
+router.route("/verify/email").post(merchantController.verifyEmail);
+router.route("/check/email/otp").post(merchantController.checkEmailOtp);
+router.route("/login/otp").post(merchantController.loginViaOtp);
+router.route("/login/otp/verify").post(merchantController.verifyLoginViaOtp);
 // property routes
 router.post(
   "/properties",
