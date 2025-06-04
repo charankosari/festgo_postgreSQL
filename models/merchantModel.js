@@ -17,6 +17,7 @@ const merchantSchema = new mongoose.Schema({
     number: {
         type: String,
         required: true,
+        unique: true,
         trim: true
     },
     password: {
@@ -27,6 +28,28 @@ const merchantSchema = new mongoose.Schema({
     image_url: {
         type: String,
         default: ''
+    },
+    is_authorized: {
+        type: Boolean,
+        default: false
+    },
+    email_otp: {
+        type: String,
+        default: null,
+        select: false
+    },
+    mobile_otp: {
+        type: String,
+        default: null,
+        select: false
+    },
+    mobile_verified: {
+        type: Boolean,
+        default: false
+    },
+    email_verified: {
+        type: Boolean,
+        default: false
     },
     role: {
         type: String,

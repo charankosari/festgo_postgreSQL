@@ -8,7 +8,18 @@ exports.createProperty = async (req, res) => {
 
     // Attach the merchantId to the property data
     propertyData.merchant = merchantId;
+    const totalSteps = 7;
+    const currentStep = propertyData.current_step || 0; // Use provided step or default to 0
+    propertyData.status = Math.min(Math.round((currentStep / totalSteps) * 100), 100);
 
+    // Set in_progress and is_completed based on current_step
+    if (currentStep >= totalSteps) {
+      propertyData.in_progress = false;
+      propertyData.is_completed = true;
+    } else {
+      propertyData.in_progress = true;
+      propertyData.is_completed = false;
+    }
     // Create new property
     const property = new Property(propertyData);
     await property.save();
@@ -63,7 +74,19 @@ exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const updatedData = req.body;
+    if (updatedData.current_step !== undefined) {
+      const totalSteps = 7;
+      const currentStep = updatedData.current_step;
+      updatedData.status = Math.min(Math.round((currentStep / totalSteps) * 100), 100);
 
+      if (currentStep >= totalSteps) {
+        updatedData.in_progress = false;
+        updatedData.is_completed = true;
+      } else {
+        updatedData.in_progress = true;
+        updatedData.is_completed = false;
+      }
+    }
     const updatedProperty = await Property.findByIdAndUpdate(id, updatedData, {
       new: true,
       runValidators: true

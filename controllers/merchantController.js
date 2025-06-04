@@ -180,3 +180,101 @@ exports.profileUpdate = asyncHandler(async (req, res, next) => {
     data: merchant,
   });
 });
+
+// @desc    Verify Mobile - Generate OTP and send
+// @route   POST /api/v1/merchant/verify/mobile
+// @access  Private
+exports.verifyMobile = asyncHandler(async (req, res, next) => {
+  const merchant = await Merchant.findById(req.merchant.id);
+
+  if (!merchant) {
+    return next(new errorHandler("Merchant not found", 404));
+  }
+
+  // Generate a 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  merchant.mobile_otp = otp;
+  await merchant.save({ validateBeforeSave: false });
+
+  // TODO: Integrate actual SMS sending service here
+  console.log(`Mobile OTP for ${merchant.number}: ${otp}`); // For testing purposes
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to mobile successfully",
+  });
+});
+
+// @desc    Check Mobile OTP
+// @route   POST /api/v1/merchant/check/mobile/otp
+// @access  Private
+exports.checkMobileOtp = asyncHandler(async (req, res, next) => {
+  const { otp } = req.body;
+  const merchant = await Merchant.findById(req.merchant.id);
+
+  if (!merchant) {
+    return next(new errorHandler("Merchant not found", 404));
+  }
+
+  if (merchant.mobile_otp === otp) {
+    merchant.mobile_verified = true;
+    merchant.mobile_otp = null; // Clear OTP after successful verification
+    await merchant.save({ validateBeforeSave: false });
+    res.status(200).json({
+      success: true,
+      message: "Mobile verified successfully",
+    });
+  } else {
+    return next(new errorHandler("Invalid Mobile OTP", 400));
+  }
+});
+
+// @desc    Verify Email - Generate OTP and send
+// @route   POST /api/v1/merchant/verify/email
+// @access  Private
+exports.verifyEmail = asyncHandler(async (req, res, next) => {
+  const merchant = await Merchant.findById(req.merchant.id);
+
+  if (!merchant) {
+    return next(new errorHandler("Merchant not found", 404));
+  }
+
+  // Generate a 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  merchant.email_otp = otp;
+  await merchant.save({ validateBeforeSave: false });
+
+  // TODO: Integrate actual email sending service here
+  console.log(`Email OTP for ${merchant.email}: ${otp}`); // For testing purposes
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to email successfully",
+  });
+});
+
+// @desc    Check Email OTP
+// @route   POST /api/v1/merchant/check/email/otp
+// @access  Private
+exports.checkEmailOtp = asyncHandler(async (req, res, next) => {
+  const { otp } = req.body;
+  const merchant = await Merchant.findById(req.merchant.id);
+
+  if (!merchant) {
+    return next(new errorHandler("Merchant not found", 404));
+  }
+
+  if (merchant.email_otp === otp) {
+    merchant.email_verified = true;
+    merchant.email_otp = null; // Clear OTP after successful verification
+    await merchant.save({ validateBeforeSave: false });
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+    });
+  } else {
+    return next(new errorHandler("Invalid Email OTP", 400));
+  }
+});

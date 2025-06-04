@@ -46,6 +46,10 @@ const propertySchema = new mongoose.Schema({
     accepting_bookings_since: Date,
     mobile_number: String,
     landline_number: String,
+    current_step: { type: Number, default: 0 },
+    status: { type: Number, default: 0, min: 0, max: 100 },
+    in_progress: { type: Boolean, default: false },
+    is_completed: { type: Boolean, default: false },
     location: {
         latitude: Number,
         longitude: Number,
