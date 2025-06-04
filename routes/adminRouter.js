@@ -9,14 +9,14 @@ router.route('/amenity/new').post(isAuthorized, roleAuthorize('admin'), adminCon
 router.route('/amenities').get(isAuthorized, roleAuthorize('admin'), adminController.getAllAmenities);
 router.route('/amenity/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updateAmenity)
-    .delete(isAuthenticatedUser, roleAuthorize('admin'), adminController.deleteAmenity);
+    .delete(isAuthorized, roleAuthorize('admin'), adminController.deleteAmenity);
 
 // Policy Routes
 router.route('/policy/new').post(isAuthorized, roleAuthorize('admin'), adminController.createPolicy);
 router.route('/policies').get(isAuthorized, roleAuthorize('admin'), adminController.getAllPolicies);
 router.route('/policy/:id')
     .put(isAuthorized, roleAuthorize('admin'), adminController.updatePolicy)
-    .delete(isAuthorized, roleAuthorize('admin'), deletePolicy);
+    .delete(isAuthorized, roleAuthorize('admin'), adminController.deletePolicy);
 
 // Room Amenity Routes
 router.route('/roomamenity/new').post(isAuthorized, roleAuthorize('admin'), adminController.createRoomAmenity);
