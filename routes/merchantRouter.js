@@ -21,7 +21,7 @@ router
     isAuthorized,
     roleAuthorize("merchant"),
     merchantController.verifyMobile
-  );  
+  );
 router
   .route("/check/mobile/otp")
   .post(
@@ -43,20 +43,8 @@ router
     roleAuthorize("merchant"),
     merchantController.checkEmailOtp
   );
-router
-  .route("/login/otp")
-  .post(
-    isAuthorized,
-    roleAuthorize("merchant"),
-    merchantController.loginViaOtp
-  );
-router
-  .route("/login/otp/verify")
-  .post(
-    isAuthorized,
-    roleAuthorize("merchant"),
-    merchantController.verifyLoginViaOtp
-  );
+router.route("/login/otp").post(merchantController.loginViaOtp);
+router.route("/login/otp/verify").post(merchantController.verifyLoginViaOtp);
 // property routes
 router.post(
   "/properties",

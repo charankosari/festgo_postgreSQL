@@ -316,36 +316,68 @@ exports.loginViaOtp = asyncHandler(async (req, res, next) => {
   }
 
   let merchant;
+
   if (email) {
-    merchant = await Merchant.findOne({ email });
+    merchant = await Merchant.findOne({ email }).select(
+      "+mobile_otp +mobile_otp_expire"
+    );
+
     if (!merchant) {
       return next(new errorHandler("Merchant not found with that email", 404));
     }
-    // Generate and save OTP for email
+
+    if (!merchant.email_verified) {
+      return next(
+        new errorHandler(
+          "Email is not verified. Please verify your email first.",
+          400
+        )
+      );
+    }
+
     const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
     merchant.email_otp = emailOtp;
+    merchant.email_otp_expire = Date.now() + 10 * 60 * 1000;
     await merchant.save({ validateBeforeSave: false });
 
-    // TODO: Send email with OTP
-    console.log(`Email OTP for ${email}: ${emailOtp}`);
+    // Send email via Mailgun
+    const htmlContent = otpTemplate(merchant.username, emailOtp);
+    try {
+      await SendEmail(merchant.email, "Your Festgo OTP for Login", htmlContent);
+    } catch (error) {
+      console.error("❌ Failed to send Email OTP:", error);
+      return next(new errorHandler("Failed to send Email OTP", 500));
+    }
 
     res.status(200).json({
       success: true,
       message: "Email OTP sent successfully",
     });
   } else if (number) {
-    merchant = await Merchant.findOne({ number });
+    merchant = await Merchant.findOne({ number }).select(
+      "+mobile_otp +mobile_otp_expire"
+    );
+
     if (!merchant) {
       return next(
         new errorHandler("Merchant not found with that mobile number", 404)
       );
     }
-    // Generate and save OTP for mobile
+
+    if (!merchant.mobile_verified) {
+      return next(
+        new errorHandler(
+          "Mobile number is not verified. Please verify your mobile first.",
+          400
+        )
+      );
+    }
+
     const mobileOtp = Math.floor(100000 + Math.random() * 900000).toString();
     merchant.mobile_otp = mobileOtp;
+    merchant.mobile_otp_expire = Date.now() + 10 * 60 * 1000;
     await merchant.save({ validateBeforeSave: false });
 
-    // TODO: Send SMS with OTP
     console.log(`Mobile OTP for ${number}: ${mobileOtp}`);
 
     res.status(200).json({
@@ -354,7 +386,6 @@ exports.loginViaOtp = asyncHandler(async (req, res, next) => {
     });
   }
 });
-
 // Verify Login via OTP
 exports.verifyLoginViaOtp = asyncHandler(async (req, res, next) => {
   const { email, number, otp } = req.body;
@@ -367,28 +398,65 @@ exports.verifyLoginViaOtp = asyncHandler(async (req, res, next) => {
 
   let merchant;
   if (email) {
-    merchant = await Merchant.findOne({ email });
+    merchant = await Merchant.findOne({ email }).select(
+      "+email_otp +email_otp_expire"
+    );
+
+    console.log(merchant);
     if (!merchant) {
       return next(new errorHandler("Merchant not found with that email", 404));
     }
-    if (merchant.email_otp !== otp) {
+
+    // Check if OTP expired
+    if (!merchant.email_otp || merchant.email_otp !== otp) {
       return next(new errorHandler("Invalid Email OTP", 400));
     }
-    merchant.email_otp = null; // Clear OTP after successful verification
-    merchant.email_verified = true;
+
+    if (merchant.email_otp_expire && merchant.email_otp_expire < Date.now()) {
+      merchant.email_otp = null;
+      merchant.email_otp_expire = null;
+      await merchant.save({ validateBeforeSave: false });
+      return next(
+        new errorHandler(
+          "Email OTP has expired. Please request a new one.",
+          400
+        )
+      );
+    }
+
+    merchant.email_otp = null;
+    merchant.email_otp_expire = null;
     await merchant.save({ validateBeforeSave: false });
   } else if (number) {
-    merchant = await Merchant.findOne({ number });
+    merchant = await Merchant.findOne({ number }).select(
+      "+mobile_otp +mobile_otp_expire"
+    );
+
     if (!merchant) {
       return next(
         new errorHandler("Merchant not found with that mobile number", 404)
       );
     }
-    if (merchant.mobile_otp !== otp) {
+
+    // Check if OTP expired
+    if (!merchant.mobile_otp || merchant.mobile_otp !== otp) {
       return next(new errorHandler("Invalid Mobile OTP", 400));
     }
-    merchant.mobile_otp = null; // Clear OTP after successful verification
-    merchant.mobile_verified = true;
+
+    if (merchant.mobile_otp_expire && merchant.mobile_otp_expire < Date.now()) {
+      merchant.mobile_otp = null;
+      merchant.mobile_otp_expire = null;
+      await merchant.save({ validateBeforeSave: false });
+      return next(
+        new errorHandler(
+          "Mobile OTP has expired. Please request a new one.",
+          400
+        )
+      );
+    }
+
+    merchant.mobile_otp = null;
+    merchant.mobile_otp_expire = null;
     await merchant.save({ validateBeforeSave: false });
   }
 
