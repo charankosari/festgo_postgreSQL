@@ -48,3 +48,54 @@ exports.otpTemplate = (username, otp) => {
     </body>
   </html>`;
 };
+
+exports.changePasswordTemplate = (username, link) => {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Reset Your Password</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f4">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:20px 0; padding:20px; border-radius:8px;">
+              <tr>
+                <td align="center" style="padding: 20px 0;">
+                  <h1 style="font-family:Arial, sans-serif; color:#333333; margin:0;">Festgo</h1>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 20px; font-family:Arial, sans-serif; color:#333333; font-size:16px;">
+                  <p>Hi <strong>${username}</strong>,</p>
+                  <p>We received a request to reset your password. Click the button below to set a new password:</p>
+
+                  <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin:30px auto;">
+                    <tr>
+                      <td bgcolor="#4CAF50" style="padding:15px 30px; border-radius:4px; text-align:center;">
+                        <a href="${link}" target="_blank" style="color:#ffffff; text-decoration:none; font-size:18px; font-family:Arial, sans-serif;">Reset Password</a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p>If you did not request a password reset, please ignore this email. This link will expire in 10 minutes for your security.</p>
+
+                  <p style="margin-top:30px;">Thank you,<br/><strong>Festgo Team</strong></p>
+                </td>
+              </tr>
+
+              <tr>
+                <td align="center" style="padding: 20px; font-family:Arial, sans-serif; color:#aaaaaa; font-size:12px;">
+                  © 2025 Festgo. All rights reserved.
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+};

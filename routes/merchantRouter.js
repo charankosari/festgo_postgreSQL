@@ -6,8 +6,8 @@ const propertyController = require("../controllers/propertyController");
 const adminController = require("../controllers/adminController");
 router.route("/register").post(merchantController.register);
 router.route("/login").post(merchantController.login);
-// router.route("/forgotpassword").post(merchantController.forgotPassword);
-router.route("/resetpassword/:id").post(merchantController.resetPassword);
+router.route("/forgotpassword").post(merchantController.forgotPassword);
+router.route("/resetpassword/:id").put(merchantController.resetPassword);
 router.route("/me").get(isAuthorized, merchantController.userDetails);
 router
   .route("/password/update")

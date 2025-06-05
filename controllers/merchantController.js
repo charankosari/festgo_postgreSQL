@@ -3,8 +3,15 @@ const errorHandler = require("../utils/errorHandler");
 const Merchant = require("../models/merchantModel"); // Import the Merchant model
 const sendToken = require("../utils/jwttokenSend"); // Utility to send JWT token
 const SendEmail = require("../libs/mailgun/mailGun");
-const { otpTemplate } = require("../libs/mailgun/mailTemplates");
+const {
+  otpTemplate,
+  changePasswordTemplate,
+} = require("../libs/mailgun/mailTemplates");
 const crypto = require("crypto"); // Node.js built-in crypto module
+const path = require("path");
+const dotenv = require("dotenv");
+// Load environment variables
+dotenv.config({ path: path.resolve("./config/config.env") });
 
 // @desc    Register Merchant
 // @route   POST /api/v1/merchant/register
@@ -55,46 +62,43 @@ exports.login = asyncHandler(async (req, res, next) => {
   const message = "Account fetched successfully";
   sendToken(merchant, 200, message, res);
 });
-
 // @desc    Forgot Password
 // @route   POST /api/v1/merchant/forgotpassword
 // @access  Public
-// exports.forgotPassword = asyncHandler(async (req, res, next) => {
-//     const merchant = await Merchant.findOne({ email: req.body.email });
 
-//     if (!merchant) {
-//         return next(new errorHandler("Merchant not found with this email", 404));
-//     }
+exports.forgotPassword = asyncHandler(async (req, res, next) => {
+  const merchant = await Merchant.findOne({ email: req.body.email });
+  const { email } = req.body;
 
-//     // Get reset token
-//     const resetToken = merchant.getResetPasswordToken();
+  if (!merchant) {
+    return next(new errorHandler("Merchant not found with this email", 404));
+  }
 
-//     await merchant.save({ validateBeforeSave: false });
+  // Get reset token
+  const resetToken = merchant.getResetPasswordToken();
+  await merchant.save({ validateBeforeSave: false });
 
-//     // Create reset URL
-//     const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/merchant/resetpassword/${resetToken}`;
+  // Use your frontend's reset URL from env
+  const resetUrl = `${process.env.RESET_URL}/?token=${resetToken}`;
 
-//     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+  // Create HTML email template
+  const htmlContent = changePasswordTemplate(merchant.username, resetUrl);
 
-//     try {
-//         await sendEmail({
-//             email: merchant.email,
-//             subject: 'Password Reset Token',
-//             message
-//         });
+  try {
+    await SendEmail(email, "Festgo Password Reset", htmlContent);
 
-//         res.status(200).json({
-//             success: true,
-//             data: 'Email Sent'
-//         });
-//     } catch (err) {
-//         merchant.resetPasswordToken = undefined;
-//         merchant.resetPasswordExpire = undefined;
-//         await merchant.save({ validateBeforeSave: false });
+    res.status(200).json({
+      success: true,
+      data: "Password reset email sent",
+    });
+  } catch (err) {
+    merchant.resetPasswordToken = undefined;
+    merchant.resetPasswordExpire = undefined;
+    await merchant.save({ validateBeforeSave: false });
 
-//         return next(new errorHandler(err.message, 500));
-//     }
-// });
+    return next(new errorHandler("Failed to send email. " + err.message, 500));
+  }
+});
 
 // @desc    Reset Password
 // @route   PUT /api/v1/merchant/resetpassword/:token

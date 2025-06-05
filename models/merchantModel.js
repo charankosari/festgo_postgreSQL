@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs"); // Import bcrypt for password hashing
 const jwt = require("jsonwebtoken"); // Import jsonwebtoken for tokens
-
+const crypto = require("crypto");
 const merchantSchema = new mongoose.Schema(
   {
     username: {

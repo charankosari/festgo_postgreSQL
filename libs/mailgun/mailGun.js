@@ -22,6 +22,7 @@ const mg = mailgun.client({
  */
 const SendEmail = async (toEmail, subject, htmlBody) => {
   try {
+    console.log(toEmail);
     const data = await mg.messages.create("festgo.in", {
       from: "Festgo <info@festgo.in>",
       to: [toEmail],
