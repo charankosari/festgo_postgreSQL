@@ -2,7 +2,8 @@ const asyncHandler = require("../middlewares/asynchandler");
 const errorHandler = require("../utils/errorHandler");
 const Merchant = require("../models/merchantModel"); // Import the Merchant model
 const sendToken = require("../utils/jwttokenSend"); // Utility to send JWT token
-// const sendEmail = require("../utils/sendEmail"); // Utility to send emails
+const SendEmail = require("../libs/mailgun/mailGun");
+const { otpTemplate } = require("../libs/mailgun/mailTemplates");
 const crypto = require("crypto"); // Node.js built-in crypto module
 
 // @desc    Register Merchant
@@ -120,7 +121,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   merchant.resetPasswordExpire = undefined;
 
   await merchant.save();
-const message = "password updated successfully";
+  const message = "password updated successfully";
   sendToken(merchant, 200, message, res);
 });
 
@@ -142,7 +143,7 @@ exports.userDetails = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.updatePassword = asyncHandler(async (req, res, next) => {
   const merchant = await Merchant.findById(req.merchant.id).select("+password");
-  const { currentPassword,newPassword } = req.body;
+  const { currentPassword, newPassword } = req.body;
 
   // Check current password
   const isMatch = await merchant.comparePassword(currentPassword);
@@ -250,10 +251,18 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   merchant.email_otp = otp;
+  merchant.email_otp_expire = Date.now() + 1 * 60 * 1000;
   await merchant.save({ validateBeforeSave: false });
 
-  // TODO: Integrate actual email sending service here
-  console.log(`Email OTP for ${merchant.email}: ${otp}`); // For testing purposes
+  const htmlContent = otpTemplate(merchant.username, otp);
+
+  try {
+    // Send email via Mailgun
+    await SendEmail(merchant.email, "Your Festgo Email OTP", htmlContent);
+  } catch (error) {
+    console.error("❌ Failed to send email:", error);
+    return next(new errorHandler("Failed to send OTP email", 500));
+  }
 
   res.status(200).json({
     success: true,
@@ -266,25 +275,34 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.checkEmailOtp = asyncHandler(async (req, res, next) => {
   const { otp } = req.body;
+
   const merchant = await Merchant.findById(req.merchant.id).select(
-    "+email_otp"
+    "+email_otp +email_otp_expire"
   );
 
   if (!merchant) {
     return next(new errorHandler("Merchant not found", 404));
   }
 
-  if (merchant.email_otp === otp) {
-    merchant.email_verified = true;
-    merchant.email_otp = null; // Clear OTP after successful verification
-    await merchant.save({ validateBeforeSave: false });
-    res.status(200).json({
-      success: true,
-      message: "Email verified successfully",
-    });
-  } else {
-    return next(new errorHandler("Invalid Email OTP", 400));
+  // Check if OTP matches and is not expired
+  if (
+    merchant.email_otp !== otp ||
+    !merchant.email_otp_expire ||
+    merchant.email_otp_expire < Date.now()
+  ) {
+    return next(new errorHandler("Invalid or expired Email OTP", 400));
   }
+
+  // Mark as verified, clear OTP and expiry
+  merchant.email_verified = true;
+  merchant.email_otp = null;
+  merchant.email_otp_expire = null;
+  await merchant.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully",
+  });
 });
 
 // Login via OTP
