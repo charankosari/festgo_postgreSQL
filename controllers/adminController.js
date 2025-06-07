@@ -4,7 +4,7 @@ const Amenity = require("../models/amenityModel");
 const Policy = require("../models/policyModel");
 const Merchant = require("../models/merchantModel");
 const RoomAmenity = require("../models/roomAmenityModel");
-
+const EventType = require('../models/eventTypeModel');
 // --- Amenity Controllers ---
 
 // @desc    Create New Amenity
@@ -254,3 +254,92 @@ exports.authorizeMerchant = asyncHandler(async (req, res, next) => {
     message: 'Merchant authorized successfully',
   });
 });
+
+// event type controllers
+// @desc    Create a new event type
+// @route   POST /api/v1/admin/eventtype/new
+// @access  Private (Admin only)
+exports.createEventType = asyncHandler(async (req, res, next) => {
+    const eventType = await EventType.create(req.body);
+    res.status(201).json({
+      success: true,
+      eventType,
+    });
+  });
+  
+  // @desc    Get single event type by ID
+  // @route   GET /api/v1/admin/eventtypes
+  // @access  Public (Admin only)
+  // Get all event types or a single event type by ID
+  exports.getEventTypes = asyncHandler(async (req, res, next) => {
+    let eventTypes;
+    if (req.params.id) {
+      eventTypes = await EventType.findById(req.params.id);
+      if (!eventTypes) {
+        return next(new errorHandler('Event Type not found', 404));
+      }
+    } else {
+      eventTypes = await EventType.find();
+    }
+    res.status(200).json({
+      success: true,
+      count: eventTypes.length || 1,
+      eventTypes,
+    });
+  });
+
+  
+  // @desc    Get all event types 
+  // @route   GET /api/v1/admin/eventtypes
+  // @access  Public (Admin only)
+  exports.getAllEventTypes = asyncHandler(async (req, res, next) => {
+   
+     const eventTypes = await EventType.find();
+    
+    res.status(200).json({
+      success: true,
+      count: eventTypes.length || 1,
+      eventTypes,
+    });
+  });
+  
+  // @desc    Update an event type
+  // @route   PUT /api/v1/admin/eventtype/:id
+  // @access  Private (Admin only)
+  // Update an event type
+  exports.updateEventType = asyncHandler(async (req, res, next) => {
+    let eventType = await EventType.findById(req.params.id);
+  
+    if (!eventType) {
+      return next(new errorHandler('Event Type not found', 404));
+    }
+  
+    eventType = await EventType.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    });
+  
+    res.status(200).json({
+      success: true,
+      eventType,
+    });
+  });
+  // @desc    Delete an event type
+  // @route   DELETE /api/v1/admin/eventtype/:id
+  // @access  Private (Admin only)
+  // Delete an event type
+  exports.deleteEventType = asyncHandler(async (req, res, next) => {
+    const eventType = await EventType.findById(req.params.id);
+  
+    if (!eventType) {
+      return next(new errorHandler('Event Type not found', 404));
+    }
+  
+    await eventType.remove();
+  
+    res.status(200).json({
+      success: true,
+      message: 'Event Type deleted successfully',
+    });
+  });

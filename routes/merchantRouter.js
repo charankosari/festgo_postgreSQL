@@ -4,6 +4,7 @@ const { isAuthorized, roleAuthorize } = require("../middlewares/auth");
 const merchantController = require("../controllers/merchantController");
 const propertyController = require("../controllers/propertyController");
 const adminController = require("../controllers/adminController");
+const eventController = require("../controllers/eventController");
 router.route("/register").post(merchantController.register);
 router.route("/login").post(merchantController.login);
 router.route("/forgotpassword").post(merchantController.forgotPassword);
@@ -89,4 +90,19 @@ router.get(
   roleAuthorize("merchant", "admin"),
   adminController.getRoomAmenitiesByCategory
 );
+// event routes with merchant role
+router.post('/events', isAuthorized,
+  roleAuthorize("merchant"), eventController.createEvent);
+
+// Get all events or a single event by ID
+router.get('/events/:id', eventController.getEvents);
+router.get('/events', eventController.getAllEvents);
+
+// Update an event by ID
+router.put('/events/:id', isAuthorized,
+  roleAuthorize("merchant"), eventController.updateEvent);
+
+// Delete an event by ID
+router.delete('/events/:id', isAuthorized,
+  roleAuthorize("merchant"), eventController.deleteEvent);
 module.exports = router;

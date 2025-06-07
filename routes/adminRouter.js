@@ -1,6 +1,7 @@
 const express = require('express');
 const { isAuthorized, roleAuthorize } = require('../middlewares/auth');
 const adminController = require('../controllers/adminController');
+const eventController = require('../controllers/eventController');
 
 const router = express.Router();
 
@@ -27,4 +28,11 @@ router.route('/roomamenity/:id')
 // merchant management routes
 router.route('/merchants').get(isAuthorized, roleAuthorize('admin'), adminController.getAllMerchants);
 router.route('/merchant/:id/authorize').put(isAuthorized, roleAuthorize('admin'), adminController.authorizeMerchant);
+
+// event routes
+router.route('/admin/eventtypes/new').post(isAuthorized, roleAuthorize('admin'), adminController.createEventType);
+router.route('/admin/eventtypes/:id').get( adminController.getEventTypes);
+router.route('/admin/eventtypes').get( adminController.getAllEventTypes);
+router.route('/admin/eventtypes/:id').put(isAuthorized, roleAuthorize('admin'), adminController.updateEventType);
+router.route('/admin/eventtypes/:id').delete(isAuthorized, roleAuthorize('admin'), adminController.deleteEventType);
 module.exports = router;
