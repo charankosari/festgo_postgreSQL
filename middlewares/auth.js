@@ -1,34 +1,52 @@
 const jwt = require("jsonwebtoken");
-const Merchant = require("../models/merchantModel");
-const errorHandler = require("../utils/errorHandler");
-const asyncHandler = require("../middlewares/asynchandler");
 
-exports.isAuthorized = asyncHandler(async (req, res, next) => {
-  const headers = req.headers["authorization"];
-  if (!headers) {
-    return next(new errorHandler("no jwtToken provided unauthorised ", 401));
+/**
+ * Middleware to check if request is authorized via JWT
+ */
+exports.isAuthorized = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized. Token missing.",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Attach user info from token payload to request object
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+    };
+
+    next();
+  } catch (error) {
+    console.error("Auth error:", error.message);
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized. Invalid or expired token.",
+    });
   }
-  const jwtToken = headers.split(" ")[1];
-  if (!jwtToken) {
-    return next(new errorHandler("login to access this resource", 401));
-  }
-  const { id } = jwt.verify(jwtToken, process.env.jwt_secret);
-  const merchant = await Merchant.findById(id);
-  req.merchant = merchant;
-  next();
-});
-exports.roleAuthorize = (...roles) => {
+};
+
+/**
+ * Middleware to restrict routes to specific roles
+ * @param  {...string} roles - Allowed roles
+ */
+exports.authorizedRoles = (...roles) => {
   return (req, res, next) => {
-    const userRole = req.merchant.role;
-    if (!roles.includes(userRole)) {
-      return next(
-        new errorHandler(
-          `Role '${userRole}' is not authorized to access this resource`,
-          403
-        )
-      );
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied: ${req.user.role} is not authorized for this action.`,
+      });
     }
     next();
   };
 };
-

@@ -1,44 +1,47 @@
-const mongoose = require("mongoose");
 const app = require("./app");
 const { config } = require("dotenv");
+const {
+  usersPool,
+  servicesPool,
+  usersSequelize,
+  servicesSequelize,
+} = require("./db");
 
 process.on("uncaughtException", (err) => {
-  console.error(`Error: ${err.message}`);
-  console.error("Shutting down the server due to uncaught exception...");
+  console.error(`Uncaught Exception: ${err.message}`);
   process.exit(1);
 });
 
 config({ path: "config/config.env" });
 
-const connectDatabase = async () => {
-  try {
-    const data = await mongoose.connect(process.env.DB_URI);
-    console.log(`Database is connected at server: ${data.connection.host}`);
-  } catch (err) {
-    console.error("Error while connecting to database:", err.message);
-    process.exit(1); // Exit the process if the database connection fails
-  }
-};
+// Load and sync models
+require("./models/users");
+require("./models/services");
 
-const startServer = () => {
-  const server = app.listen(process.env.PORT, () =>
-    console.log(`App is running at port ${process.env.PORT}`)
-  );
+const PORT = process.env.PORT || 5000;
 
-  process.on("unhandledRejection", (err) => {
-    console.error(`Error: ${err.message}`);
-    console.error(
-      "Shutting down the server due to unhandled promise rejection..."
-    );
-    server.close(() => {
-      process.exit(1);
-    });
-  });
-};
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
-const init = async () => {
-  await connectDatabase();
-  startServer();
-};
+// Test DB pool connections
+usersPool
+  .connect()
+  .then((client) => {
+    console.log("✅ Connected to festgo_users pool");
+    client.release();
+  })
+  .catch((err) => console.error("❌ festgo_users pool error:", err.message));
 
-init();
+servicesPool
+  .connect()
+  .then((client) => {
+    console.log("✅ Connected to festgo_services pool");
+    client.release();
+  })
+  .catch((err) => console.error("❌ festgo_services pool error:", err.message));
+
+process.on("unhandledRejection", (err) => {
+  console.error(`Unhandled Rejection: ${err.message}`);
+  server.close(() => process.exit(1));
+});
