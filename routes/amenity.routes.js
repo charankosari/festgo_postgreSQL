@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const amenityController = require("../controllers/amenity.controller");
+const categoryController = require("../controllers/amenityCategory.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 router.post(
   "/",
@@ -10,18 +11,40 @@ router.post(
 );
 router.get("/", amenityController.getAllAmenities);
 router.get("/allc", amenityController.getAllAmenitiesGroupedByCategory);
-router.get("/:id", amenityController.getAmenityById);
+router.get("/a/:id", amenityController.getAmenityById);
 router.put(
-  "/:id",
+  "/a/:id",
   isAuthorized,
   authorizedRoles("admin"),
   amenityController.updateAmenity
 );
 router.delete(
-  "/:id",
+  "/a/:id",
   isAuthorized,
   authorizedRoles("admin"),
   amenityController.deleteAmenity
+);
+
+// amenity categories
+router.post(
+  "/c",
+  isAuthorized,
+  authorizedRoles("admin"),
+  categoryController.createCategory
+);
+router.get("/c", categoryController.getAllCategories);
+router.get("/c/:id", categoryController.getCategoryById);
+router.put(
+  "/c/:id",
+  isAuthorized,
+  authorizedRoles("admin"),
+  categoryController.updateCategory
+);
+router.delete(
+  "/c/:id",
+  isAuthorized,
+  authorizedRoles("admin"),
+  categoryController.deleteCategory
 );
 
 module.exports = router;
