@@ -8,6 +8,8 @@ const room_amenity_category = require("./room_amenity_category.model")(
 );
 const room_amenity = require("./room_amenity.model")(servicesSequelize);
 const Property = require("./property.model")(servicesSequelize);
+const Event = require("./events.model")(servicesSequelize);
+const EventType = require("./event_types.model")(servicesSequelize);
 // Define Associations for Amenity
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
@@ -28,6 +30,11 @@ room_amenity_category.hasMany(room_amenity, {
   foreignKey: "categoryId",
   as: "roomAmenities",
 });
+Event.belongsTo(EventType, {
+  foreignKey: "eventTypeId",
+  onDelete: "CASCADE",
+});
+EventType.hasMany(Event, { foreignKey: "eventTypeId", as: "events" });
 
 // Setup DB object
 const db = {
@@ -37,6 +44,8 @@ const db = {
   room_amenity_category,
   room_amenity,
   Property,
+  Event,
+  EventType,
 };
 
 // Sync all models
