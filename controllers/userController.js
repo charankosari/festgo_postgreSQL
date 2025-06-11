@@ -271,9 +271,16 @@ exports.loginViaOtp = async (req, res) => {
   user.mobile_otp_expire = Date.now() + 10 * 60 * 1000;
   await user.save();
 
-  // await sendSMS(user.number, `Your login OTP is: ${otp}`);
-  console.log(otp, "otp");
-  res.status(200).json({ message: "Login OTP sent" });
+  const message = loginOtpTemplate(otp);
+
+  const smsResponse = await sendSMS(user.number, message);
+  if (smsResponse.status === "failed") {
+    console.error("SMS sending failed:", smsResponse.error);
+    return res.status(500).json({ message: "Failed to send OTP via SMS" });
+  }
+
+  console.log("OTP sent:", otp);
+  res.status(200).json({ message: "OTP sent to mobile number" });
 };
 
 // Verify Login via OTP

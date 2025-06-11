@@ -15,20 +15,9 @@ dotenv.config({ path: path.resolve("./config/config.env") });
  */
 export async function sendSMS(to, message, type = 0, dlr = 1) {
   try {
-    const formattedNumber = to.startsWith("+91") ? to : `+91${to}`;
     const encodedMessage = encodeURIComponent(message);
 
-    const queryParams = querystring.stringify({
-      username: process.env.SMS_USERNAME,
-      password: process.env.SMS_PASSWORD,
-      type: type,
-      dlr: dlr,
-      destination: formattedNumber,
-      source: process.env.SMS_SENDER,
-      message: encodedMessage,
-    });
-
-    const url = `http://${process.env.SMS_HOST}:${process.env.SMS_PORT}/sendsms/bulksms?${queryParams}`;
+    const url = `http://${process.env.SMS_HOST}:${process.env.SMS_PORT}/sendsms/bulksms?username=${process.env.SMS_USERNAME}&password=${process.env.SMS_PASSWORD}&type=0&dlr=1&destination=${to}&source=${process.env.SMS_SENDER}&message=${encodedMessage}&entityid=${process.env.SMS_ENTITY_ID}&tempid=${process.env.SMS_TEMPLATE_ID}&tmid=${process.env.SMS_TMID}`;
 
     const response = await axios.get(url);
     return {
