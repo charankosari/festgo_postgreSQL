@@ -27,6 +27,8 @@ module.exports = (sequelize) => {
       mobile_otp_expire: { type: DataTypes.DATE, defaultValue: null },
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
+      signupToken: { type: DataTypes.STRING, defaultValue: null },
+      signupTokenExpire: { type: DataTypes.DATE, defaultValue: null },
     },
     {
       timestamps: true,

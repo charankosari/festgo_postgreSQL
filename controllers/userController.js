@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const {
   otpTemplate,
   changePasswordTemplate,
+  SignupEmail,
 } = require("../libs/mailgun/mailTemplates");
 const path = require("path");
 const dotenv = require("dotenv");
@@ -28,6 +29,8 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "mobile_otp_expire",
     "resetPasswordToken",
     "resetPasswordExpire",
+    "signupTokenExpire",
+    "signupToken",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -63,7 +66,8 @@ exports.registerUser = async (req, res, roleType) => {
       role: roleType,
     });
     const message = "Registration successfull";
-    sendToken(user, 201, message, res);
+    const su = safeUser(user);
+    sendToken(su, 201, message, res);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -314,5 +318,67 @@ exports.getUserDetails = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+exports.registerEmail = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  try {
+    let user = await User.findOne({ where: { email } });
+    if (!user) {
+      user = await User.create({
+        email,
+        role: "user",
+      });
+    }
+    // Generate signup token
+    const signupToken = crypto.randomBytes(32).toString("hex");
+    const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Update user record
+    user.signupToken = signupToken;
+    user.signupTokenExpire = tokenExpire;
+    await user.save();
+
+    // Send Email
+    const verificationLink = `${process.env.APP_DEEP_LINK}?token=${signupToken}`;
+    await sendEmail(
+      email,
+      "Activate your account",
+      SignupEmail(verificationLink)
+    );
+
+    res.status(200).json({ message: "Verification email sent successfully" });
+  } catch (err) {
+    console.error("Error in registerEmail:", err);
+    res.status(500).json({ message: "Something went wrong" });
+  }
+};
+
+exports.verifyEmailToken = async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ message: "Token is required" });
+
+  try {
+    // Find user by token
+    const user = await User.findOne({ where: { signupToken: token } });
+
+    if (!user || user.signupTokenExpire < new Date()) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    // Mark email as verified, clear signupToken fields
+    user.email_verified = true;
+    user.signupToken = null;
+    user.signupTokenExpire = null;
+    await user.save();
+
+    const message = "Registration successful";
+    const cleanUser = safeUser(user);
+    sendToken(cleanUser, 200, message, res);
+  } catch (err) {
+    console.error("Error in verifyEmailToken:", err);
+    res.status(500).json({ message: "Something went wrong" });
   }
 };

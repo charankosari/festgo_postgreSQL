@@ -99,3 +99,22 @@ exports.changePasswordTemplate = (username, link) => {
     </body>
   </html>`;
 };
+exports.SignupEmail = (verificationLink) => {
+  return `
+    <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7f7f7;">
+      <div style="max-width: 600px; margin: auto; background: #fff; padding: 30px; border-radius: 8px;">
+        <h2 style="color: #333;">Welcome to FestGo 🎉</h2>
+        <p style="font-size: 16px; color: #555;">Thanks for signing up! Click the button below to activate your account:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verificationLink}" 
+             style="background-color: #ff4500; color: #fff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-size: 16px;">
+            Activate Your FestGo Account
+          </a>
+        </div>
+        <p style="font-size: 14px; color: #999;">This link will expire in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #aaa;">&copy; ${new Date().getFullYear()} FestGo. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+};
