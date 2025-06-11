@@ -21,8 +21,6 @@ exports.createProperty = async (req, res) => {
       return res
         .status(403)
         .json({ message: "Vendor can only create a property" });
-    if (!vendor.is_authorized)
-      return res.status(403).json({ message: "Vendor is not authorized" });
 
     const status = calculateStatus(current_step);
     const in_progress = status < 100;

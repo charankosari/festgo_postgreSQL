@@ -17,7 +17,6 @@ module.exports = (sequelize) => {
       number: { type: DataTypes.STRING, allowNull: true, unique: true },
       password: { type: DataTypes.STRING, allowNull: true },
       image_url: { type: DataTypes.STRING, defaultValue: "" },
-      is_authorized: { type: DataTypes.BOOLEAN, defaultValue: false },
       email_otp: { type: DataTypes.STRING, defaultValue: null },
       mobile_otp: { type: DataTypes.STRING, defaultValue: null },
       mobile_verified: { type: DataTypes.BOOLEAN, defaultValue: false },

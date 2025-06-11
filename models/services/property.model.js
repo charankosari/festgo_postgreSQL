@@ -55,7 +55,10 @@ module.exports = (sequelize) =>
       type: DataTypes.JSONB, // [{ policyId, value }]
       defaultValue: [],
     },
-
+    active: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     // Rooms list
     rooms: {
       type: DataTypes.JSONB,

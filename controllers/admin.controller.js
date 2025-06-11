@@ -1,3 +1,4 @@
+const { Property } = require("../models/services");
 const { User } = require("../models/users");
 
 // ✅ Get all vendors
@@ -24,32 +25,34 @@ exports.getVendorById = async (req, res) => {
 };
 
 // ✅ Authorize vendor
-exports.authorizeVendor = async (req, res) => {
+exports.authorizeProperty = async (req, res) => {
   try {
-    const vendor = await User.findByPk(req.params.id);
-    if (!vendor || vendor.role !== "vendor") {
-      return res.status(404).json({ message: "Vendor not found" });
+    const property = await Property.findByPk(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: "property not found" });
     }
-    vendor.is_authorized = true;
-    await vendor.save();
-    res.status(200).json({ message: "Vendor authorized successfully", vendor });
+    property.active = true;
+    await property.save();
+    res
+      .status(200)
+      .json({ message: "property authorized successfully", property });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
 // ✅ De-authorize vendor
-exports.deauthorizeVendor = async (req, res) => {
+exports.deauthorizeProperty = async (req, res) => {
   try {
-    const vendor = await User.findByPk(req.params.id);
-    if (!vendor || vendor.role !== "vendor") {
-      return res.status(404).json({ message: "Vendor not found" });
+    const property = await Property.findByPk(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
     }
-    vendor.is_authorized = false;
-    await vendor.save();
+    property.active = false;
+    await property.save();
     res
       .status(200)
-      .json({ message: "Vendor de-authorized successfully", vendor });
+      .json({ message: "property de-authorized successfully", vendor });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
