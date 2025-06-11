@@ -44,7 +44,9 @@ router.post("/login-via-otp", userController.loginViaOtp);
 
 // VERIFY MOBILE OTP FOR LOGIN
 router.post("/verify-login-otp", userController.verifyLoginViaOtp);
-
+// email login
+router.post("/register-email", userController.registerEmail);
+router.post("/verify-email-token", userController.verifyEmailToken);
 // get user details
 router.get("/me", isAuthorized, userController.getUserDetails);
 module.exports = router;
