@@ -13,8 +13,8 @@ const calculateStatus = (currentStep) => {
 // ✅ Create Property
 exports.createProperty = async (req, res) => {
   try {
-    const { vendorId, current_step = 1, ...details } = req.body;
-
+    const { current_step = 1, ...details } = req.body;
+    const vendorId = req.user.id;
     const vendor = await User.findByPk(vendorId);
     if (!vendor) return res.status(404).json({ message: "Vendor not found" });
     if (vendor.role !== "vendor")
