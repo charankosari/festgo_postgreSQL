@@ -170,8 +170,23 @@ exports.updateProfile = async (req, res) => {
   fields.forEach((field) => {
     if (req.body[field]) updateData[field] = req.body[field];
   });
+  const user = await User.findOne({ where: { id: req.user.id } });
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
-  await User.update(updateData, { where: { id: req.user.id } });
+  if (req.body.password) {
+    if (user.password === null) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(req.body.password, salt);
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Password already set, cannot overwrite." });
+    }
+  }
+
+  await user.update(updateData);
   res.status(200).json({ message: "Profile updated" });
 };
 
