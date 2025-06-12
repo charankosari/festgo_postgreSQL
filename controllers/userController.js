@@ -1,11 +1,11 @@
 const { User } = require("../models/users");
-
+const { Sequelize } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
 const sendEmail = require("../libs/mailgun/mailGun");
 const { sendSMS } = require("../libs/sms/sms");
 const { loginOtpTemplate } = require("../libs/sms/messageTemplates");
 const { Op } = require("sequelize");
-
+const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const {
   otpTemplate,
@@ -157,10 +157,12 @@ exports.updatePassword = async (req, res) => {
   const isMatch = await user.comparePassword(req.body.oldPassword);
   if (!isMatch)
     return res.status(401).json({ message: "Incorrect old password" });
-
-  user.password = req.body.newPassword;
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(req.body.newPassword, salt);
+  user.password = hashedPassword;
   await user.save();
-  sendToken(user, 200, res);
+  const message = "password updated successfully";
+  sendToken(user, 200, message, res);
 };
 
 // Update Profile
@@ -170,24 +172,46 @@ exports.updateProfile = async (req, res) => {
   fields.forEach((field) => {
     if (req.body[field]) updateData[field] = req.body[field];
   });
-  const user = await User.findOne({ where: { id: req.user.id } });
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
 
-  if (req.body.password) {
-    if (user.password === null) {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(req.body.password, salt);
-    } else {
-      return res
-        .status(400)
-        .json({ message: "Password already set, cannot overwrite." });
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-  }
 
-  await user.update(updateData);
-  res.status(200).json({ message: "Profile updated" });
+    // If there's a password, and it isn't already set
+    if (req.body.password) {
+      if (user.password === null) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(req.body.password, salt);
+        user.password = hashedPassword;
+      } else {
+        return res
+          .status(400)
+          .json({ message: "Password already set, cannot overwrite." });
+      }
+    }
+
+    // Update other fields if any
+    if (Object.keys(updateData).length > 0) {
+      await user.update(updateData);
+    }
+
+    // If password was updated, save the user
+    if (req.body.password) {
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Profile updated" });
+  } catch (err) {
+    if (err instanceof Sequelize.UniqueConstraintError) {
+      // Extract which field failed
+      const field = err.errors[0].path;
+      return res.status(400).json({ message: `${field} already in use` });
+    }
+    console.error("Error in updateProfile:", err);
+    res.status(500).json({ message: "Something went wrong" });
+  }
 };
 
 // Send Email OTP
