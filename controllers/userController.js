@@ -348,20 +348,29 @@ exports.registerEmail = async (req, res) => {
 
   try {
     let user = await User.findOne({ where: { email } });
-    if (!user) {
-      user = await User.create({
-        email,
-        role: "user",
-      });
-    }
+
     // Generate signup token
     const signupToken = crypto.randomBytes(32).toString("hex");
     const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Update user record
-    user.signupToken = signupToken;
-    user.signupTokenExpire = tokenExpire;
-    await user.save();
+    if (user) {
+      if (user.status === "pending") {
+        // If user is pending, update signup token and expiry
+        user.signupToken = signupToken;
+        user.signupTokenExpire = tokenExpire;
+        await user.save();
+      } else {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+    } else {
+      // If no user, create one with pending status
+      user = await User.create({
+        email,
+        role: "user",
+        status: "pending",
+        signupToken: signupToken,
+        signupTokenExpire: tokenExpire,
+      });
+    }
 
     // Send Email
     const verificationLink = `${process.env.APP_DEEP_LINK}?token=${signupToken}`;
@@ -387,13 +396,14 @@ exports.verifyEmailToken = async (req, res) => {
     const user = await User.findOne({ where: { signupToken: token } });
 
     if (!user || user.signupTokenExpire < new Date()) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+      return res.status(400).json({ message: "Invalid or expired link " });
     }
 
     // Mark email as verified, clear signupToken fields
     user.email_verified = true;
     user.signupToken = null;
     user.signupTokenExpire = null;
+    user.status = "active";
     await user.save();
 
     const message = "Registration successful";
