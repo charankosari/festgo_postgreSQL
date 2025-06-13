@@ -12,18 +12,10 @@ module.exports = (sequelize) =>
       propertyId: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-          model: "Properties",
-          key: "id",
-        },
       },
       userId: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-          model: "Users",
-          key: "id",
-        },
       },
       rating: {
         type: DataTypes.INTEGER,
