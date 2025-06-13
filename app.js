@@ -6,8 +6,9 @@ const admin = require("./routes/admin.routes");
 const room_amenity = require("./routes/room_amenity.routes");
 const upload = require("./routes/uploadRouter");
 const propertyRoutes = require("./routes/property.routes");
-const event = require("./routes/event.routes");
-const festbite = require("./routes/festbite.routes");
+const eventRoutes = require("./routes/event.routes");
+const festbiteRoutes = require("./routes/festbite.routes");
+const reviewRoutes = require("./routes/review.route");
 const errorMiddleware = require("./middlewares/error");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
@@ -21,6 +22,10 @@ app.use("/api/amenity", amenities);
 app.use("/api/admin", admin);
 app.use("/api/room-amenity", room_amenity);
 app.use("/api/properties", propertyRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/festbite", festbiteRoutes);
+
 app.use("/api/upload", upload);
 app.use(errorMiddleware);
 
