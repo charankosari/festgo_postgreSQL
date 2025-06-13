@@ -10,6 +10,10 @@ const room_amenity = require("./room_amenity.model")(servicesSequelize);
 const Property = require("./property.model")(servicesSequelize);
 const Event = require("./events.model")(servicesSequelize);
 const EventType = require("./event_types.model")(servicesSequelize);
+// fest bite
+const Festbite = require("./festbite.model")(servicesSequelize);
+const MenuItem = require("./menu_item.model")(servicesSequelize);
+const MenuType = require("./menu_type.model")(servicesSequelize);
 // Define Associations for Amenity
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
@@ -36,6 +40,16 @@ Event.belongsTo(EventType, {
 });
 EventType.hasMany(Event, { foreignKey: "eventTypeId", as: "events" });
 
+MenuType.hasMany(MenuItem, {
+  foreignKey: "menuTypeId",
+  as: "menuItems",
+  onDelete: "CASCADE",
+});
+MenuItem.belongsTo(MenuType, {
+  foreignKey: "menuTypeId",
+  as: "menuType",
+  onDelete: "CASCADE",
+});
 // Setup DB object
 const db = {
   Sequelize: servicesSequelize,
@@ -46,6 +60,9 @@ const db = {
   Property,
   Event,
   EventType,
+  MenuItem,
+  MenuType,
+  Festbite,
 };
 
 // Sync all models
