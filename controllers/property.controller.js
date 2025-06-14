@@ -82,6 +82,17 @@ exports.getAllProperties = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// get all active properties
+exports.getAllActiveProperties = async (req, res) => {
+  try {
+    const properties = await Property.findAll({
+      where: { active: true },
+    });
+    res.json({ success: true, properties });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
 // ✅ Get Property by ID
 exports.getPropertyById = async (req, res) => {
