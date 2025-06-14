@@ -8,6 +8,7 @@ const room_amenity_category = require("./room_amenity_category.model")(
 );
 const room_amenity = require("./room_amenity.model")(servicesSequelize);
 const Property = require("./property.model")(servicesSequelize);
+const Room = require("./room.model")(servicesSequelize);
 const Event = require("./events.model")(servicesSequelize);
 const EventType = require("./event_types.model")(servicesSequelize);
 // fest bite
@@ -39,6 +40,16 @@ Event.belongsTo(EventType, {
   onDelete: "CASCADE",
 });
 EventType.hasMany(Event, { foreignKey: "eventTypeId", as: "events" });
+Property.hasMany(Room, {
+  foreignKey: "propertyId",
+  as: "rooms",
+  onDelete: "CASCADE",
+});
+Room.belongsTo(Property, {
+  foreignKey: "propertyId",
+  as: "property",
+  onDelete: "CASCADE",
+});
 
 MenuType.hasMany(MenuItem, {
   foreignKey: "menuTypeId",
@@ -58,6 +69,7 @@ const db = {
   room_amenity_category,
   room_amenity,
   Property,
+  Room,
   Event,
   EventType,
   MenuItem,

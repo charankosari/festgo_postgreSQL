@@ -1,6 +1,7 @@
-const { Property } = require("../models/services/index");
 const { User } = require("../models/users");
 const {
+  Property,
+  Room,
   amenity,
   amenity_category,
   room_amenity,
@@ -55,12 +56,28 @@ exports.updateProperty = async (req, res) => {
     if (!property)
       return res.status(404).json({ message: "Property not found" });
 
-    // update fields
+    // If rooms are included in update request
+    if (updates.rooms && Array.isArray(updates.rooms)) {
+      // Create new room records for this property without deleting existing ones
+      await Promise.all(
+        updates.rooms.map((room) =>
+          Room.create({
+            ...room,
+            propertyId: id,
+          })
+        )
+      );
+
+      // Remove rooms key from updates so it doesn't touch Property model's 'rooms' JSONB field
+      delete updates.rooms;
+    }
+
+    // Update other property fields
     await property.update(updates);
 
     // recalculate status and completion state
     const currentStep = updates.current_step || property.current_step + 1;
-    const status = calculateStatus(currentStep);
+    const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
 
@@ -86,6 +103,7 @@ exports.getAllProperties = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 // get all active properties
 exports.getAllActiveProperties = async (req, res) => {
   try {
@@ -216,10 +234,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
     }
 
     // Fetch property by id
-    const property = await Property.findOne({
-      where: { id: propertyId },
-    });
-
+    const property = await Property.findOne({ where: { id: propertyId } });
     if (!property) {
       return res.status(404).json({ message: "Property not found" });
     }
@@ -248,7 +263,12 @@ exports.getAmenitiesForProperty = async (req, res) => {
     });
 
     // === Fetch Room Amenities ===
-    const roomAmenityIds = property.rooms.flatMap((room) =>
+    const rooms = await Room.findAll({
+      where: { propertyId },
+      include: ["room_amenities"], // assuming you have a relation alias set as 'room_amenities'
+    });
+
+    const roomAmenityIds = rooms.flatMap((room) =>
       room.room_amenities.map((ra) => ra.roomAmenityId)
     );
 
@@ -261,7 +281,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
     });
 
     const roomAmenitiesList = roomAmenities.map((ra) => {
-      const matchedValue = property.rooms
+      const matchedValue = rooms
         .flatMap((room) => room.room_amenities)
         .find((ram) => ram.roomAmenityId === ra.id)?.value;
 
@@ -284,6 +304,88 @@ exports.getAmenitiesForProperty = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching amenities:", error);
+    res.status(500).json({ message: "Something went wrong", error });
+  }
+};
+exports.getRoomsByPropertyId = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    if (!propertyId) {
+      return res.status(400).json({ message: "propertyId is required" });
+    }
+
+    // Fetch rooms by propertyId
+    const rooms = await Room.findAll({
+      where: { propertyId },
+      include: [
+        {
+          model: room_amenity,
+          as: "room_amenities", // use the alias you defined in your model
+        },
+      ],
+    });
+
+    if (!rooms || rooms.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No rooms found for this property" });
+    }
+
+    res.status(200).json({
+      success: true,
+      rooms,
+    });
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+    res.status(500).json({ message: "Something went wrong", error });
+  }
+};
+exports.editRoom = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Find room by ID
+    const room = await Room.findByPk(id);
+
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    // Update fields
+    await room.update(updates);
+
+    res.status(200).json({
+      success: true,
+      message: "Room updated successfully",
+      room,
+    });
+  } catch (error) {
+    console.error("Error updating room:", error);
+    res.status(500).json({ message: "Something went wrong", error });
+  }
+};
+exports.deleteRoom = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find room by ID
+    const room = await Room.findByPk(id);
+
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    // Delete the room
+    await room.destroy();
+
+    res.status(200).json({
+      success: true,
+      message: "Room deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting room:", error);
     res.status(500).json({ message: "Something went wrong", error });
   }
 };

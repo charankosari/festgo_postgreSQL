@@ -59,37 +59,6 @@ module.exports = (sequelize) =>
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-    // Rooms list
-    rooms: {
-      type: DataTypes.JSONB,
-      defaultValue: [],
-      // Example of each room structure:
-      /*
-      [
-        {
-          room_type: "Deluxe",
-          view: "Sea View",
-          area: "350 sqft",
-          room_name: "Ocean Suite",
-          number_of_rooms: 5,
-          description: "Spacious suite with ocean view",
-          max_people: 3,
-          sleeping_arrangement: "1 King Bed",
-          bathroom_details: "Private Bathroom",
-          meal_plans: ["Breakfast Included"],
-          rates: 3500,
-          inventory_details: "Available on demand",
-          room_amenities: [
-            { roomAmenityId: "id", value: true },
-            { roomAmenityId: "id", value: "Available" }
-          ],
-          photos: [{"url":"url1",tag:"","url":"url2",tag:""}],
-          videos: [{"url":"url1",tag:"","url":"url2",tag:""}]
-        }
-      ]
-      */
-    },
-
     photos: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
