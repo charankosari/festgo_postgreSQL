@@ -17,6 +17,8 @@ module.exports = (sequelize) => {
       number: { type: DataTypes.STRING, allowNull: true, unique: true },
       password: { type: DataTypes.STRING, allowNull: true },
       image_url: { type: DataTypes.STRING, defaultValue: "" },
+      date_of_birth: { type: DataTypes.DATEONLY, allowNull: true },
+      gender: { type: DataTypes.STRING, allowNull: true },
       email_otp: { type: DataTypes.STRING, defaultValue: null },
       mobile_otp: { type: DataTypes.STRING, defaultValue: null },
       mobile_verified: { type: DataTypes.BOOLEAN, defaultValue: false },
@@ -27,8 +29,14 @@ module.exports = (sequelize) => {
       mobile_otp_expire: { type: DataTypes.DATE, defaultValue: null },
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
-      signupToken: { type: DataTypes.STRING, defaultValue: null },
-      signupTokenExpire: { type: DataTypes.DATE, defaultValue: null },
+      token: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      tokenExpire: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       timestamps: true,

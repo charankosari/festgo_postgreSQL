@@ -167,10 +167,17 @@ exports.updatePassword = async (req, res) => {
 
 // Update Profile
 exports.updateProfile = async (req, res) => {
-  const fields = ["username", "email", "number", "image_url"];
+  const fields = [
+    "username",
+    "email",
+    "number",
+    "image_url",
+    "date_of_birth",
+    "gender",
+  ];
   const updateData = {};
   fields.forEach((field) => {
-    if (req.body[field]) updateData[field] = req.body[field];
+    if (req.body[field] !== undefined) updateData[field] = req.body[field];
   });
 
   try {
@@ -179,33 +186,14 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If there's a password, and it isn't already set
-    if (req.body.password) {
-      if (user.password === null) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(req.body.password, salt);
-        user.password = hashedPassword;
-      } else {
-        return res
-          .status(400)
-          .json({ message: "Password already set, cannot overwrite." });
-      }
-    }
-
-    // Update other fields if any
+    // Update fields if any
     if (Object.keys(updateData).length > 0) {
       await user.update(updateData);
     }
 
-    // If password was updated, save the user
-    if (req.body.password) {
-      await user.save();
-    }
-
-    res.status(200).json({ message: "Profile updated" });
+    res.status(200).json({ message: "Profile updated successfully" });
   } catch (err) {
     if (err instanceof Sequelize.UniqueConstraintError) {
-      // Extract which field failed
       const field = err.errors[0].path;
       return res.status(400).json({ message: `${field} already in use` });
     }
@@ -366,67 +354,152 @@ exports.getUserDetails = async (req, res) => {
     });
   }
 };
-exports.registerEmail = async (req, res) => {
+// exports.registerEmail = async (req, res) => {
+//   const { email } = req.body;
+//   if (!email) return res.status(400).json({ message: "Email is required" });
+
+//   try {
+//     let user = await User.findOne({ where: { email } });
+
+//     // Generate signup token
+//     const signupToken = crypto.randomBytes(32).toString("hex");
+//     const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+//     if (user) {
+//       if (user.status === "pending") {
+//         // If user is pending, update signup token and expiry
+//         user.signupToken = signupToken;
+//         user.signupTokenExpire = tokenExpire;
+//         await user.save();
+//       } else {
+//         return res.status(400).json({ message: "Email already registered" });
+//       }
+//     } else {
+//       // If no user, create one with pending status
+//       user = await User.create({
+//         email,
+//         role: "user",
+//         status: "pending",
+//         signupToken: signupToken,
+//         signupTokenExpire: tokenExpire,
+//       });
+//     }
+
+//     // Send Email
+//     const verificationLink = `${process.env.APP_DEEP_LINK}?token=${signupToken}`;
+//     await sendEmail(
+//       email,
+//       "Activate your account",
+//       SignupEmail(verificationLink)
+//     );
+
+//     res.status(200).json({ message: "Verification email sent successfully" });
+//   } catch (err) {
+//     console.error("Error in registerEmail:", err);
+//     res.status(500).json({ message: "Something went wrong" });
+//   }
+// };
+
+// for user login or signup with email or number
+exports.loginWithEmailOrMobile = async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ message: "Email is required" });
+  const loginType = req.body.loginType?.toLowerCase();
+  if (!email || !loginType) {
+    return res
+      .status(400)
+      .json({ message: "Email/Mobile and loginType required" });
+  }
 
   try {
-    let user = await User.findOne({ where: { email } });
+    let user;
 
-    // Generate signup token
-    const signupToken = crypto.randomBytes(32).toString("hex");
-    const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    if (user) {
-      if (user.status === "pending") {
-        // If user is pending, update signup token and expiry
-        user.signupToken = signupToken;
-        user.signupTokenExpire = tokenExpire;
+    if (loginType === "email") {
+      user = await User.findOne({ where: { email } });
+
+      // Generate token
+      const token = crypto.randomBytes(32).toString("hex");
+      const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+      if (user) {
+        // If user exists, update token and expiry
+        user.token = token;
+        user.tokenExpire = tokenExpire;
         await user.save();
       } else {
-        return res.status(400).json({ message: "Email already registered" });
+        // Create new user with pending status
+        user = await User.create({
+          email,
+          role: "user",
+          status: "pending",
+          token,
+          tokenExpire,
+        });
       }
-    } else {
-      // If no user, create one with pending status
-      user = await User.create({
+
+      const verificationLink = `${process.env.APP_DEEP_LINK}?token=${token}`;
+      await sendEmail(
         email,
-        role: "user",
-        status: "pending",
-        signupToken: signupToken,
-        signupTokenExpire: tokenExpire,
-      });
+        "Your FestGo Login Link",
+        SignupEmail(verificationLink)
+      );
+
+      return res.status(200).json({ message: "Email login link sent" });
+    } else if (loginType === "mobile") {
+      user = await User.findOne({ where: { number: email } });
+
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpire = Date.now() + 10 * 60 * 1000;
+
+      if (user) {
+        user.mobile_otp = otp;
+        user.mobile_otp_expire = otpExpire;
+        await user.save();
+      } else {
+        user = await User.create({
+          number: email,
+          role: "user",
+          status: "pending",
+          mobile_otp: otp,
+          mobile_otp_expire: otpExpire,
+        });
+      }
+
+      const message = loginOtpTemplate(otp);
+      const smsResponse = await sendSMS(user.number, message);
+
+      if (smsResponse.status === "failed") {
+        console.error("SMS sending failed:", smsResponse.error);
+        return res.status(500).json({ message: "Failed to send OTP via SMS" });
+      }
+
+      return res.status(200).json({ message: "OTP sent to mobile number" });
+    } else {
+      return res.status(400).json({ message: "Invalid loginType" });
     }
-
-    // Send Email
-    const verificationLink = `${process.env.APP_DEEP_LINK}?token=${signupToken}`;
-    await sendEmail(
-      email,
-      "Activate your account",
-      SignupEmail(verificationLink)
-    );
-
-    res.status(200).json({ message: "Verification email sent successfully" });
   } catch (err) {
-    console.error("Error in registerEmail:", err);
+    console.error("Error in loginWithEmailOrMobile:", err);
     res.status(500).json({ message: "Something went wrong" });
   }
 };
-
 exports.verifyEmailToken = async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ message: "Token is required" });
 
   try {
     // Find user by token
-    const user = await User.findOne({ where: { signupToken: token } });
+    const user = await User.findOne({ where: { token } });
 
-    if (!user || user.signupTokenExpire < new Date()) {
-      return res.status(400).json({ message: "Invalid or expired link " });
-    }
+    if (!user)
+      return res
+        .status(400)
+        .json({ message: "Invalid link or user not found" });
 
-    // Mark email as verified, clear signupToken fields
-    user.email_verified = true;
-    user.signupToken = null;
-    user.signupTokenExpire = null;
+    if (user.tokenExpire < new Date())
+      return res.status(400).json({ message: "Link has expired" });
+
+    // Mark email as verified, clear token fields
+    user.token = null;
+    user.tokenExpire = null;
     user.status = "active";
     await user.save();
 
@@ -437,4 +510,20 @@ exports.verifyEmailToken = async (req, res) => {
     console.error("Error in verifyEmailToken:", err);
     res.status(500).json({ message: "Something went wrong" });
   }
+};
+exports.verifyOtp = async (req, res) => {
+  const user = await User.findOne({ where: { number: req.body.number } });
+  if (
+    !user ||
+    user.mobile_otp !== req.body.otp ||
+    Date.now() > user.mobile_otp_expire
+  )
+    return res.status(400).json({ message: "Invalid or expired OTP" });
+
+  user.mobile_otp = null;
+  user.mobile_otp_expire = null;
+  await user.save();
+  const cleanUser = safeUser(user);
+  const message = "Login successfull";
+  sendToken(cleanUser, 200, message, res);
 };
