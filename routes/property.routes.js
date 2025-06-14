@@ -21,6 +21,7 @@ router.put(
 // ✅ Get all properties
 router.get("/", propertyController.getAllProperties);
 router.get("/active", propertyController.getAllActiveProperties);
+router.get("/active-r", propertyController.getAllActivePropertiesByRange);
 
 // ✅ Get property by ID
 router.get("/:id", propertyController.getPropertyById);
