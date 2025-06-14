@@ -1,7 +1,11 @@
 const { Property } = require("../models/services/index");
 const { User } = require("../models/users");
-const { Op } = require("sequelize");
-
+const {
+  amenity,
+  amenity_category,
+  room_amenity,
+  room_amenity_category,
+} = require("../models/services/index");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
 
@@ -145,7 +149,11 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       // If no location provided, return first 20 active properties
       return res.json({
         success: true,
-        properties: properties.slice(0, 20),
+        properties: properties.slice(0, 20).map((property) => {
+          const plainProperty = property.get({ plain: true });
+          delete plainProperty.ownership_details;
+          return plainProperty;
+        }),
       });
     }
 
@@ -188,10 +196,94 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     // Return only up to 20 properties
     res.json({
       success: true,
-      properties: nearbyProperties.slice(0, 20),
+      properties: nearbyProperties.slice(0, 20).map((property) => {
+        const plainProperty = property.get({ plain: true });
+        delete plainProperty.ownership_details;
+        return plainProperty;
+      }),
     });
   } catch (err) {
     console.error("Error fetching properties:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getAmenitiesForProperty = async (req, res) => {
+  try {
+    const { propertyId } = req.body;
+    if (!propertyId) {
+      return res.status(400).json({ message: "propertyId is required" });
+    }
+
+    // Fetch property by id
+    const property = await Property.findOne({
+      where: { id: propertyId },
+    });
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // === Fetch Property Amenities ===
+    const amenityIds = property.amenities.map((a) => a.amenityId);
+
+    const amenities = await amenity.findAll({
+      where: { id: amenityIds },
+      include: [{ model: amenity_category, as: "category" }],
+      attributes: ["id", "name", "type", "options"],
+    });
+
+    const propertyAmenities = amenities.map((a) => {
+      const matchedValue = property.amenities.find(
+        (am) => am.amenityId === a.id
+      )?.value;
+
+      return {
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        value: matchedValue,
+        categoryName: a.category ? a.category.categoryName : null,
+      };
+    });
+
+    // === Fetch Room Amenities ===
+    const roomAmenityIds = property.rooms.flatMap((room) =>
+      room.room_amenities.map((ra) => ra.roomAmenityId)
+    );
+
+    const uniqueRoomAmenityIds = [...new Set(roomAmenityIds)];
+
+    const roomAmenities = await room_amenity.findAll({
+      where: { id: uniqueRoomAmenityIds },
+      include: [{ model: room_amenity_category, as: "roomAmenityCategory" }],
+      attributes: ["id", "name", "type", "options"],
+    });
+
+    const roomAmenitiesList = roomAmenities.map((ra) => {
+      const matchedValue = property.rooms
+        .flatMap((room) => room.room_amenities)
+        .find((ram) => ram.roomAmenityId === ra.id)?.value;
+
+      return {
+        id: ra.id,
+        name: ra.name,
+        type: ra.type,
+        value: matchedValue,
+        categoryName: ra.roomAmenityCategory
+          ? ra.roomAmenityCategory.categoryName
+          : null,
+      };
+    });
+
+    // Final clean response
+    res.status(200).json({
+      success: true,
+      amenities: propertyAmenities,
+      room_amenities: roomAmenitiesList,
+    });
+  } catch (error) {
+    console.error("Error fetching amenities:", error);
+    res.status(500).json({ message: "Something went wrong", error });
   }
 };
