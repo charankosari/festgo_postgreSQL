@@ -1,4 +1,4 @@
-const { Review } = require("../models/users");
+const { review } = require("../models/users");
 const { Property } = require("../models/services");
 const { Sequelize } = require("sequelize");
 
@@ -8,8 +8,8 @@ exports.createReview = async (req, res) => {
     const { propertyId, rating, comment } = req.body;
     const userId = req.user.id;
 
-    const review = await Review.create({ propertyId, userId, rating, comment });
-    res.status(201).json(review);
+    const r = await review.create({ propertyId, userId, rating, comment });
+    res.status(201).json(r);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -19,17 +19,17 @@ exports.createReview = async (req, res) => {
 exports.updateReview = async (req, res) => {
   try {
     const { id } = req.params;
-    const review = await Review.findByPk(id);
+    const r = await review.findByPk(id);
 
-    if (!review) return res.status(404).json({ message: "Review not found" });
+    if (!r) return res.status(404).json({ message: "Review not found" });
 
     // Check if current user is the owner or admin
-    if (review.userId !== req.user.id && req.user.role !== "admin") {
+    if (r.userId !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({ message: "Unauthorized action" });
     }
 
-    await review.update(req.body);
-    res.json(review);
+    await r.update(req.body);
+    res.json(r);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -39,7 +39,7 @@ exports.updateReview = async (req, res) => {
 exports.deleteReview = async (req, res) => {
   try {
     const { id } = req.params;
-    const review = await Review.findByPk(id);
+    const review = await review.findByPk(id);
 
     if (!review) return res.status(404).json({ message: "Review not found" });
 
@@ -58,9 +58,7 @@ exports.deleteReview = async (req, res) => {
 // ✅ Get All Reviews
 exports.getAllReviews = async (req, res) => {
   try {
-    const reviews = await Review.findAll({
-      include: [{ model: Property, as: "property" }],
-    });
+    const reviews = await review.findAll({});
     res.json(reviews);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -71,12 +69,12 @@ exports.getAllReviews = async (req, res) => {
 exports.getReviewsByProperty = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const reviews = await Review.findAll({
+    const reviews = await review.findAll({
       where: { propertyId },
-      include: [{ model: Property, as: "property" }],
     });
-    res.json(reviews);
+    res.status(200).json(reviews);
   } catch (error) {
+    console.error("Error fetching reviews:", error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -86,7 +84,7 @@ exports.getAverageRatingByPropertyId = async (req, res) => {
   try {
     const { propertyId } = req.params;
 
-    const result = await Review.findAll({
+    const result = await review.findAll({
       attributes: [
         "propertyId",
         [Sequelize.fn("AVG", Sequelize.col("rating")), "averageRating"],
@@ -108,7 +106,7 @@ exports.getAverageRatingByPropertyId = async (req, res) => {
 // ✅ Get Average Ratings for All Properties
 exports.getAverageRatingOfAllProperties = async (req, res) => {
   try {
-    const result = await Review.findAll({
+    const result = await review.findAll({
       attributes: [
         "propertyId",
         [Sequelize.fn("AVG", Sequelize.col("rating")), "averageRating"],
