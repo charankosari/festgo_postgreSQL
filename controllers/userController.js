@@ -29,8 +29,8 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "mobile_otp_expire",
     "resetPasswordToken",
     "resetPasswordExpire",
-    "signupTokenExpire",
-    "signupToken",
+    "tokenExpire",
+    "token",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -354,50 +354,6 @@ exports.getUserDetails = async (req, res) => {
     });
   }
 };
-// exports.registerEmail = async (req, res) => {
-//   const { email } = req.body;
-//   if (!email) return res.status(400).json({ message: "Email is required" });
-
-//   try {
-//     let user = await User.findOne({ where: { email } });
-
-//     // Generate signup token
-//     const signupToken = crypto.randomBytes(32).toString("hex");
-//     const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-//     if (user) {
-//       if (user.status === "pending") {
-//         // If user is pending, update signup token and expiry
-//         user.signupToken = signupToken;
-//         user.signupTokenExpire = tokenExpire;
-//         await user.save();
-//       } else {
-//         return res.status(400).json({ message: "Email already registered" });
-//       }
-//     } else {
-//       // If no user, create one with pending status
-//       user = await User.create({
-//         email,
-//         role: "user",
-//         status: "pending",
-//         signupToken: signupToken,
-//         signupTokenExpire: tokenExpire,
-//       });
-//     }
-
-//     // Send Email
-//     const verificationLink = `${process.env.APP_DEEP_LINK}?token=${signupToken}`;
-//     await sendEmail(
-//       email,
-//       "Activate your account",
-//       SignupEmail(verificationLink)
-//     );
-
-//     res.status(200).json({ message: "Verification email sent successfully" });
-//   } catch (err) {
-//     console.error("Error in registerEmail:", err);
-//     res.status(500).json({ message: "Something went wrong" });
-//   }
-// };
 
 // for user login or signup with email or number
 exports.loginWithEmailOrMobile = async (req, res) => {
@@ -500,6 +456,7 @@ exports.verifyEmailToken = async (req, res) => {
     // Mark email as verified, clear token fields
     user.token = null;
     user.tokenExpire = null;
+    user.email_verified = true;
     user.status = "active";
     await user.save();
 
@@ -522,6 +479,8 @@ exports.verifyOtp = async (req, res) => {
 
   user.mobile_otp = null;
   user.mobile_otp_expire = null;
+  user.mobile_verified = true;
+  user.status = "active";
   await user.save();
   const cleanUser = safeUser(user);
   const message = "Login successfull";
