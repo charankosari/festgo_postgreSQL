@@ -99,21 +99,27 @@ exports.changePasswordTemplate = (username, link) => {
     </body>
   </html>`;
 };
-exports.SignupEmail = (verificationLink) => {
+exports.LoginEmailTemplate = (verificationLink) => {
   return `
-    <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7f7f7;">
-      <div style="max-width: 600px; margin: auto; background: #fff; padding: 30px; border-radius: 8px;">
-        <h2 style="color: #333;">Welcome to FestGo 🎉</h2>
-        <p style="font-size: 16px; color: #555;">Thanks for signing up! Click the button below to activate your account:</p>
+    <div style="font-family: 'Segoe UI', sans-serif; padding: 24px; background-color: #f4f4f4;">
+      <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 32px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+        <h2 style="color: #222; text-align: center; margin-bottom: 20px;">FestGo Login Verification 🔐</h2>
+        <p style="font-size: 16px; color: #555; line-height: 1.6; text-align: center;">
+          You requested to log in to your FestGo account. Click the button below to verify and login:
+        </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" 
-             style="background-color: #ff4500; color: #fff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-size: 16px;">
-            Activate Your FestGo Account
+          <a href="${verificationLink}"
+             style="background-color: #ff4500; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; display: inline-block;">
+            Verify and Login
           </a>
         </div>
-        <p style="font-size: 14px; color: #999;">This link will expire in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #aaa;">&copy; ${new Date().getFullYear()} FestGo. All rights reserved.</p>
+        <p style="font-size: 14px; color: #888; text-align: center;">
+          This link is valid for the next 10 minutes. If you didn’t initiate this login, you can safely ignore this email.
+        </p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 32px 0;" />
+        <p style="font-size: 12px; color: #aaa; text-align: center;">
+          &copy; ${new Date().getFullYear()} FestGo. All rights reserved.
+        </p>
       </div>
     </div>
   `;
