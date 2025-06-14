@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
+const wishlistController = require("../controllers/wishlist.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 // USER REGISTRATION
 router.post("/user/register", (req, res) =>
@@ -49,4 +50,17 @@ router.post("/register-email", userController.registerEmail);
 router.post("/verify-email-token", userController.verifyEmailToken);
 // get user details
 router.get("/me", isAuthorized, userController.getUserDetails);
+
+// wishlist.routes.js
+// ✅ Create a wishlist item
+router.post("/", isAuthorized, wishlistController.createWishlist);
+
+// ✅ Get all wishlist items for logged-in user
+router.get("/", isAuthorized, wishlistController.getWishlist);
+
+// ✅ Update wishlist item (usually type)
+router.put("/:id", isAuthorized, wishlistController.updateWishlistItem);
+
+// ✅ Delete a wishlist item by ID
+router.delete("/:id", isAuthorized, wishlistController.deleteWishlistItem);
 module.exports = router;
