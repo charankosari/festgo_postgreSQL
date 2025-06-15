@@ -225,7 +225,6 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 exports.getAmenitiesForProperty = async (req, res) => {
   try {
     const { propertyId } = req.body;
@@ -265,15 +264,13 @@ exports.getAmenitiesForProperty = async (req, res) => {
     // === Fetch Room Amenities ===
     const rooms = await Room.findAll({
       where: { propertyId },
-      include: ["room_amenities"], // assuming you have a relation alias set as 'room_amenities'
+      include: [{ model: room_amenity, as: "roomAmenities" }],
     });
-
     const roomAmenityIds = rooms.flatMap((room) =>
       room.room_amenities.map((ra) => ra.roomAmenityId)
     );
 
     const uniqueRoomAmenityIds = [...new Set(roomAmenityIds)];
-
     const roomAmenities = await room_amenity.findAll({
       where: { id: uniqueRoomAmenityIds },
       include: [{ model: room_amenity_category, as: "roomAmenityCategory" }],
@@ -282,7 +279,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
 
     const roomAmenitiesList = roomAmenities.map((ra) => {
       const matchedValue = rooms
-        .flatMap((room) => room.room_amenities)
+        .flatMap((room) => room.roomAmenities)
         .find((ram) => ram.roomAmenityId === ra.id)?.value;
 
       return {
@@ -307,6 +304,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
     res.status(500).json({ message: "Something went wrong", error });
   }
 };
+
 exports.getRoomsByPropertyId = async (req, res) => {
   try {
     const { propertyId } = req.params;
@@ -321,7 +319,7 @@ exports.getRoomsByPropertyId = async (req, res) => {
       include: [
         {
           model: room_amenity,
-          as: "room_amenities", // use the alias you defined in your model
+          as: "roomAmenities", // use the alias you defined in your model
         },
       ],
     });

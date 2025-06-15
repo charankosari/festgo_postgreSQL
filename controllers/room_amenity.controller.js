@@ -111,6 +111,7 @@ exports.getAmenitiesGroupedByCategory = async (req, res) => {
         name: a.name,
         type: a.type,
         options: a.options,
+        image: a.image,
       }));
     });
 

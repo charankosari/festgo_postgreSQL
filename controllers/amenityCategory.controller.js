@@ -2,8 +2,8 @@ const { amenity_category } = require("../models/services");
 
 exports.createCategory = async (req, res) => {
   try {
-    const { categoryName } = req.body;
-    const newCategory = await amenity_category.create({ categoryName });
+    const { categoryName, image } = req.body;
+    const newCategory = await amenity_category.create({ categoryName, image });
     res.status(201).json(newCategory);
   } catch (err) {
     res.status(500).json({ message: err.message });

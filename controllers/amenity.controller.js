@@ -2,7 +2,7 @@ const { amenity, amenity_category } = require("../models/services");
 
 exports.createAmenity = async (req, res) => {
   try {
-    const { categoryId, name, type, options } = req.body;
+    const { categoryId, name, type, options, image } = req.body;
 
     if (type === "MULTI" && (!options || !Array.isArray(options)))
       return res
@@ -13,6 +13,7 @@ exports.createAmenity = async (req, res) => {
       categoryId,
       name,
       type,
+      image,
       options: type === "BOOLEAN" ? null : options,
     });
 
@@ -46,7 +47,7 @@ exports.updateAmenity = async (req, res) => {
     const ament = await amenity.findByPk(req.params.id);
     if (!ament) return res.status(404).json({ message: "Amenity not found" });
 
-    const { name, type, options } = req.body;
+    const { name, type, options, image } = req.body;
 
     if (type && type === "MULTI" && (!options || !Array.isArray(options)))
       return res
@@ -56,6 +57,7 @@ exports.updateAmenity = async (req, res) => {
     await ament.update({
       name: name ?? ament.name,
       type: type ?? ament.type,
+      image: image ?? ament.image,
       options: type === "BOOLEAN" ? null : options ?? ament.options,
     });
 
@@ -97,6 +99,7 @@ exports.getAllAmenitiesGroupedByCategory = async (req, res) => {
         name: ament.name,
         type: ament.type,
         options: ament.options,
+        image: ament.image,
       }));
     });
 

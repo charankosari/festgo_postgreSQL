@@ -22,6 +22,10 @@ module.exports = (sequelize) => {
         type: DataTypes.ENUM("BOOLEAN", "MULTI"),
         allowNull: false,
       },
+      image: {
+        type: DataTypes.STRING,
+        allowNull: true, // can be null if no image is assigned yet
+      },
       options: {
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,

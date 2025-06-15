@@ -61,6 +61,17 @@ MenuItem.belongsTo(MenuType, {
   as: "menuType",
   onDelete: "CASCADE",
 });
+Room.hasMany(room_amenity, {
+  foreignKey: "roomId",
+  as: "roomAmenities", // camelCase
+  onDelete: "CASCADE",
+});
+
+room_amenity.belongsTo(Room, {
+  foreignKey: "roomId",
+  as: "room",
+  onDelete: "CASCADE",
+});
 // Setup DB object
 const db = {
   Sequelize: servicesSequelize,
