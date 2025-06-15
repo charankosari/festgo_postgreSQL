@@ -244,7 +244,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
     const amenities = await amenity.findAll({
       where: { id: amenityIds },
       include: [{ model: amenity_category, as: "category" }],
-      attributes: ["id", "name", "type", "options"],
+      attributes: ["id", "name", "type", "options", "image"],
     });
 
     const propertyAmenities = amenities.map((a) => {
@@ -256,8 +256,10 @@ exports.getAmenitiesForProperty = async (req, res) => {
         id: a.id,
         name: a.name,
         type: a.type,
+        image: a.image,
         value: matchedValue,
         categoryName: a.category ? a.category.categoryName : null,
+        categoryImage: a.category ? a.category.image : null,
       };
     });
 
@@ -274,7 +276,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
     const roomAmenities = await room_amenity.findAll({
       where: { id: uniqueRoomAmenityIds },
       include: [{ model: room_amenity_category, as: "roomAmenityCategory" }],
-      attributes: ["id", "name", "type", "options"],
+      attributes: ["id", "name", "type", "options", "image"],
     });
 
     const roomAmenitiesList = roomAmenities.map((ra) => {
@@ -287,8 +289,12 @@ exports.getAmenitiesForProperty = async (req, res) => {
         name: ra.name,
         type: ra.type,
         value: matchedValue,
+        image: ra.image,
         categoryName: ra.roomAmenityCategory
           ? ra.roomAmenityCategory.categoryName
+          : null,
+        categoryImage: ra.roomAmenityCategory
+          ? ra.roomAmenityCategory.image
           : null,
       };
     });
