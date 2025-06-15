@@ -197,10 +197,12 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     if (err instanceof Sequelize.UniqueConstraintError) {
       const field = err.errors[0].path;
-      return res.status(400).json({ message: `${field} already in use` });
+      return res
+        .status(400)
+        .json({ message: `${field} already in use`, status: 400 });
     }
     console.error("Error in updateProfile:", err);
-    res.status(500).json({ message: "Something went wrong" });
+    res.status(500).json({ message: "Something went wrong", status: 500 });
   }
 };
 
