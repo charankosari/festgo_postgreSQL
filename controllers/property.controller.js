@@ -172,6 +172,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
           delete plainProperty.ownership_details;
           return plainProperty;
         }),
+        status: 200,
       });
     }
 
@@ -214,6 +215,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     // Return only up to 20 properties
     res.json({
       success: true,
+      status: 200,
       properties: nearbyProperties.slice(0, 20).map((property) => {
         const plainProperty = property.get({ plain: true });
         delete plainProperty.ownership_details;
@@ -222,20 +224,24 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching properties:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message, status: 200 });
   }
 };
 exports.getAmenitiesForProperty = async (req, res) => {
   try {
     const { propertyId } = req.body;
     if (!propertyId) {
-      return res.status(400).json({ message: "propertyId is required" });
+      return res
+        .status(400)
+        .json({ message: "propertyId is required", status: 400 });
     }
 
     // Fetch property by id
     const property = await Property.findOne({ where: { id: propertyId } });
     if (!property) {
-      return res.status(404).json({ message: "Property not found" });
+      return res
+        .status(404)
+        .json({ message: "Property not found", status: 404 });
     }
 
     // === Fetch Property Amenities ===
@@ -304,10 +310,13 @@ exports.getAmenitiesForProperty = async (req, res) => {
       success: true,
       amenities: propertyAmenities,
       room_amenities: roomAmenitiesList,
+      status: 200,
     });
   } catch (error) {
     console.error("Error fetching amenities:", error);
-    res.status(500).json({ message: "Something went wrong", error });
+    res
+      .status(500)
+      .json({ message: "Something went wrong", error, status: 500 });
   }
 };
 
@@ -316,7 +325,9 @@ exports.getRoomsByPropertyId = async (req, res) => {
     const { propertyId } = req.params;
 
     if (!propertyId) {
-      return res.status(400).json({ message: "propertyId is required" });
+      return res
+        .status(400)
+        .json({ message: "propertyId is required", status: 400 });
     }
 
     // Fetch rooms by propertyId
@@ -333,16 +344,19 @@ exports.getRoomsByPropertyId = async (req, res) => {
     if (!rooms || rooms.length === 0) {
       return res
         .status(404)
-        .json({ message: "No rooms found for this property" });
+        .json({ message: "No rooms found for this property", status: 404 });
     }
 
     res.status(200).json({
       success: true,
+      status: 200,
       rooms,
     });
   } catch (error) {
     console.error("Error fetching rooms:", error);
-    res.status(500).json({ message: "Something went wrong", error });
+    res
+      .status(500)
+      .json({ message: "Something went wrong", error, status: 500 });
   }
 };
 exports.editRoom = async (req, res) => {
