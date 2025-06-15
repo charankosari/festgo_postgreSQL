@@ -183,7 +183,7 @@ exports.updateProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found", status: 404 });
     }
 
     // Update fields if any
@@ -191,7 +191,9 @@ exports.updateProfile = async (req, res) => {
       await user.update(updateData);
     }
 
-    res.status(200).json({ message: "Profile updated successfully" });
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", status: 200 });
   } catch (err) {
     if (err instanceof Sequelize.UniqueConstraintError) {
       const field = err.errors[0].path;
@@ -336,6 +338,7 @@ exports.getUserDetails = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found",
+        status: 404,
       });
     }
 
@@ -345,19 +348,21 @@ exports.getUserDetails = async (req, res) => {
     res.status(200).json({
       success: true,
       user: cleanUser,
+      status: 200,
     });
   } catch (error) {
     console.error("Error fetching user details:", error.message);
     res.status(500).json({
       success: false,
       message: "Server error",
+      status: 500,
     });
   }
 };
 
 // for user login or signup with email or number
 exports.loginWithEmailOrMobile = async (req, res) => {
-  const { email } = req.body;
+  const { email, image_url, username } = req.body;
   const loginType = req.body.loginType?.toLowerCase();
   if (!email || !loginType) {
     return res
@@ -386,6 +391,8 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           email,
           role: "user",
           status: "pending",
+          image_url,
+          username,
           token,
           tokenExpire,
         });
@@ -415,6 +422,8 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           number: email,
           role: "user",
           status: "pending",
+          image_url,
+          username,
           mobile_otp: otp,
           mobile_otp_expire: otpExpire,
         });
@@ -425,21 +434,28 @@ exports.loginWithEmailOrMobile = async (req, res) => {
 
       if (smsResponse.status === "failed") {
         console.error("SMS sending failed:", smsResponse.error);
-        return res.status(500).json({ message: "Failed to send OTP via SMS" });
+        return res
+          .status(500)
+          .json({ message: "Failed to send OTP via SMS", status: 500 });
       }
 
-      return res.status(200).json({ message: "OTP sent to mobile number" });
+      return res
+        .status(200)
+        .json({ status: 200, message: "OTP sent to mobile number" });
     } else {
-      return res.status(400).json({ message: "Invalid loginType" });
+      return res
+        .status(400)
+        .json({ status: 400, message: "Invalid loginType" });
     }
   } catch (err) {
     console.error("Error in loginWithEmailOrMobile:", err);
-    res.status(500).json({ message: "Something went wrong" });
+    res.status(500).json({ message: "Something went wrong", status: 500 });
   }
 };
 exports.verifyEmailToken = async (req, res) => {
   const { token } = req.body;
-  if (!token) return res.status(400).json({ message: "Token is required" });
+  if (!token)
+    return res.status(400).json({ message: "Token is required", status: 400 });
 
   try {
     // Find user by token
@@ -448,10 +464,10 @@ exports.verifyEmailToken = async (req, res) => {
     if (!user)
       return res
         .status(400)
-        .json({ message: "Invalid link or user not found" });
+        .json({ message: "Invalid link or user not found", status: 400 });
 
     if (user.tokenExpire < new Date())
-      return res.status(400).json({ message: "Link has expired" });
+      return res.status(400).json({ message: "Link has expired", status: 400 });
 
     // Mark email as verified, clear token fields
     user.token = null;
@@ -465,7 +481,7 @@ exports.verifyEmailToken = async (req, res) => {
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
-    res.status(500).json({ message: "Something went wrong" });
+    res.status(500).json({ message: "Something went wrong", status: 500 });
   }
 };
 exports.verifyOtp = async (req, res) => {
@@ -475,7 +491,9 @@ exports.verifyOtp = async (req, res) => {
     user.mobile_otp !== req.body.otp ||
     Date.now() > user.mobile_otp_expire
   )
-    return res.status(400).json({ message: "Invalid or expired OTP" });
+    return res
+      .status(400)
+      .json({ message: "Invalid or expired OTP", status: 400 });
 
   user.mobile_otp = null;
   user.mobile_otp_expire = null;

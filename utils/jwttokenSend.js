@@ -18,7 +18,7 @@ const sendJwt = async (user, statusCode, message, res) => {
   res
     .status(statusCode)
     .cookie("jwtToken", jwtToken, options)
-    .json({ success: true, message, jwtToken, user });
+    .json({ success: true, message, jwtToken, user, status: 200 });
 };
 
 module.exports = sendJwt;
