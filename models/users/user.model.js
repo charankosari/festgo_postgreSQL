@@ -32,15 +32,11 @@ module.exports = (sequelize) => {
       mobile_otp_expire: { type: DataTypes.DATE, defaultValue: null },
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
-      billing_details: {
-        type: DataTypes.JSONB,
-        allowNull: true,
-        defaultValue: {
-          billing_address: "",
-          pincode: "",
-          state: "",
-        },
-      },
+      logintype: { type: DataTypes.STRING, defaultValue: null },
+
+      pincode: { type: DataTypes.STRING, defaultValue: null },
+      state: { type: DataTypes.STRING, defaultValue: null },
+      billing_address: { type: DataTypes.STRING, defaultValue: null },
       token: {
         type: DataTypes.STRING,
         allowNull: true,

@@ -36,7 +36,9 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "resetPasswordExpire",
     "tokenExpire",
     "token",
-    "billing_details",
+    "billing_address",
+    "pincode",
+    "state",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -195,7 +197,9 @@ exports.updateProfile = async (req, res) => {
         "gender",
         "date_of_birth",
         "location",
-        "billing_details",
+        "billing_address",
+        "pincode",
+        "state",
         "email",
         "number",
         "image_url",
@@ -414,29 +418,60 @@ exports.getUserDetails = async (req, res) => {
 exports.loginWithEmailOrMobile = async (req, res) => {
   const { email, image_url, firstname, lastname } = req.body;
   const loginType = req.body.loginType?.toLowerCase();
+
   if (!email || !loginType) {
     return res
       .status(400)
-      .json({ message: "Email/Mobile and loginType required" });
+      .json({ message: "Email and loginType are required", status: 400 });
   }
 
   try {
     let user;
 
+    if (["gmail", "facebook"].includes(loginType)) {
+      user = await User.findOne({ where: { email } });
+
+      if (user) {
+        const cleanUser = safeUser(
+          user,
+          ["username"],
+          ["billing_address", "pincode", "state"]
+        );
+        const message = "Login successfull";
+        sendToken(cleanUser, 201, message, res);
+      } else {
+        user = await User.create({
+          email,
+          role: "user",
+          status: "pending",
+          image_url,
+          firstname,
+          lastname,
+          logintype: loginType,
+        });
+
+        const cleanUser = safeUser(
+          user,
+          ["username"],
+          ["billing_address", "pincode", "state"]
+        );
+        const message = "Login successfull";
+        sendToken(cleanUser, 201, message, res);
+      }
+    }
+
+    // Email link login
     if (loginType === "email") {
       user = await User.findOne({ where: { email } });
 
-      // Generate token
       const token = crypto.randomBytes(32).toString("hex");
-      const tokenExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      const tokenExpire = new Date(Date.now() + 10 * 60 * 1000);
 
       if (user) {
-        // If user exists, update token and expiry
         user.token = token;
         user.tokenExpire = tokenExpire;
         await user.save();
       } else {
-        // Create new user with pending status
         user = await User.create({
           email,
           role: "user",
@@ -446,6 +481,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           lastname,
           token,
           tokenExpire,
+          logintype: loginType,
         });
       }
 
@@ -456,11 +492,15 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         SignupEmail(verificationLink)
       );
 
-      return res.status(200).json({ message: "Email login link sent" });
-    } else if (loginType === "mobile") {
+      return res
+        .status(200)
+        .json({ message: "Email login link sent", status: 200 });
+    }
+
+    // Mobile login
+    if (loginType === "mobile") {
       user = await User.findOne({ where: { number: email } });
 
-      // Generate OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const otpExpire = Date.now() + 10 * 60 * 1000;
 
@@ -475,6 +515,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           status: "pending",
           image_url,
           firstname,
+          logintype: loginType,
           lastname,
           mobile_otp: otp,
           mobile_otp_expire: otpExpire,
@@ -493,17 +534,17 @@ exports.loginWithEmailOrMobile = async (req, res) => {
 
       return res
         .status(200)
-        .json({ status: 200, message: "OTP sent to mobile number" });
-    } else {
-      return res
-        .status(400)
-        .json({ status: 400, message: "Invalid loginType" });
+        .json({ message: "OTP sent to mobile number", status: 200 });
     }
+
+    // Invalid loginType
+    return res.status(400).json({ status: 400, message: "Invalid loginType" });
   } catch (err) {
     console.error("Error in loginWithEmailOrMobile:", err);
     res.status(500).json({ message: "Something went wrong", status: 500 });
   }
 };
+
 exports.verifyEmailToken = async (req, res) => {
   const { token } = req.body;
   if (!token)
@@ -529,7 +570,11 @@ exports.verifyEmailToken = async (req, res) => {
     await user.save();
 
     const message = "Registration successful";
-    const cleanUser = safeUser(user, ["username"], []);
+    const cleanUser = safeUser(
+      user,
+      ["username"],
+      ["billing_address", "pincode", "state"]
+    );
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
@@ -552,7 +597,11 @@ exports.verifyOtp = async (req, res) => {
   user.mobile_verified = true;
   user.status = "active";
   await user.save();
-  const cleanUser = safeUser(user, ["username"], []);
+  const cleanUser = safeUser(
+    user,
+    ["username"],
+    ["billing_address", "pincode", "state"]
+  );
   const message = "Login successfull";
   sendToken(cleanUser, 200, message, res);
 };

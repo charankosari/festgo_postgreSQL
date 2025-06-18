@@ -49,7 +49,7 @@ router.post("/verify-login-otp", userController.verifyLoginViaOtp);
 router.post("/userlogin", userController.loginWithEmailOrMobile);
 router.post("/verify-email", userController.verifyEmailToken);
 router.post("/verify-otp", userController.verifyOtp);
-router.post("/auth/google", userController.googleAuth);
+// router.post("/auth/google", userController.googleAuth);
 // get user details
 router.get("/me", isAuthorized, userController.getUserDetails);
 
