@@ -388,13 +388,16 @@ exports.getUserDetails = async (req, res) => {
     }
 
     if (user.role === "user") {
-      cleanUser = safeUser(user, ["username"]);
+      cleanUser = safeUser(
+        user,
+        ["username"],
+        ["billing_address", "pincode", "state"]
+      );
     } else {
       cleanUser = safeUser(user, [
         "firstname",
         "lastname",
         "gender",
-        "billing_details",
         "location",
         "date_of_birth",
       ]);
