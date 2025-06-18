@@ -7,7 +7,6 @@ const { loginOtpTemplate } = require("../libs/sms/messageTemplates");
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
 const {
   otpTemplate,
   changePasswordTemplate,
@@ -20,7 +19,6 @@ const sendJwt = require("../utils/jwttokenSend");
 // Load environment variables
 dotenv.config({ path: path.resolve("./config/config.env") });
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
   if (!user) return null;
 
@@ -610,46 +608,46 @@ exports.verifyOtp = async (req, res) => {
 };
 // login and signup with google
 
-exports.googleAuth = async (req, res, next) => {
-  const { token } = req.body;
+// exports.googleAuth = async (req, res, next) => {
+//   const { token } = req.body;
 
-  if (!token) {
-    return next(new errorHandler("Google token is required", 400));
-  }
+//   if (!token) {
+//     return next(new errorHandler("Google token is required", 400));
+//   }
 
-  let ticket;
-  try {
-    // Verify the token using Google client
-    ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-  } catch (error) {
-    return next(new errorHandler("Invalid Google token", 400));
-  }
+//   let ticket;
+//   try {
+//     // Verify the token using Google client
+//     ticket = await client.verifyIdToken({
+//       idToken: token,
+//       audience: process.env.GOOGLE_CLIENT_ID,
+//     });
+//   } catch (error) {
+//     return next(new errorHandler("Invalid Google token", 400));
+//   }
 
-  const payload = ticket.getPayload();
-  const { email, given_name, family_name, picture } = payload;
-  // Check if user already exists in PostgreSQL DB
-  let user = await User.findOne({ where: { email } });
-  let message = "";
+//   const payload = ticket.getPayload();
+//   const { email, given_name, family_name, picture } = payload;
+//   // Check if user already exists in PostgreSQL DB
+//   let user = await User.findOne({ where: { email } });
+//   let message = "";
 
-  if (user) {
-    message = "Google authentication successful";
-    const cleanUser = safeUser(user, ["username"], ["billing_details"]);
-    return sendJwt(cleanUser, 200, message, res);
-  }
+//   if (user) {
+//     message = "Google authentication successful";
+//     const cleanUser = safeUser(user, ["username"], ["billing_details"]);
+//     return sendJwt(cleanUser, 200, message, res);
+//   }
 
-  // Create new user in PostgreSQL
-  user = await User.create({
-    email,
-    firstname: given_name,
-    lastname: family_name,
-    image_url: picture,
-    role: "user",
-    email_verified: true,
-  });
-  const cleanUser = safeUser(user, ["username"], ["billing_details"]);
-  message = "Google authentication successful (new user)";
-  return sendJwt(cleanUser, 200, message, res);
-};
+//   // Create new user in PostgreSQL
+//   user = await User.create({
+//     email,
+//     firstname: given_name,
+//     lastname: family_name,
+//     image_url: picture,
+//     role: "user",
+//     email_verified: true,
+//   });
+//   const cleanUser = safeUser(user, ["username"], ["billing_details"]);
+//   message = "Google authentication successful (new user)";
+//   return sendJwt(cleanUser, 200, message, res);
+// };
