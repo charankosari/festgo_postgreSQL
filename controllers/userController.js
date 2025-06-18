@@ -7,6 +7,7 @@ const { loginOtpTemplate } = require("../libs/sms/messageTemplates");
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const { OAuth2Client } = require("google-auth-library");
 const {
   otpTemplate,
   changePasswordTemplate,
@@ -14,8 +15,12 @@ const {
 } = require("../libs/mailgun/mailTemplates");
 const path = require("path");
 const dotenv = require("dotenv");
+const sendJwt = require("../utils/jwttokenSend");
+
 // Load environment variables
 dotenv.config({ path: path.resolve("./config/config.env") });
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
   if (!user) return null;
 
@@ -31,6 +36,7 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "resetPasswordExpire",
     "tokenExpire",
     "token",
+    "billing_details",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -93,7 +99,14 @@ exports.loginUser = async (req, res) => {
   }
 
   const message = "Login successful";
-  const cleanUser = safeUser(user);
+  const cleanUser = safeUser(user, [
+    "firstname",
+    "lastname",
+    "gender",
+    "billing_details",
+    "location",
+    "date_of_birth",
+  ]);
   sendToken(cleanUser, 200, message, res);
 };
 
@@ -165,44 +178,62 @@ exports.updatePassword = async (req, res) => {
   sendToken(user, 200, message, res);
 };
 
-// Update Profile
 exports.updateProfile = async (req, res) => {
-  const fields = [
-    "username",
-    "email",
-    "number",
-    "image_url",
-    "date_of_birth",
-    "gender",
-  ];
-  const updateData = {};
-  fields.forEach((field) => {
-    if (req.body[field] !== undefined) updateData[field] = req.body[field];
-  });
-
   try {
     const user = await User.findByPk(req.user.id);
     if (!user) {
       return res.status(404).json({ message: "User not found", status: 404 });
     }
 
-    // Update fields if any
+    // Define allowed fields based on user role
+    let fields = [];
+
+    if (user.role === "user") {
+      fields = [
+        "firstname",
+        "lastname",
+        "gender",
+        "date_of_birth",
+        "location",
+        "billing_details",
+        "email",
+        "number",
+        "image_url",
+      ];
+    } else {
+      fields = ["username", "email", "number", "image_url"];
+    }
+
+    // Build update data based on allowed fields
+    const updateData = {};
+    fields.forEach((field) => {
+      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+    });
+
+    // Debug: log what is being updated
+    console.log("Updating fields:", updateData);
+
     if (Object.keys(updateData).length > 0) {
       await user.update(updateData);
     }
 
-    res
-      .status(200)
-      .json({ message: "Profile updated successfully", status: 200 });
+    res.status(200).json({
+      message: "Profile updated successfully",
+      status: 200,
+    });
   } catch (err) {
     if (err instanceof Sequelize.UniqueConstraintError) {
       const field = err.errors[0].path;
-      return res
-        .status(400)
-        .json({ message: `${field} already in use`, status: 400 });
+      return res.status(400).json({
+        message: `${field} already in use`,
+        status: 400,
+      });
     }
     console.error("Error in updateProfile:", err);
-    res.status(500).json({ message: "Something went wrong", status: 500 });
+    res.status(500).json({
+      message: "Something went wrong",
+      status: 500,
+    });
   }
 };
 
@@ -328,7 +359,15 @@ exports.verifyLoginViaOtp = async (req, res) => {
   user.mobile_otp_expire = null;
   await user.save();
   const message = "Login successfull";
-  sendToken(user, 200, message, res);
+  const cleanuser = safeUser(user, [
+    "firstname",
+    "lastname",
+    "gender",
+    "billing_details",
+    "location",
+    "date_of_birth",
+  ]);
+  sendToken(cleanuser, 200, message, res);
 };
 exports.getUserDetails = async (req, res) => {
   try {
@@ -344,9 +383,18 @@ exports.getUserDetails = async (req, res) => {
       });
     }
 
-    // Use the safeUser utility to clean sensitive fields
-    const cleanUser = safeUser(user);
-
+    if (user.role === "user") {
+      cleanUser = safeUser(user, ["username"]);
+    } else {
+      cleanUser = safeUser(user, [
+        "firstname",
+        "lastname",
+        "gender",
+        "billing_details",
+        "location",
+        "date_of_birth",
+      ]);
+    }
     res.status(200).json({
       success: true,
       user: cleanUser,
@@ -364,7 +412,7 @@ exports.getUserDetails = async (req, res) => {
 
 // for user login or signup with email or number
 exports.loginWithEmailOrMobile = async (req, res) => {
-  const { email, image_url, username } = req.body;
+  const { email, image_url, firstname, lastname } = req.body;
   const loginType = req.body.loginType?.toLowerCase();
   if (!email || !loginType) {
     return res
@@ -394,7 +442,8 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           role: "user",
           status: "pending",
           image_url,
-          username,
+          firstname,
+          lastname,
           token,
           tokenExpire,
         });
@@ -425,7 +474,8 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           role: "user",
           status: "pending",
           image_url,
-          username,
+          firstname,
+          lastname,
           mobile_otp: otp,
           mobile_otp_expire: otpExpire,
         });
@@ -479,7 +529,7 @@ exports.verifyEmailToken = async (req, res) => {
     await user.save();
 
     const message = "Registration successful";
-    const cleanUser = safeUser(user);
+    const cleanUser = safeUser(user, ["username"], []);
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
@@ -502,7 +552,52 @@ exports.verifyOtp = async (req, res) => {
   user.mobile_verified = true;
   user.status = "active";
   await user.save();
-  const cleanUser = safeUser(user);
+  const cleanUser = safeUser(user, ["username"], []);
   const message = "Login successfull";
   sendToken(cleanUser, 200, message, res);
+};
+// login and signup with google
+
+exports.googleAuth = async (req, res, next) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return next(new errorHandler("Google token is required", 400));
+  }
+
+  let ticket;
+  try {
+    // Verify the token using Google client
+    ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+  } catch (error) {
+    return next(new errorHandler("Invalid Google token", 400));
+  }
+
+  const payload = ticket.getPayload();
+  const { email, given_name, family_name, picture } = payload;
+  // Check if user already exists in PostgreSQL DB
+  let user = await User.findOne({ where: { email } });
+  let message = "";
+
+  if (user) {
+    message = "Google authentication successful";
+    const cleanUser = safeUser(user, ["username"], ["billing_details"]);
+    return sendJwt(cleanUser, 200, message, res);
+  }
+
+  // Create new user in PostgreSQL
+  user = await User.create({
+    email,
+    firstname: given_name,
+    lastname: family_name,
+    image_url: picture,
+    role: "user",
+    email_verified: true,
+  });
+  const cleanUser = safeUser(user, ["username"], ["billing_details"]);
+  message = "Google authentication successful (new user)";
+  return sendJwt(cleanUser, 200, message, res);
 };

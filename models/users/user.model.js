@@ -12,6 +12,9 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      firstname: { type: DataTypes.STRING, allowNull: true },
+      lastname: { type: DataTypes.STRING, allowNull: true },
+      location: { type: DataTypes.STRING, allowNull: true },
       username: { type: DataTypes.STRING, allowNull: true },
       email: { type: DataTypes.STRING, allowNull: true, unique: true },
       number: { type: DataTypes.STRING, allowNull: true, unique: true },
@@ -29,6 +32,15 @@ module.exports = (sequelize) => {
       mobile_otp_expire: { type: DataTypes.DATE, defaultValue: null },
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
+      billing_details: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {
+          billing_address: "",
+          pincode: "",
+          state: "",
+        },
+      },
       token: {
         type: DataTypes.STRING,
         allowNull: true,

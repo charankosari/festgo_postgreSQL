@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Login Example</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      function handleCredentialResponse(response) {
+        // Decode the JWT token to see the user's info
+        const data = parseJwt(response.credential);
+        console.log("User Info: ", data);
+        document.getElementById("user-info").innerHTML = `
+          <p><strong>Name:</strong> ${data.name}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <img src="${data.picture}" alt="Profile Picture" />
+        `;
+      }
+
+      function parseJwt(token) {
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map(function (c) {
+              return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+            })
+            .join("")
+        );
+        return JSON.parse(jsonPayload);
+      }
+    </script>
+  </head>
+  <body>
+    <h2>Login with Google</h2>
+    <div
+      id="g_id_onload"
+      data-client_id="279985081336-n66tsurbc0l1vsmar96aqko0cv5eodu9.apps.googleusercontent.com"
+      data-callback="handleCredentialResponse"
+      data-auto_prompt="false"
+    ></div>
+
+    <div
+      class="g_id_signin"
+      data-type="standard"
+      data-size="large"
+      data-theme="outline"
+      data-text="sign_in_with"
+      data-shape="rectangular"
+      data-logo_alignment="left"
+    ></div>
+
+    <div id="user-info"></div>
+  </body>
+</html>
