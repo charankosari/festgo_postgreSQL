@@ -8,6 +8,7 @@ const {
   room_amenity_category,
   RoomBookedDate,
 } = require("../models/services/index");
+const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
 
@@ -15,7 +16,65 @@ const TOTAL_STEPS = 7;
 const calculateStatus = (currentStep) => {
   return Math.floor((currentStep / TOTAL_STEPS) * 100);
 };
+// helper for checking available rooms
+const checkAvailableRooms = async (
+  property,
+  adult,
+  child,
+  requestedRooms,
+  startDate,
+  finalDate
+) => {
+  const roomConditions = { propertyId: property.id };
 
+  const totalPeople =
+    (!isNaN(parseInt(adult)) ? parseInt(adult) : 0) +
+    (!isNaN(parseInt(child)) ? parseInt(child) : 0);
+  if (totalPeople > 0) {
+    roomConditions.max_people = { [Op.gte]: totalPeople };
+  }
+  if (adult !== null && adult !== undefined && !isNaN(adult)) {
+    roomConditions.max_adults = { [Op.gte]: parseInt(adult) };
+  }
+  if (child !== null && child !== undefined && !isNaN(child)) {
+    roomConditions.max_children = { [Op.gte]: parseInt(child) };
+  }
+
+  const roomsInProperty = await Room.findAll({ where: roomConditions });
+  if (!roomsInProperty.length) return null;
+
+  const roomIds = roomsInProperty.map((room) => room.id);
+
+  const bookedRooms = await RoomBookedDate.findAll({
+    where: {
+      roomId: { [Op.in]: roomIds },
+      [Op.and]: [
+        { checkIn: { [Op.lt]: finalDate } },
+        { checkOut: { [Op.gt]: startDate } },
+      ],
+    },
+  });
+
+  const bookedRoomCounts = {};
+  bookedRooms.forEach((booking) => {
+    bookedRoomCounts[booking.roomId] =
+      (bookedRoomCounts[booking.roomId] || 0) + 1;
+  });
+
+  const availableRooms = roomsInProperty.filter((room) => {
+    const alreadyBooked = bookedRoomCounts[room.id] || 0;
+    return (
+      room.number_of_rooms - alreadyBooked >=
+      (isNaN(requestedRooms) ? 1 : requestedRooms)
+    );
+  });
+
+  if (!availableRooms.length) return null;
+
+  const plainProperty = property.get({ plain: true });
+  delete plainProperty.ownership_details;
+  return plainProperty;
+};
 // ✅ Create Property
 exports.createProperty = async (req, res) => {
   try {
@@ -230,8 +289,16 @@ exports.deleteProperty = async (req, res) => {
 // };
 exports.getAllActivePropertiesByRange = async (req, res) => {
   try {
-    const { latitude, longitude, rooms, adult, child, todate, enddate } =
-      req.body;
+    const {
+      latitude,
+      longitude,
+      rooms,
+      adult,
+      child,
+      todate,
+      enddate,
+      location,
+    } = req.body;
 
     if (!latitude || !longitude) {
       const properties = await Property.findAll({
@@ -254,7 +321,9 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     const finalDate = new Date(enddate);
     const requestedRooms = parseInt(rooms);
 
-    // Step 1: Find properties within 10km using Postgres earth_distance
+    const availableProperties = [];
+
+    // Step 1: Nearby properties within 10km
     const nearbyProperties = await Property.findAll({
       where: {
         active: true,
@@ -270,55 +339,40 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       },
     });
 
-    if (!nearbyProperties.length) {
-      return res.json({
-        success: true,
-        status: 200,
-        properties: [],
-      });
+    for (const property of nearbyProperties) {
+      const available = await checkAvailableRooms(
+        property,
+        adult,
+        child,
+        requestedRooms,
+        startDate,
+        finalDate
+      );
+      if (available) availableProperties.push(available);
     }
 
-    const availableProperties = [];
-
-    for (const property of nearbyProperties) {
-      const roomsInProperty = await Room.findAll({
+    // Step 2: If less than 20, get from same city (using location.city from req.body)
+    if (availableProperties.length < 20 && location) {
+      const cityProperties = await Property.findAll({
         where: {
-          propertyId: property.id,
-          max_people: { [Op.gte]: parseInt(adult) + parseInt(child) },
-          max_adults: { [Op.gte]: parseInt(adult) },
-          max_children: { [Op.gte]: parseInt(child) },
+          active: true,
+          [Op.and]: Sequelize.literal(`(location->>'city') = '${location}'`),
+          id: { [Op.notIn]: availableProperties.map((p) => `'${p.id}'`) },
         },
+        limit: 20 - availableProperties.length,
       });
 
-      if (!roomsInProperty.length) continue;
-
-      const roomIds = roomsInProperty.map((room) => room.id);
-
-      const bookedRooms = await RoomBookedDate.findAll({
-        where: {
-          roomId: { [Op.in]: roomIds },
-          [Op.and]: [
-            { checkIn: { [Op.lt]: finalDate } },
-            { checkOut: { [Op.gt]: startDate } },
-          ],
-        },
-      });
-
-      const bookedRoomCounts = {};
-      bookedRooms.forEach((booking) => {
-        bookedRoomCounts[booking.roomId] =
-          (bookedRoomCounts[booking.roomId] || 0) + 1;
-      });
-
-      const availableRooms = roomsInProperty.filter((room) => {
-        const alreadyBooked = bookedRoomCounts[room.id] || 0;
-        return room.number_of_rooms - alreadyBooked >= requestedRooms;
-      });
-
-      if (availableRooms.length) {
-        const plainProperty = property.get({ plain: true });
-        delete plainProperty.ownership_details;
-        availableProperties.push(plainProperty);
+      for (const property of cityProperties) {
+        const available = await checkAvailableRooms(
+          property,
+          adult,
+          child,
+          requestedRooms,
+          startDate,
+          finalDate
+        );
+        if (available) availableProperties.push(available);
+        if (availableProperties.length === 20) break;
       }
     }
 
@@ -332,6 +386,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     res.status(500).json({ message: err.message, status: 500 });
   }
 };
+
 exports.getAmenitiesForProperty = async (req, res) => {
   try {
     const { propertyId } = req.body;

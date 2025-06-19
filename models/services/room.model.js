@@ -18,7 +18,6 @@ module.exports = (sequelize) =>
     area: DataTypes.STRING,
     room_name: DataTypes.STRING,
     number_of_rooms: DataTypes.INTEGER,
-    available_rooms: DataTypes.INTEGER, // ✅ new field added
     description: DataTypes.TEXT,
     max_people: DataTypes.INTEGER,
     sleeping_arrangement: DataTypes.STRING,
