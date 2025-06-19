@@ -29,6 +29,7 @@ module.exports = (sequelize) =>
     max_children: DataTypes.INTEGER,
     discount: DataTypes.STRING,
     free_cancellation: DataTypes.STRING,
+    additional_info: DataTypes.STRING,
     free_breakfast: DataTypes.STRING,
     //end
 

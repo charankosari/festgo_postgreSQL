@@ -75,6 +75,93 @@ const checkAvailableRooms = async (
   delete plainProperty.ownership_details;
   return plainProperty;
 };
+
+const enrichProperties = async (properties) => {
+  const enriched = [];
+
+  for (const p of properties) {
+    const plain = p.get ? p.get({ plain: true }) : p;
+
+    // Fetch amenities by IDs
+    const amenityIds = plain.amenities?.map((a) => a.amenityId) || [];
+
+    let amenities = [];
+    if (amenityIds.length) {
+      const foundAmenities = await amenity.findAll({
+        where: { id: { [Op.in]: amenityIds } },
+        attributes: ["name"],
+      });
+      amenities = foundAmenities.map((a) => a.name);
+    }
+
+    // Attach amenities as 'facilities'
+    plain.facilities = amenities;
+
+    // Clean up ownership_details
+    delete plain.ownership_details;
+
+    // Format final response
+    const formattedProperty = await formatPropertyResponse(plain);
+    if (formattedProperty) enriched.push(formattedProperty);
+  }
+
+  return enriched;
+};
+
+const formatPropertyResponse = async (property) => {
+  const {
+    id,
+    vendorId,
+    name,
+    property_type,
+    email,
+    description,
+    star_rating,
+    location,
+    photos,
+    facilities,
+  } = property;
+
+  // Parse image URLs
+  const imageList = photos ? photos.map((p) => JSON.parse(p).url) : [];
+
+  // Fetch room
+  const room = await Room.findOne({
+    where: { propertyId: id },
+    order: [["discounted_price", "ASC"]],
+  });
+
+  // If no room found, skip property
+  if (!room) return null;
+
+  // Extract room details
+  const pricePerNight = `₹${room.discounted_price}`;
+  const originalPrice = `₹${room.original_price}`;
+  const discount = room.discount;
+  const additionalInfo = room.additional_info || "";
+  const freeBreakfast = room.free_breakfast;
+  const freeCancellation = room.free_cancellation;
+
+  return {
+    id,
+    vendorId,
+    name,
+    property_type,
+    email,
+    description,
+    star_rating,
+    pricePerNight,
+    originalPrice,
+    discount,
+    additionalInfo,
+    freeBreakfast,
+    freeCancellation,
+    location,
+    facilities,
+    imageList,
+  };
+};
+
 // ✅ Create Property
 exports.createProperty = async (req, res) => {
   try {
@@ -136,7 +223,16 @@ exports.updateProperty = async (req, res) => {
     await property.update(updates);
 
     // recalculate status and completion state
-    const currentStep = updates.current_step || property.current_step + 1;
+    let currentStep = property.current_step;
+
+    // If update value exists and is ≤ 7, use it
+    if (updates.current_step !== undefined) {
+      currentStep = Math.min(updates.current_step, 7);
+    } else if (currentStep < 7) {
+      // If no update provided, increment only if less than 7
+      currentStep += 1;
+    }
+
     const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
@@ -306,14 +402,11 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
         limit: 20,
       });
 
+      const finalProperties = await enrichProperties(properties);
       return res.json({
         success: true,
         status: 200,
-        properties: properties.map((p) => {
-          const plain = p.get({ plain: true });
-          delete plain.ownership_details;
-          return plain;
-        }),
+        properties: finalProperties,
       });
     }
 
@@ -351,7 +444,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       if (available) availableProperties.push(available);
     }
 
-    // Step 2: If less than 20, get from same city (using location.city from req.body)
+    // Step 2: If less than 20, fetch from same city
     if (availableProperties.length < 20 && location) {
       const cityProperties = await Property.findAll({
         where: {
@@ -376,10 +469,13 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
+    // Step 3: Enrich property responses with amenity names
+    const finalProperties = await enrichProperties(availableProperties);
+
     res.json({
       success: true,
       status: 200,
-      properties: availableProperties,
+      properties: finalProperties,
     });
   } catch (err) {
     console.error("Error fetching nearby properties:", err);
