@@ -23,13 +23,22 @@ module.exports = (sequelize) =>
     max_people: DataTypes.INTEGER,
     sleeping_arrangement: DataTypes.STRING,
     bathroom_details: DataTypes.STRING,
+    // newly added things
+    original_price: DataTypes.FLOAT,
+    discounted_price: DataTypes.FLOAT,
+    max_adults: DataTypes.INTEGER,
+    max_children: DataTypes.INTEGER,
+    discount: DataTypes.STRING,
+    free_cancellation: DataTypes.STRING,
+    free_breakfast: DataTypes.STRING,
+    //end
 
     meal_plans: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
     },
 
-    rates: DataTypes.FLOAT,
+    // rates: DataTypes.FLOAT,
     inventory_details: DataTypes.STRING,
 
     room_amenities: {

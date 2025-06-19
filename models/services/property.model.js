@@ -21,7 +21,6 @@ module.exports = (sequelize) =>
     accepting_bookings_since: DataTypes.DATE,
     mobile_number: DataTypes.STRING,
     landline_number: DataTypes.STRING,
-
     current_step: {
       type: DataTypes.INTEGER,
       defaultValue: 0,

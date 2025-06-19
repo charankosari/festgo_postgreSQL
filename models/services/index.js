@@ -6,6 +6,7 @@ const amenity = require("./amenity.model")(servicesSequelize);
 const room_amenity_category = require("./room_amenity_category.model")(
   servicesSequelize
 );
+const RoomBookedDate = require("./roomBookedDate.model")(servicesSequelize);
 const room_amenity = require("./room_amenity.model")(servicesSequelize);
 const Property = require("./property.model")(servicesSequelize);
 const Room = require("./room.model")(servicesSequelize);
@@ -72,6 +73,29 @@ room_amenity.belongsTo(Room, {
   as: "room",
   onDelete: "CASCADE",
 });
+// for available rooms
+Property.hasMany(RoomBookedDate, {
+  foreignKey: "propertyId",
+  as: "roomBookedDates",
+  onDelete: "CASCADE",
+});
+RoomBookedDate.belongsTo(Property, {
+  foreignKey: "propertyId",
+  as: "property",
+  onDelete: "CASCADE",
+});
+
+Room.hasMany(RoomBookedDate, {
+  foreignKey: "roomId",
+  as: "bookedDates",
+  onDelete: "CASCADE",
+});
+RoomBookedDate.belongsTo(Room, {
+  foreignKey: "roomId",
+  as: "room",
+  onDelete: "CASCADE",
+});
+
 // Setup DB object
 const db = {
   Sequelize: servicesSequelize,
@@ -86,6 +110,7 @@ const db = {
   MenuItem,
   MenuType,
   Festbite,
+  RoomBookedDate,
 };
 
 // Sync all models

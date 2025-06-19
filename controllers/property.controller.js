@@ -6,6 +6,7 @@ const {
   amenity_category,
   room_amenity,
   room_amenity_category,
+  RoomBookedDate,
 } = require("../models/services/index");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
@@ -155,76 +156,180 @@ exports.deleteProperty = async (req, res) => {
   }
 };
 //  get property range 10 km
+// exports.getAllActivePropertiesByRange = async (req, res) => {
+//   try {
+//     const { latitude, longitude } = req.query;
+
+//     const properties = await Property.findAll({
+//       where: { active: true },
+//     });
+
+//     if (!latitude || !longitude) {
+//       // If no location provided, return first 20 active properties
+//       return res.json({
+//         success: true,
+//         properties: properties.slice(0, 20).map((property) => {
+//           const plainProperty = property.get({ plain: true });
+//           delete plainProperty.ownership_details;
+//           return plainProperty;
+//         }),
+//         status: 200,
+//       });
+//     }
+
+//     // Haversine distance function
+//     const haversineDistance = (lat1, lon1, lat2, lon2) => {
+//       const toRad = (value) => (value * Math.PI) / 180;
+//       const R = 6371; // Earth radius in km
+
+//       const dLat = toRad(lat2 - lat1);
+//       const dLon = toRad(lon2 - lon1);
+
+//       const a =
+//         Math.sin(dLat / 2) ** 2 +
+//         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+
+//       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+//       return R * c;
+//     };
+
+//     // Filter properties within 10km
+//     const nearbyProperties = properties.filter((property) => {
+//       if (!property.location) return false;
+
+//       const propLat = property.location.latitude;
+//       const propLng = property.location.longitude;
+
+//       if (propLat == null || propLng == null) return false;
+
+//       const distance = haversineDistance(
+//         parseFloat(latitude),
+//         parseFloat(longitude),
+//         parseFloat(propLat),
+//         parseFloat(propLng)
+//       );
+
+//       return distance <= 10;
+//     });
+
+//     // Return only up to 20 properties
+//     res.json({
+//       success: true,
+//       status: 200,
+//       properties: nearbyProperties.slice(0, 20).map((property) => {
+//         const plainProperty = property.get({ plain: true });
+//         delete plainProperty.ownership_details;
+//         return plainProperty;
+//       }),
+//     });
+//   } catch (err) {
+//     console.error("Error fetching properties:", err);
+//     res.status(500).json({ message: err.message, status: 200 });
+//   }
+// };
 exports.getAllActivePropertiesByRange = async (req, res) => {
   try {
-    const { latitude, longitude } = req.query;
-
-    const properties = await Property.findAll({
-      where: { active: true },
-    });
+    const { latitude, longitude, rooms, adult, child, todate, enddate } =
+      req.body;
 
     if (!latitude || !longitude) {
-      // If no location provided, return first 20 active properties
+      const properties = await Property.findAll({
+        where: { active: true },
+        limit: 20,
+      });
+
       return res.json({
         success: true,
-        properties: properties.slice(0, 20).map((property) => {
-          const plainProperty = property.get({ plain: true });
-          delete plainProperty.ownership_details;
-          return plainProperty;
-        }),
         status: 200,
+        properties: properties.map((p) => {
+          const plain = p.get({ plain: true });
+          delete plain.ownership_details;
+          return plain;
+        }),
       });
     }
 
-    // Haversine distance function
-    const haversineDistance = (lat1, lon1, lat2, lon2) => {
-      const toRad = (value) => (value * Math.PI) / 180;
-      const R = 6371; // Earth radius in km
+    const startDate = new Date(todate);
+    const finalDate = new Date(enddate);
+    const requestedRooms = parseInt(rooms);
 
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
-
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-      return R * c;
-    };
-
-    // Filter properties within 10km
-    const nearbyProperties = properties.filter((property) => {
-      if (!property.location) return false;
-
-      const propLat = property.location.latitude;
-      const propLng = property.location.longitude;
-
-      if (propLat == null || propLng == null) return false;
-
-      const distance = haversineDistance(
-        parseFloat(latitude),
-        parseFloat(longitude),
-        parseFloat(propLat),
-        parseFloat(propLng)
-      );
-
-      return distance <= 10;
+    // Step 1: Find properties within 10km using Postgres earth_distance
+    const nearbyProperties = await Property.findAll({
+      where: {
+        active: true,
+        [Op.and]: Sequelize.literal(`
+          earth_distance(
+            ll_to_earth(${latitude}, ${longitude}),
+            ll_to_earth(
+              (location->>'latitude')::float, 
+              (location->>'longitude')::float
+            )
+          ) <= 10000
+        `),
+      },
     });
 
-    // Return only up to 20 properties
+    if (!nearbyProperties.length) {
+      return res.json({
+        success: true,
+        status: 200,
+        properties: [],
+      });
+    }
+
+    const availableProperties = [];
+
+    for (const property of nearbyProperties) {
+      const roomsInProperty = await Room.findAll({
+        where: {
+          propertyId: property.id,
+          max_people: { [Op.gte]: parseInt(adult) + parseInt(child) },
+          max_adults: { [Op.gte]: parseInt(adult) },
+          max_children: { [Op.gte]: parseInt(child) },
+        },
+      });
+
+      if (!roomsInProperty.length) continue;
+
+      const roomIds = roomsInProperty.map((room) => room.id);
+
+      const bookedRooms = await RoomBookedDate.findAll({
+        where: {
+          roomId: { [Op.in]: roomIds },
+          [Op.and]: [
+            { checkIn: { [Op.lt]: finalDate } },
+            { checkOut: { [Op.gt]: startDate } },
+          ],
+        },
+      });
+
+      const bookedRoomCounts = {};
+      bookedRooms.forEach((booking) => {
+        bookedRoomCounts[booking.roomId] =
+          (bookedRoomCounts[booking.roomId] || 0) + 1;
+      });
+
+      const availableRooms = roomsInProperty.filter((room) => {
+        const alreadyBooked = bookedRoomCounts[room.id] || 0;
+        return room.number_of_rooms - alreadyBooked >= requestedRooms;
+      });
+
+      if (availableRooms.length) {
+        const plainProperty = property.get({ plain: true });
+        delete plainProperty.ownership_details;
+        availableProperties.push(plainProperty);
+      }
+    }
+
     res.json({
       success: true,
       status: 200,
-      properties: nearbyProperties.slice(0, 20).map((property) => {
-        const plainProperty = property.get({ plain: true });
-        delete plainProperty.ownership_details;
-        return plainProperty;
-      }),
+      properties: availableProperties,
     });
   } catch (err) {
-    console.error("Error fetching properties:", err);
-    res.status(500).json({ message: err.message, status: 200 });
+    console.error("Error fetching nearby properties:", err);
+    res.status(500).json({ message: err.message, status: 500 });
   }
 };
 exports.getAmenitiesForProperty = async (req, res) => {
