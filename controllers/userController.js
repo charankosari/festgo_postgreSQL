@@ -160,8 +160,8 @@ exports.resetPassword = async (req, res) => {
   user.resetPasswordToken = null;
   user.resetPasswordExpire = null;
   await user.save();
-
-  sendToken(user, 200, res);
+  const message = "password reset successfully";
+  sendToken(user, 200, message, res);
 };
 
 // Update Password
