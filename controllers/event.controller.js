@@ -3,10 +3,28 @@ const { Event, EventType } = require("../models/services"); // adjust path as pe
 // Create Event
 exports.createEvent = async (req, res) => {
   try {
-    const event = await Event.create(req.body);
-    res.status(201).json(event);
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: User not found" });
+    }
+    const eventData = {
+      ...req.body,
+      userId,
+    };
+    const event = await Event.create(eventData);
+    res.status(201).json({
+      success: true,
+      message: "Event created successfully",
+      status: 201,
+      event,
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Error creating event:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+      status: 400,
+    });
   }
 };
 
@@ -69,11 +87,11 @@ exports.getEventById = async (req, res) => {
 };
 
 // Get Events By VendorId
-exports.getEventsByVendorId = async (req, res) => {
+exports.getEventsByUserId = async (req, res) => {
   try {
-    const { vendorId } = req.params;
+    const { userId } = req.params;
     const events = await Event.findAll({
-      where: { vendorId },
+      where: { userId: userId },
       include: [{ model: EventType, as: "eventType" }],
     });
 
