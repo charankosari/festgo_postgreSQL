@@ -15,14 +15,9 @@ module.exports = (sequelize) =>
         unique: true,
         trim: true,
       },
-      imageUrls: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+      imageUrl: {
+        type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: [],
-      },
-      themes: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
-        defaultValue: [],
       },
     },
     {
