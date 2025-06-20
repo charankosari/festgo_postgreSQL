@@ -34,7 +34,10 @@ router.get(
   authorizedRoles("vendor"),
   propertyController.getPropertiesByVendor
 );
-router.get("/room/:propertyId", propertyController.getRoomsByPropertyId);
+router.post(
+  "/property-details",
+  propertyController.getSelectedPropertyDetailed
+);
 
 // ✅ Delete property by ID
 router.delete(

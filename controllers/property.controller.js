@@ -8,6 +8,7 @@ const {
   room_amenity_category,
   RoomBookedDate,
 } = require("../models/services/index");
+const { review } = require("../models/users/index");
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
@@ -81,7 +82,6 @@ const enrichProperties = async (properties) => {
 
   for (const p of properties) {
     const plain = p.get ? p.get({ plain: true }) : p;
-
     // Fetch amenities by IDs
     const amenityIds = plain.amenities?.map((a) => a.amenityId) || [];
 
@@ -394,64 +394,71 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       todate,
       enddate,
       location,
+      property_type,
     } = req.body;
-
-    if (!latitude || !longitude) {
-      const properties = await Property.findAll({
-        where: { active: true },
-        limit: 20,
-      });
-
-      const finalProperties = await enrichProperties(properties);
-      return res.json({
-        success: true,
-        status: 200,
-        properties: finalProperties,
-      });
-    }
 
     const startDate = new Date(todate);
     const finalDate = new Date(enddate);
     const requestedRooms = parseInt(rooms);
 
+    // Prepare property_type filter if given
+    const propertyTypeFilter = property_type
+      ? Sequelize.where(
+          Sequelize.fn("lower", Sequelize.col("property_type")),
+          property_type.toLowerCase()
+        )
+      : null;
+
     const availableProperties = [];
 
     // Step 1: Nearby properties within 10km
-    const nearbyProperties = await Property.findAll({
-      where: {
+    if (latitude && longitude) {
+      const whereNearby = {
         active: true,
-        [Op.and]: Sequelize.literal(`
-          earth_distance(
-            ll_to_earth(${latitude}, ${longitude}),
-            ll_to_earth(
-              (location->>'latitude')::float, 
-              (location->>'longitude')::float
-            )
-          ) <= 10000
-        `),
-      },
-    });
+        [Op.and]: [
+          propertyTypeFilter,
+          Sequelize.literal(`
+            earth_distance(
+              ll_to_earth(${latitude}, ${longitude}),
+              ll_to_earth(
+                (location->>'latitude')::float, 
+                (location->>'longitude')::float
+              )
+            ) <= 10000
+          `),
+        ].filter(Boolean),
+      };
 
-    for (const property of nearbyProperties) {
-      const available = await checkAvailableRooms(
-        property,
-        adult,
-        child,
-        requestedRooms,
-        startDate,
-        finalDate
-      );
-      if (available) availableProperties.push(available);
+      const nearbyProperties = await Property.findAll({ where: whereNearby });
+
+      for (const property of nearbyProperties) {
+        const available = await checkAvailableRooms(
+          property,
+          adult,
+          child,
+          requestedRooms,
+          startDate,
+          finalDate
+        );
+        if (available) availableProperties.push(available);
+      }
     }
 
-    // Step 2: If less than 20, fetch from same city
+    // Step 2: If less than 20 and location.city given
     if (availableProperties.length < 20 && location) {
-      const cityProperties = await Property.findAll({
-        where: {
-          active: true,
-          [Op.and]: Sequelize.literal(`(location->>'city') = '${location}'`),
-          id: { [Op.notIn]: availableProperties.map((p) => `'${p.id}'`) },
+      const whereCity = {
+        active: true,
+        [Op.and]: [
+          propertyTypeFilter,
+          Sequelize.literal(`(location->>'city') = '${location}'`),
+        ].filter(Boolean),
+        id: {
+          [Op.notIn]: availableProperties.map((p) => p.id),
         },
+      };
+
+      const cityProperties = await Property.findAll({
+        where: whereCity,
         limit: 20 - availableProperties.length,
       });
 
@@ -469,10 +476,28 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
-    // Step 3: Enrich property responses with amenity names
+    // Step 3: Fallback — fetch default active properties (same type if given)
+    if (availableProperties.length < 20) {
+      const whereFallback = {
+        active: true,
+        [Op.and]: [propertyTypeFilter].filter(Boolean),
+        id: {
+          [Op.notIn]: availableProperties.map((p) => p.id),
+        },
+      };
+
+      const fallbackProperties = await Property.findAll({
+        where: whereFallback,
+        limit: 20 - availableProperties.length,
+      });
+
+      availableProperties.push(...fallbackProperties);
+    }
+
+    // Step 4: Enrich final properties
     const finalProperties = await enrichProperties(availableProperties);
 
-    res.json({
+    return res.json({
       success: true,
       status: 200,
       properties: finalProperties,
@@ -573,6 +598,121 @@ exports.getAmenitiesForProperty = async (req, res) => {
     res
       .status(500)
       .json({ message: "Something went wrong", error, status: 500 });
+  }
+};
+
+exports.getSelectedPropertyDetailed = async (req, res) => {
+  try {
+    const { propertyId } = req.body;
+
+    if (!propertyId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Property ID required" });
+    }
+
+    // Fetch property
+    const property = await Property.findOne({
+      where: { id: propertyId },
+    });
+
+    if (!property) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Property not found" });
+    }
+
+    const plainProperty = property.get({ plain: true });
+
+    // Get common facilities (amenities) via amenityIds inside property.amenities array
+    const amenityIds = (plainProperty.amenities || []).map((a) => a.amenityId);
+    const amenityRecords = await amenity.findAll({
+      where: { id: { [Op.in]: amenityIds } },
+      attributes: ["name", "image"],
+    });
+
+    const commonFacilities = amenityRecords.map((a) => ({
+      name: a.name,
+      iconRes: a.image,
+    }));
+
+    // Property rules (policies)
+    const propertyRules = (plainProperty.policies || []).map((p) => ({
+      rulesData: `${p.title}: ${p.description}`,
+    }));
+
+    // Fetch all rooms for this property, with room amenities
+    const rooms = await Room.findAll({
+      where: { propertyId: propertyId },
+      include: [{ model: room_amenity, as: "roomAmenities" }],
+    });
+
+    const formattedRooms = await Promise.all(
+      rooms.map(async (r) => {
+        const room = r.get({ plain: true });
+
+        // Fetch room amenity details by roomAmenities
+        const amenityIds = (room.room_amenities || []).map(
+          (ra) => ra.roomAmenityId
+        );
+        const roomAmenityRecords = await room_amenity.findAll({
+          where: { id: { [Op.in]: amenityIds } },
+          attributes: ["name", "image"],
+        });
+
+        return {
+          ...room,
+          roomAmenities: roomAmenityRecords.map((a) => ({
+            name: a.name,
+            iconRes: a.image,
+          })),
+        };
+      })
+    );
+
+    // Fetch reviews
+    const reviewRecords = await review.findAll({
+      where: { propertyId: propertyId },
+    });
+
+    const totalReviewRate = reviewRecords.length
+      ? reviewRecords.reduce((sum, r) => sum + parseFloat(r.rating || 0), 0) /
+        reviewRecords.length
+      : 0;
+
+    const reviews = reviewRecords.map((r) => ({
+      userName: r.userName,
+      reviewText: r.reviewText,
+      rating: parseFloat(r.rating),
+    }));
+
+    // Final response
+    const firstRoom = formattedRooms[0] || {};
+
+    const response = {
+      success: true,
+      status: 200,
+      hotelName: plainProperty.name,
+      rating: plainProperty.star_rating || 0,
+      latitude: parseFloat(plainProperty.location?.latitude),
+      longitude: parseFloat(plainProperty.location?.longitude),
+      price: {
+        amount: parseFloat(firstRoom.discounted_price || 0),
+        currency: "INR",
+        perNight: true,
+      },
+      description: firstRoom.description || "",
+      commonFacilities,
+      totalReviewRate: parseFloat(totalReviewRate.toFixed(1)),
+      review: reviews,
+      propertyRules,
+      rooms: formattedRooms,
+    };
+
+    return res.json(response);
+  } catch (err) {
+    console.error("Error in getSelectedPropertyDetailed:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
