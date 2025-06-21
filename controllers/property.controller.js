@@ -136,8 +136,8 @@ const formatPropertyResponse = async (property) => {
   if (!room) return null;
 
   // Extract room details
-  const pricePerNight = `₹${room.discounted_price}`;
-  const originalPrice = `₹${room.original_price}`;
+  const pricePerNight = `${room.discounted_price}`;
+  const originalPrice = `${room.original_price}`;
   const discount = room.discount;
   const additionalInfo = room.additional_info || "";
   const freeBreakfast = room.free_breakfast;
