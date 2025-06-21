@@ -14,7 +14,6 @@ const {
 } = require("../libs/mailgun/mailTemplates");
 const path = require("path");
 const dotenv = require("dotenv");
-const sendJwt = require("../utils/jwttokenSend");
 
 // Load environment variables
 dotenv.config({ path: path.resolve("./config/config.env") });
@@ -38,6 +37,7 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "pincode",
     "state",
     "festgo_coins",
+    "referralCode",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -390,7 +390,7 @@ exports.getUserDetails = async (req, res) => {
       cleanUser = safeUser(
         user,
         ["username"],
-        ["billing_address", "pincode", "state", "festgo_coins"]
+        ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
       );
     } else {
       cleanUser = safeUser(user, [
@@ -437,7 +437,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         const cleanUser = safeUser(
           user,
           ["username"],
-          ["billing_address", "pincode", "state", "festgo_coins"]
+          [
+            "billing_address",
+            "pincode",
+            "state",
+            "festgo_coins",
+            "referralCode",
+          ]
         );
         const message = "Login successfull";
         sendToken(cleanUser, 201, message, res);
@@ -455,7 +461,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         const cleanUser = safeUser(
           user,
           ["username"],
-          ["billing_address", "pincode", "state", "festgo_coins"]
+          [
+            "billing_address",
+            "pincode",
+            "state",
+            "festgo_coins",
+            "referralCode",
+          ]
         );
         const message = "Login successfull";
         sendToken(cleanUser, 201, message, res);
@@ -575,7 +587,7 @@ exports.verifyEmailToken = async (req, res) => {
     const cleanUser = safeUser(
       user,
       ["username"],
-      ["billing_address", "pincode", "state", "festgo_coins"]
+      ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
     );
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
@@ -602,7 +614,7 @@ exports.verifyOtp = async (req, res) => {
   const cleanUser = safeUser(
     user,
     ["username"],
-    ["billing_address", "pincode", "state", "festgo_coins"]
+    ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
   );
   const message = "Login successfull";
   sendToken(cleanUser, 200, message, res);

@@ -36,6 +36,10 @@ module.exports = (sequelize) => {
       festgo_coins: { type: DataTypes.INTEGER, defaultValue: 0 },
       pincode: { type: DataTypes.STRING, defaultValue: null },
       state: { type: DataTypes.STRING, defaultValue: null },
+      referralCode: {
+        type: DataTypes.STRING(6),
+        unique: true,
+      },
       billing_address: { type: DataTypes.STRING, defaultValue: null },
       token: {
         type: DataTypes.STRING,
@@ -51,14 +55,25 @@ module.exports = (sequelize) => {
       tableName: "users",
     }
   );
-
+  function generateReferralCode() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
   User.beforeCreate(async (user) => {
     if (user.password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(user.password, salt);
     }
   });
-
+  User.beforeCreate(async (user) => {
+    if (user.role === "user") {
+      user.referralCode = generateReferralCode();
+    }
+  });
   User.prototype.comparePassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
   };

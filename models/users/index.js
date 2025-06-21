@@ -5,6 +5,7 @@ const Wishlist = require("./wishlist.model")(usersSequelize);
 const FestGoCoinHistory = require("./festgocoins_history.model")(
   usersSequelize
 );
+const ReferralHistory = require("./referral_history.model")(usersSequelize);
 const db = {
   Sequelize: usersSequelize,
   User,
@@ -43,6 +44,28 @@ User.hasMany(FestGoCoinHistory, {
   foreignKey: "userId",
   as: "coinHistories",
 });
+User.hasMany(ReferralHistory, {
+  foreignKey: "referrerId",
+  as: "sentReferrals",
+  onDelete: "CASCADE",
+});
+
+User.hasMany(ReferralHistory, {
+  foreignKey: "referredId",
+  as: "receivedReferrals",
+  onDelete: "CASCADE",
+});
+
+ReferralHistory.belongsTo(User, {
+  foreignKey: "referrerId",
+  as: "referrer",
+});
+
+ReferralHistory.belongsTo(User, {
+  foreignKey: "referredId",
+  as: "referred",
+});
+
 db.Sequelize.sync({ alter: true })
   .then(() => console.log("✅ Users DB models synced."))
   .catch((err) => console.error("❌ Users DB sync error:", err.message));
