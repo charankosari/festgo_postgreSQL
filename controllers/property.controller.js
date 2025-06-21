@@ -519,7 +519,7 @@ exports.getAmenitiesForProperty = async (req, res) => {
         .json({ message: "propertyId is required", status: 400 });
     }
 
-    // Fetch property by id
+    // Fetch property
     const property = await Property.findOne({ where: { id: propertyId } });
     if (!property) {
       return res
@@ -536,20 +536,22 @@ exports.getAmenitiesForProperty = async (req, res) => {
       attributes: ["id", "name", "type", "options", "image"],
     });
 
-    const propertyAmenities = amenities.map((a) => {
-      const matchedValue = property.amenities.find(
-        (am) => am.amenityId === a.id
-      )?.value;
+    // Group amenities by category
+    const categoryMap = {};
+    amenities.forEach((a) => {
+      const categoryName = a.category ? a.category.categoryName : "General";
+      const categoryImage = a.category
+        ? a.category.image
+        : "https://example.com/default_icon.png";
 
-      return {
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        image: a.image,
-        value: matchedValue,
-        categoryName: a.category ? a.category.categoryName : null,
-        categoryImage: a.category ? a.category.image : null,
-      };
+      if (!categoryMap[categoryName]) {
+        categoryMap[categoryName] = {
+          iconRes: categoryImage,
+          title: categoryName,
+          features: [],
+        };
+      }
+      categoryMap[categoryName].features.push(a.name);
     });
 
     // === Fetch Room Amenities ===
@@ -557,49 +559,53 @@ exports.getAmenitiesForProperty = async (req, res) => {
       where: { propertyId },
       include: [{ model: room_amenity, as: "roomAmenities" }],
     });
+
     const roomAmenityIds = rooms.flatMap((room) =>
-      room.room_amenities.map((ra) => ra.roomAmenityId)
+      room.roomAmenities.map((ra) => ra.roomAmenityId)
     );
 
     const uniqueRoomAmenityIds = [...new Set(roomAmenityIds)];
+
     const roomAmenities = await room_amenity.findAll({
       where: { id: uniqueRoomAmenityIds },
       include: [{ model: room_amenity_category, as: "roomAmenityCategory" }],
       attributes: ["id", "name", "type", "options", "image"],
     });
 
-    const roomAmenitiesList = roomAmenities.map((ra) => {
-      const matchedValue = rooms
-        .flatMap((room) => room.roomAmenities)
-        .find((ram) => ram.roomAmenityId === ra.id)?.value;
+    // Group room amenities by category
+    roomAmenities.forEach((ra) => {
+      const categoryName = ra.roomAmenityCategory
+        ? ra.roomAmenityCategory.categoryName
+        : "General";
+      const categoryImage = ra.roomAmenityCategory
+        ? ra.roomAmenityCategory.image
+        : "https://example.com/default_icon.png";
 
-      return {
-        id: ra.id,
-        name: ra.name,
-        type: ra.type,
-        value: matchedValue,
-        image: ra.image,
-        categoryName: ra.roomAmenityCategory
-          ? ra.roomAmenityCategory.categoryName
-          : null,
-        categoryImage: ra.roomAmenityCategory
-          ? ra.roomAmenityCategory.image
-          : null,
-      };
+      if (!categoryMap[categoryName]) {
+        categoryMap[categoryName] = {
+          iconRes: categoryImage,
+          title: categoryName,
+          features: [],
+        };
+      }
+      categoryMap[categoryName].features.push(ra.name);
     });
 
-    // Final clean response
+    // Convert map to array
+    const finalData = Object.values(categoryMap);
+
     res.status(200).json({
-      success: true,
-      amenities: propertyAmenities,
-      room_amenities: roomAmenitiesList,
-      status: 200,
+      data: finalData,
+      responseCode: "200",
+      responseMessage: "Facilities fetched successfully",
     });
   } catch (error) {
     console.error("Error fetching amenities:", error);
-    res
-      .status(500)
-      .json({ message: "Something went wrong", error, status: 500 });
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message,
+      status: 500,
+    });
   }
 };
 
