@@ -1,4 +1,4 @@
-const { review } = require("../models/users");
+const { review, User } = require("../models/users");
 const { Property } = require("../models/services");
 const { Sequelize } = require("sequelize");
 
@@ -8,8 +8,39 @@ exports.createReview = async (req, res) => {
     const { propertyId, rating, comment } = req.body;
     const userId = req.user.id;
 
-    const r = await review.create({ propertyId, userId, rating, comment });
-    res.status(201).json(r);
+    // Fetch property
+    const property = await Property.findByPk(propertyId);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // Increment review count
+    property.review_count += 1;
+    await property.save();
+
+    // Fetch user
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Determine reviewer name
+    const reviewer_name =
+      user.firstname && user.lastname
+        ? `${user.firstname} ${user.lastname}`
+        : user.username;
+
+    // Create review
+    const newReview = await review.create({
+      propertyId,
+      userId,
+      rating,
+      comment,
+      name: reviewer_name,
+      image: user.image_url,
+    });
+
+    res.status(201).json(newReview);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

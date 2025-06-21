@@ -72,4 +72,8 @@ module.exports = (sequelize) =>
       type: DataTypes.JSONB,
       defaultValue: {},
     },
+    review_count: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
   });

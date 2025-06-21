@@ -17,6 +17,14 @@ module.exports = (sequelize) =>
         type: DataTypes.UUID,
         allowNull: false,
       },
+      name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      image: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       rating: {
         type: DataTypes.INTEGER,
         allowNull: false,

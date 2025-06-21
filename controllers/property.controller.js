@@ -120,6 +120,7 @@ const formatPropertyResponse = async (property) => {
     location,
     photos,
     facilities,
+    review_count,
   } = property;
 
   // Parse image URLs
@@ -156,6 +157,7 @@ const formatPropertyResponse = async (property) => {
     additionalInfo,
     freeBreakfast,
     freeCancellation,
+    review_count,
     location,
     facilities,
     imageList,
