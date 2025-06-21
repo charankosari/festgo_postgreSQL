@@ -559,9 +559,8 @@ exports.getAmenitiesForProperty = async (req, res) => {
       where: { propertyId },
       include: [{ model: room_amenity, as: "roomAmenities" }],
     });
-
     const roomAmenityIds = rooms.flatMap((room) =>
-      room.roomAmenities.map((ra) => ra.roomAmenityId)
+      (room.room_amenities || []).map((ra) => ra.roomAmenityId)
     );
 
     const uniqueRoomAmenityIds = [...new Set(roomAmenityIds)];

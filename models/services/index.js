@@ -16,7 +16,10 @@ const EventType = require("./event_types.model")(servicesSequelize);
 const Festbite = require("./festbite.model")(servicesSequelize);
 const MenuItem = require("./menu_item.model")(servicesSequelize);
 const MenuType = require("./menu_type.model")(servicesSequelize);
+// beach fests model
+const beach_fests = require("./beach_fest.model")(servicesSequelize);
 // Define Associations for Amenity
+
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
   as: "category",
@@ -111,6 +114,7 @@ const db = {
   MenuType,
   Festbite,
   RoomBookedDate,
+  beach_fests,
 };
 
 // Sync all models
