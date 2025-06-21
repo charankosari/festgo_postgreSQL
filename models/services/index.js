@@ -1,4 +1,6 @@
 const { servicesSequelize, usersSequelize } = require("../../db");
+const city_festModel = require("./city_fest.model");
+const city_fest_categoryModel = require("./city_fest_category.model");
 
 // Import models
 const amenity_category = require("./amenity_category.model")(servicesSequelize);
@@ -18,6 +20,12 @@ const MenuItem = require("./menu_item.model")(servicesSequelize);
 const MenuType = require("./menu_type.model")(servicesSequelize);
 // beach fests model
 const beach_fests = require("./beach_fest.model")(servicesSequelize);
+
+// city fests models
+const CityFestCategory = require("./city_fest_category.model")(
+  servicesSequelize
+);
+const CityFest = require("./city_fest.model")(servicesSequelize);
 // Define Associations for Amenity
 
 amenity.belongsTo(amenity_category, {
@@ -98,6 +106,16 @@ RoomBookedDate.belongsTo(Room, {
   as: "room",
   onDelete: "CASCADE",
 });
+CityFest.belongsTo(CityFestCategory, {
+  foreignKey: "categoryId",
+  as: "festCategory", // <-- changed alias here
+  onDelete: "CASCADE",
+});
+
+CityFestCategory.hasMany(CityFest, {
+  foreignKey: "categoryId",
+  as: "cityFests",
+});
 
 // Setup DB object
 const db = {
@@ -115,6 +133,8 @@ const db = {
   Festbite,
   RoomBookedDate,
   beach_fests,
+  city_festModel,
+  city_fest_categoryModel,
 };
 
 // Sync all models
