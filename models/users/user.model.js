@@ -69,9 +69,18 @@ module.exports = (sequelize) => {
       user.password = await bcrypt.hash(user.password, salt);
     }
   });
-  User.beforeCreate(async (user) => {
+  User.beforeCreate(async (user, options) => {
     if (user.role === "user") {
-      user.referralCode = generateReferralCode();
+      let code;
+      let exists = true;
+      while (exists) {
+        code = generateReferralCode();
+        const existingUser = await User.findOne({
+          where: { referralCode: code },
+        });
+        if (!existingUser) exists = false;
+      }
+      user.referralCode = code;
     }
   });
   User.prototype.comparePassword = async function (enteredPassword) {
