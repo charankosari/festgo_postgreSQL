@@ -2,6 +2,9 @@ const { usersSequelize } = require("../../db");
 const review = require("./review.model")(usersSequelize);
 const User = require("./user.model")(usersSequelize);
 const Wishlist = require("./wishlist.model")(usersSequelize);
+const FestGoCoinHistory = require("./festgocoins_history.model")(
+  usersSequelize
+);
 const db = {
   Sequelize: usersSequelize,
   User,
@@ -29,6 +32,16 @@ User.hasMany(Wishlist, {
   foreignKey: "user_id",
   as: "wishlists",
   onDelete: "CASCADE",
+});
+FestGoCoinHistory.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE",
+});
+
+User.hasMany(FestGoCoinHistory, {
+  foreignKey: "userId",
+  as: "coinHistories",
 });
 db.Sequelize.sync({ alter: true })
   .then(() => console.log("✅ Users DB models synced."))

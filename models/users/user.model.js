@@ -33,7 +33,7 @@ module.exports = (sequelize) => {
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
       logintype: { type: DataTypes.STRING, defaultValue: null },
-
+      festgo_coins: { type: DataTypes.INTEGER, defaultValue: 0 },
       pincode: { type: DataTypes.STRING, defaultValue: null },
       state: { type: DataTypes.STRING, defaultValue: null },
       billing_address: { type: DataTypes.STRING, defaultValue: null },

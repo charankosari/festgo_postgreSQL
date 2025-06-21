@@ -37,6 +37,7 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "billing_address",
     "pincode",
     "state",
+    "festgo_coins",
   ];
 
   // remove any fields that are in defaultExcludedFields + extraFieldsToExclude,
@@ -389,7 +390,7 @@ exports.getUserDetails = async (req, res) => {
       cleanUser = safeUser(
         user,
         ["username"],
-        ["billing_address", "pincode", "state"]
+        ["billing_address", "pincode", "state", "festgo_coins"]
       );
     } else {
       cleanUser = safeUser(user, [
@@ -436,7 +437,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         const cleanUser = safeUser(
           user,
           ["username"],
-          ["billing_address", "pincode", "state"]
+          ["billing_address", "pincode", "state", "festgo_coins"]
         );
         const message = "Login successfull";
         sendToken(cleanUser, 201, message, res);
@@ -454,7 +455,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         const cleanUser = safeUser(
           user,
           ["username"],
-          ["billing_address", "pincode", "state"]
+          ["billing_address", "pincode", "state", "festgo_coins"]
         );
         const message = "Login successfull";
         sendToken(cleanUser, 201, message, res);
@@ -574,7 +575,7 @@ exports.verifyEmailToken = async (req, res) => {
     const cleanUser = safeUser(
       user,
       ["username"],
-      ["billing_address", "pincode", "state"]
+      ["billing_address", "pincode", "state", "festgo_coins"]
     );
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
@@ -601,7 +602,7 @@ exports.verifyOtp = async (req, res) => {
   const cleanUser = safeUser(
     user,
     ["username"],
-    ["billing_address", "pincode", "state"]
+    ["billing_address", "pincode", "state", "festgo_coins"]
   );
   const message = "Login successfull";
   sendToken(cleanUser, 200, message, res);
