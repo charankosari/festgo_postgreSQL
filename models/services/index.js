@@ -26,6 +26,8 @@ const CityFestCategory = require("./city_fest_category.model")(
   servicesSequelize
 );
 const CityFest = require("./city_fest.model")(servicesSequelize);
+// property booking
+const property_booking = require("./property_booking.model")(servicesSequelize);
 // Define Associations for Amenity
 
 amenity.belongsTo(amenity_category, {
@@ -117,6 +119,30 @@ CityFestCategory.hasMany(CityFest, {
   as: "cityFests",
 });
 
+// Property-Booking Association
+Property.hasMany(property_booking, {
+  foreignKey: "property_id",
+  as: "bookings",
+  onDelete: "CASCADE",
+});
+property_booking.belongsTo(Property, {
+  foreignKey: "property_id",
+  as: "property",
+  onDelete: "CASCADE",
+});
+
+// Room-Booking Association
+Room.hasMany(property_booking, {
+  foreignKey: "room_id",
+  as: "roomBookings",
+  onDelete: "CASCADE",
+});
+property_booking.belongsTo(Room, {
+  foreignKey: "room_id",
+  as: "room",
+  onDelete: "CASCADE",
+});
+
 // Setup DB object
 const db = {
   Sequelize: servicesSequelize,
@@ -135,6 +161,7 @@ const db = {
   beach_fests,
   city_fest,
   city_fest_category,
+  property_booking,
 };
 
 // Sync all models

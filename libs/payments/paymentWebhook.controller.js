@@ -1,6 +1,10 @@
-const { validateSignature } = require("../services/razorpay");
+const { validateSignature } = require("./razorpay");
+const dotenv = require("dotenv");
+const path = require("path");
 
-exports.captureHook = async (req, res) => {
+dotenv.config({ path: path.resolve("./config/config.env") });
+
+const captureHook = async (req, res) => {
   try {
     const webhook_headers = req.headers;
     const rawPayload = JSON.stringify(req.body);
@@ -44,3 +48,5 @@ exports.captureHook = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+module.exports = captureHook;
