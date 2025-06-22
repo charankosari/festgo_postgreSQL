@@ -53,6 +53,7 @@ const checkAvailableRooms = async (
         { checkIn: { [Op.lt]: finalDate } },
         { checkOut: { [Op.gt]: startDate } },
       ],
+      status: { [Op.in]: ["pending", "confirmed"] },
     },
   });
 
@@ -313,78 +314,7 @@ exports.deleteProperty = async (req, res) => {
   }
 };
 //  get property range 10 km
-// exports.getAllActivePropertiesByRange = async (req, res) => {
-//   try {
-//     const { latitude, longitude } = req.query;
 
-//     const properties = await Property.findAll({
-//       where: { active: true },
-//     });
-
-//     if (!latitude || !longitude) {
-//       // If no location provided, return first 20 active properties
-//       return res.json({
-//         success: true,
-//         properties: properties.slice(0, 20).map((property) => {
-//           const plainProperty = property.get({ plain: true });
-//           delete plainProperty.ownership_details;
-//           return plainProperty;
-//         }),
-//         status: 200,
-//       });
-//     }
-
-//     // Haversine distance function
-//     const haversineDistance = (lat1, lon1, lat2, lon2) => {
-//       const toRad = (value) => (value * Math.PI) / 180;
-//       const R = 6371; // Earth radius in km
-
-//       const dLat = toRad(lat2 - lat1);
-//       const dLon = toRad(lon2 - lon1);
-
-//       const a =
-//         Math.sin(dLat / 2) ** 2 +
-//         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-//       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-//       return R * c;
-//     };
-
-//     // Filter properties within 10km
-//     const nearbyProperties = properties.filter((property) => {
-//       if (!property.location) return false;
-
-//       const propLat = property.location.latitude;
-//       const propLng = property.location.longitude;
-
-//       if (propLat == null || propLng == null) return false;
-
-//       const distance = haversineDistance(
-//         parseFloat(latitude),
-//         parseFloat(longitude),
-//         parseFloat(propLat),
-//         parseFloat(propLng)
-//       );
-
-//       return distance <= 10;
-//     });
-
-//     // Return only up to 20 properties
-//     res.json({
-//       success: true,
-//       status: 200,
-//       properties: nearbyProperties.slice(0, 20).map((property) => {
-//         const plainProperty = property.get({ plain: true });
-//         delete plainProperty.ownership_details;
-//         return plainProperty;
-//       }),
-//     });
-//   } catch (err) {
-//     console.error("Error fetching properties:", err);
-//     res.status(500).json({ message: err.message, status: 200 });
-//   }
-// };
 exports.getAllActivePropertiesByRange = async (req, res) => {
   try {
     const {

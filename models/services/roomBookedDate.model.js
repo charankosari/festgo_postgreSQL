@@ -28,6 +28,15 @@ module.exports = (sequelize) =>
       allowNull: false,
       defaultValue: "online",
     },
+    status: {
+      type: DataTypes.ENUM("pending", "completed", "cancelled"),
+      allowNull: false,
+      defaultValue: "pending",
+    },
+    bookingId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

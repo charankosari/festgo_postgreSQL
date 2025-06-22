@@ -133,6 +133,8 @@ exports.bookProperty = async (req, res) => {
           checkIn: check_in_date,
           checkOut: check_out_date,
           source: "online",
+          status: "pending",
+          bookingId: newBooking.id,
         },
         { transaction: t }
       );
