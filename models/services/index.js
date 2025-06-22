@@ -145,6 +145,7 @@ property_booking.belongsTo(Room, {
 
 // Setup DB object
 const db = {
+  sequelize: servicesSequelize,
   Sequelize: servicesSequelize,
   amenity_category,
   amenity,

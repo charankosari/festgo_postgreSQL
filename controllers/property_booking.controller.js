@@ -1,5 +1,5 @@
 const {
-  Booking,
+  property_booking,
   RoomBookedDate,
   Property,
   Room,
@@ -54,7 +54,7 @@ exports.bookProperty = async (req, res) => {
     }
 
     // Validate user
-    const user = await User.findOne({ where: { id: user_id }, transaction: t });
+    const user = await User.findOne({ where: { id: user_id } });
     if (!user) {
       await t.rollback();
       return res.status(404).json({ message: "User not found" });
@@ -73,7 +73,7 @@ exports.bookProperty = async (req, res) => {
           },
         ],
       },
-      lock: t.LOCK.UPDATE,
+      lock: Transaction.LOCK.UPDATE,
       transaction: t,
     });
 
@@ -102,7 +102,7 @@ exports.bookProperty = async (req, res) => {
     const amount_paid = total_amount - coins_discount_value;
 
     // Create Booking
-    const newBooking = await Booking.create(
+    const newBooking = await property_booking.create(
       {
         user_id,
         property_id,
