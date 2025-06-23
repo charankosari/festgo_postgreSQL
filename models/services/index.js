@@ -28,8 +28,8 @@ const CityFestCategory = require("./city_fest_category.model")(
 const CityFest = require("./city_fest.model")(servicesSequelize);
 // property booking
 const property_booking = require("./property_booking.model")(servicesSequelize);
-// Define Associations for Amenity
-
+// cron
+const CronThing = require("./cron_things")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
   as: "category",
@@ -163,6 +163,7 @@ const db = {
   city_fest,
   city_fest_category,
   property_booking,
+  CronThing,
 };
 
 // Sync all models
