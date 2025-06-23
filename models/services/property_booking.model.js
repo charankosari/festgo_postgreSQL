@@ -38,6 +38,11 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 0,
       },
+      num_rooms: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+
       total_amount: {
         type: DataTypes.FLOAT,
         allowNull: false,
