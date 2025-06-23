@@ -10,7 +10,7 @@ const razorpayInstance = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-const createOrder = async ({ order_id, amount }) => {
+const createOrder = async ({ order_id, amount, notes = {} }) => {
   const order = await razorpayInstance.orders.create({
     amount: Math.round(amount * 100),
     currency: "INR",
