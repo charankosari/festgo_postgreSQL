@@ -64,15 +64,11 @@ exports.bookProperty = async (req, res) => {
     const existingBookings = await RoomBookedDate.findAll({
       where: {
         roomId: room_id,
-        [Op.or]: [
-          { checkIn: { [Op.between]: [check_in_date, check_out_date] } },
-          { checkOut: { [Op.between]: [check_in_date, check_out_date] } },
-          {
-            checkIn: { [Op.lte]: check_in_date },
-            checkOut: { [Op.gte]: check_out_date },
-          },
+        [Op.and]: [
+          { checkIn: { [Op.lt]: check_out_date } },
+          { checkOut: { [Op.gt]: check_in_date } },
         ],
-        status: { [Op.in]: ["pending", "confirmed"] }, // 💡 count both pending and confirmed
+        status: { [Op.in]: ["pending", "confirmed"] },
       },
       lock: Transaction.LOCK.UPDATE,
       transaction: t,
@@ -80,11 +76,11 @@ exports.bookProperty = async (req, res) => {
 
     const totalBookedRooms = existingBookings.length;
 
-    if (totalBookedRooms + num_rooms > room.totalRooms) {
+    if (totalBookedRooms + num_rooms > room.number_of_rooms) {
       await t.rollback();
       return res.status(400).json({
         message: `Only ${
-          room.totalRooms - totalBookedRooms
+          room.number_of_rooms - totalBookedRooms
         } rooms available for selected dates`,
       });
     }
@@ -100,7 +96,11 @@ exports.bookProperty = async (req, res) => {
     }
 
     const coins_discount_value = usable_coins * FESTGO_COIN_VALUE;
-    const amount_paid = total_amount - coins_discount_value;
+    const discounted_amount = total_amount - coins_discount_value;
+
+    // Apply 18% GST on discounted amount
+    const gst_amount = (discounted_amount * 18) / 100;
+    const amount_paid = discounted_amount + gst_amount;
 
     // Create Booking
     const newBooking = await property_booking.create(
@@ -115,6 +115,8 @@ exports.bookProperty = async (req, res) => {
         num_rooms,
         total_amount,
         festgo_coins_used: usable_coins,
+        coins_discount_value,
+        gst_amount,
         amount_paid,
         payment_method: "online",
         payment_status: "pending",
@@ -141,7 +143,7 @@ exports.bookProperty = async (req, res) => {
       );
     }
 
-    // Create Razorpay order with booking metadata
+    // Create Razorpay order
     const razorpayOrder = await createOrder({
       order_id: newBooking.id,
       amount: amount_paid,
