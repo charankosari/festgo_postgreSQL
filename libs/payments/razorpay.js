@@ -17,6 +17,7 @@ const createOrder = async ({ order_id, amount }) => {
     receipt: "ORDER #" + Date.now(),
     notes: {
       platform_order_id: order_id,
+      ...notes,
     },
   });
   return order;

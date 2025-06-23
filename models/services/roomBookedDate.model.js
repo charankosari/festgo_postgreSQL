@@ -29,7 +29,7 @@ module.exports = (sequelize) =>
       defaultValue: "online",
     },
     status: {
-      type: DataTypes.ENUM("pending", "completed", "cancelled"),
+      type: DataTypes.ENUM("pending", "confirmed", "completed", "cancelled"),
       allowNull: false,
       defaultValue: "pending",
     },
