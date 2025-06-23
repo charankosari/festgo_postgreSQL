@@ -160,20 +160,11 @@ exports.bookProperty = async (req, res) => {
         booking_id: newBooking.id,
       },
     });
-    let cronThing = await CronThing.findOne({
-      where: { entity: "property_booking" },
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    await CronThing.upsert(
+      { entity: "property_booking", active: true, last_run: new Date() },
+      { transaction: t }
+    );
 
-    if (!cronThing) {
-      cronThing = await CronThing.create(
-        { entity: "property_booking", active: true, last_run: new Date() },
-        { transaction: t }
-      );
-    } else if (!cronThing.active) {
-      await cronThing.update({ active: true }, { transaction: t });
-    }
     await t.commit();
 
     return res.status(201).json({
