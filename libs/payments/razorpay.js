@@ -16,7 +16,6 @@ const createOrder = async ({ order_id, amount, notes = {} }) => {
     currency: "INR",
     receipt: "ORDER #" + Date.now(),
     notes: {
-      platform_order_id: order_id,
       ...notes,
     },
   });

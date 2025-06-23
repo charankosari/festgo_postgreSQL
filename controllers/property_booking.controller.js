@@ -76,12 +76,19 @@ exports.bookProperty = async (req, res) => {
 
     const totalBookedRooms = existingBookings.length;
 
-    if (totalBookedRooms + num_rooms > room.number_of_rooms) {
+    const availableRooms = room.number_of_rooms - totalBookedRooms;
+
+    if (availableRooms <= 0) {
       await t.rollback();
       return res.status(400).json({
-        message: `Only ${
-          room.number_of_rooms - totalBookedRooms
-        } rooms available for selected dates`,
+        message: `No rooms available for the selected dates.`,
+      });
+    }
+
+    if (num_rooms > availableRooms) {
+      await t.rollback();
+      return res.status(400).json({
+        message: `Only ${availableRooms} room(s) available for the selected dates.`,
       });
     }
 
