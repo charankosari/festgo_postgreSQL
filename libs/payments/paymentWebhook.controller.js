@@ -2,6 +2,11 @@ const { validateSignature } = require("./razorpay");
 const dotenv = require("dotenv");
 const path = require("path");
 
+const {
+  handlePaymentSuccess,
+  handlePaymentFailure,
+} = require("../../controllers/property_booking.controller"); // import your handlers here
+
 dotenv.config({ path: path.resolve("./config/config.env") });
 
 const captureHook = async (req, res) => {
@@ -16,29 +21,46 @@ const captureHook = async (req, res) => {
       payload: rawPayload,
     });
 
-    console.log("Webhook Received", { event: req.body.event, is_valid });
-
     if (!is_valid) {
       return res.status(400).json({ message: "Invalid signature" });
     }
 
     const webhook_payload = req.body;
+    const event = webhook_payload.event;
 
-    switch (webhook_payload.event) {
-      case "payment.authorized":
-        console.log("✅ Payment Authorized");
-        break;
+    const paymentEntity = webhook_payload.payload?.payment?.entity;
 
-      case "payment.failed":
-        console.log("❌ Payment Failed");
-        break;
+    // Extract data safely
+    const paymentFor = paymentEntity?.notes?.payment_for;
+    const bookingId = paymentEntity?.notes?.booking_id;
+    const transactionId = paymentEntity?.id;
 
-      case "payment.captured":
-        console.log("✅ Payment Captured");
+    console.log("Webhook Received:", { event, paymentFor, bookingId });
+
+    // Route based on payment type
+    switch (paymentFor) {
+      case "property_booking":
+        switch (event) {
+          case "payment.captured":
+            if (bookingId) {
+              await handlePaymentSuccess(bookingId, transactionId);
+            }
+            break;
+
+          case "payment.failed":
+            if (bookingId) {
+              await handlePaymentFailure(bookingId);
+            }
+            break;
+
+          default:
+            console.log("Unhandled event for property_booking:", event);
+            break;
+        }
         break;
 
       default:
-        console.log("Unhandled event:", webhook_payload.event);
+        console.log("Unhandled payment_for type:", paymentFor);
         break;
     }
 

@@ -72,6 +72,7 @@ exports.bookProperty = async (req, res) => {
             checkOut: { [Op.gte]: check_out_date },
           },
         ],
+        status: { [Op.in]: ["pending", "confirmed"] }, // 💡 count both pending and confirmed
       },
       lock: Transaction.LOCK.UPDATE,
       transaction: t,
@@ -140,10 +141,14 @@ exports.bookProperty = async (req, res) => {
       );
     }
 
-    // Create Razorpay order
+    // Create Razorpay order with booking metadata
     const razorpayOrder = await createOrder({
       order_id: newBooking.id,
       amount: amount_paid,
+      notes: {
+        payment_for: "property_booking",
+        booking_id: newBooking.id,
+      },
     });
 
     await t.commit();
@@ -162,5 +167,56 @@ exports.bookProperty = async (req, res) => {
       error: error.message,
       status: 500,
     });
+  }
+};
+
+exports.handlePaymentSuccess = async (bookingId, transactionId) => {
+  try {
+    // Update booking status
+    await property_booking.update(
+      {
+        payment_status: "paid",
+        booking_status: "confirmed",
+        transaction_id: transactionId,
+      },
+      { where: { id: bookingId } }
+    );
+
+    // Confirm room holds
+    await RoomBookedDate.update(
+      { status: "confirmed" },
+      { where: { bookingId, status: "pending" } }
+    );
+
+    console.log(`✅ Booking ${bookingId} confirmed, rooms blocked.`);
+    return true;
+  } catch (error) {
+    console.error("Error in handlePaymentSuccess:", error);
+    return false;
+  }
+};
+
+// On Payment Failure
+exports.handlePaymentFailure = async (bookingId) => {
+  try {
+    // Update booking status
+    await property_booking.update(
+      {
+        payment_status: "failed",
+        booking_status: "cancelled",
+      },
+      { where: { id: bookingId } }
+    );
+
+    // Release room holds
+    await RoomBookedDate.destroy({
+      where: { bookingId, status: "pending" },
+    });
+
+    console.log(`❌ Booking ${bookingId} cancelled, rooms released.`);
+    return true;
+  } catch (error) {
+    console.error("Error in handlePaymentFailure:", error);
+    return false;
   }
 };
