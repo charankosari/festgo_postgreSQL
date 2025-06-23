@@ -32,7 +32,6 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/festbite", festbiteRoutes);
 app.use("/api/upload", upload);
 app.use("/api/property-booking", propertyBookingRoutes);
-
 app.post("/api/payment/hook", captureHook);
 app.use(errorMiddleware);
 

@@ -234,3 +234,30 @@ exports.handlePaymentFailure = async (bookingId) => {
     return false;
   }
 };
+
+exports.getMyBookings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const bookings = await property_booking.findAll({
+      where: { user_id: userId },
+
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "Your bookings fetched successfully.",
+      bookings,
+    });
+  } catch (error) {
+    console.error("Error fetching user bookings:", error);
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Something went wrong while fetching your bookings.",
+      error: error.message,
+    });
+  }
+};

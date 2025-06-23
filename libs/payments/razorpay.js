@@ -15,6 +15,7 @@ const createOrder = async ({ order_id, amount, notes = {} }) => {
     amount: Math.round(amount * 100),
     currency: "INR",
     receipt: "ORDER #" + Date.now(),
+
     notes: {
       ...notes,
     },
@@ -45,6 +46,7 @@ const validateSignature = ({ webhook_signature, webhook_secret, payload }) => {
 
 module.exports = {
   createOrder,
+  razorpayInstance,
   capturePayment,
   orderStatus,
   validateSignature,

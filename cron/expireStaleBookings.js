@@ -36,10 +36,15 @@ const expireStaleBookings = async () => {
 
     // Delete expired records
     if (expiredRoomDates.length > 0) {
-      await RoomBookedDate.destroy({
-        where: { id: expiredRoomDates.map((r) => r.id) },
-        transaction: t,
-      });
+      await RoomBookedDate.update(
+        { status: "cancelled" },
+        {
+          where: {
+            id: expiredRoomDates.map((r) => r.id),
+          },
+          transaction: t,
+        }
+      );
 
       await property_booking.update(
         { booking_status: "cancelled" },
