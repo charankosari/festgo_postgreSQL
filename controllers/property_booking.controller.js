@@ -116,7 +116,7 @@ exports.bookProperty = async (req, res) => {
     } else if (room.discounted_price >= 7500 && room.discounted_price <= 9999) {
       service_fee = 200;
     } else if (room.discounted_price >= 10000) {
-      service_fee = 300;
+      service_fee = 250;
     }
     const gross_payable = total_amount + gst_amount + service_fee;
 
