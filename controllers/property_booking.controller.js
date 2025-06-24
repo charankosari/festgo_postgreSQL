@@ -95,20 +95,40 @@ exports.bookProperty = async (req, res) => {
 
     // Calculate total and apply coins
     const total_amount = room.discounted_price * num_rooms;
+    let gst_rate = 0;
+    if (room.discounted_price >= 7500) {
+      gst_rate = 18;
+    } else {
+      gst_rate = 12;
+    }
 
+    // Calculate GST
+    const gst_amount = (total_amount * gst_rate) / 100;
+
+    // Determine Service Fee based on room price
+    let service_fee = 0;
+    if (room.discounted_price >= 1000 && room.discounted_price <= 1999) {
+      service_fee = 50;
+    } else if (room.discounted_price >= 2000 && room.discounted_price <= 4999) {
+      service_fee = 100;
+    } else if (room.discounted_price >= 5000 && room.discounted_price <= 7499) {
+      service_fee = 150;
+    } else if (room.discounted_price >= 7500 && room.discounted_price <= 9999) {
+      service_fee = 200;
+    } else if (room.discounted_price >= 10000) {
+      service_fee = 300;
+    }
+    const gross_payable = total_amount + gst_amount + service_fee;
+
+    // FestGo Coins discount — after all charges
     let usable_coins = 0;
     if (festgo_coins >= 10 && user.festgo_coins >= festgo_coins) {
       usable_coins = festgo_coins;
     } else if (festgo_coins >= 10 && user.festgo_coins < festgo_coins) {
       usable_coins = user.festgo_coins;
     }
-
     const coins_discount_value = usable_coins * FESTGO_COIN_VALUE;
-    const discounted_amount = total_amount - coins_discount_value;
-
-    // Apply 18% GST on discounted amount
-    const gst_amount = (discounted_amount * 18) / 100;
-    const amount_paid = discounted_amount + gst_amount;
+    const amount_paid = gross_payable - coins_discount_value;
 
     // Create Booking
     const newBooking = await property_booking.create(
@@ -125,6 +145,8 @@ exports.bookProperty = async (req, res) => {
         festgo_coins_used: usable_coins,
         coins_discount_value,
         gst_amount,
+        gst_rate,
+        service_fee,
         amount_paid,
         payment_method: "online",
         payment_status: "pending",

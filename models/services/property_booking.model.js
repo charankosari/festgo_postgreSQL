@@ -59,6 +59,16 @@ module.exports = (sequelize) => {
         type: DataTypes.FLOAT,
         defaultValue: 0,
       },
+      gst_rate: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+
+      service_fee: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+
       amount_paid: {
         type: DataTypes.FLOAT,
         allowNull: false,
