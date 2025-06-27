@@ -17,7 +17,7 @@ router.post("/vendor/register", (req, res, next) => {
 router.post("/login", userController.loginUser);
 
 // FORGOT PASSWORD vendor
-router.post("/forgot-password", isAuthorized, userController.forgotPassword);
+router.post("/forgot-password", userController.forgotPassword);
 
 // RESET PASSWORD vendor
 router.post("/reset-password/:token", userController.resetPassword);
