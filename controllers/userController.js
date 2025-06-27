@@ -122,7 +122,8 @@ exports.forgotPassword = async (req, res) => {
   const resetUrl = `${process.env.RESET_URL}/?token=${resetToken}`;
 
   // Create HTML email template
-  const htmlContent = changePasswordTemplate(user.username, resetUrl);
+  const displayName = user.username ? user.username : user;
+  const htmlContent = changePasswordTemplate(displayName, resetUrl);
 
   try {
     await sendEmail(user.email, "Festgo Password Reset", htmlContent);
