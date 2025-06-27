@@ -34,6 +34,12 @@ router.get(
   authorizedRoles("vendor"),
   propertyController.getPropertiesByVendor
 );
+router.get(
+  "/vendor/r/:vendorId",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.getRoomsByVendor
+);
 router.post(
   "/property-details",
   propertyController.getSelectedPropertyDetailed

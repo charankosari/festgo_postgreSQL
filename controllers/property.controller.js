@@ -292,7 +292,17 @@ exports.getPropertyById = async (req, res) => {
 exports.getPropertiesByVendor = async (req, res) => {
   try {
     const { vendorId } = req.params;
-    const properties = await Property.findAll({ where: { vendorId } });
+
+    const properties = await Property.findAll({
+      where: { vendorId },
+      include: [
+        {
+          model: Room,
+          as: "rooms",
+        },
+      ],
+    });
+
     res.json({ success: true, properties });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -738,5 +748,15 @@ exports.deleteRoom = async (req, res) => {
   } catch (error) {
     console.error("Error deleting room:", error);
     res.status(500).json({ message: "Something went wrong", error });
+  }
+};
+//   get rooms by vendor
+exports.getRoomsByVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const Rooms = await Room.findAll({ where: { vendorId } });
+    res.json({ success: true, Rooms });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
