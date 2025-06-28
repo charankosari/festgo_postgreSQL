@@ -272,16 +272,27 @@ exports.getMyBookings = async (req, res) => {
     const bookingsWithLocation = await Promise.all(
       bookings.map(async (booking) => {
         const prop = await Property.findByPk(booking.property_id, {
-          attributes: ["location", "name"],
+          attributes: ["location", "name", "photos"],
         });
         const room = await Room.findByPk(booking.room_id, {
           attributes: ["room_name"],
         });
-        // Add property location to booking data
+        let photoUrls = [];
+        if (prop && prop.photos && Array.isArray(prop.photos)) {
+          try {
+            photoUrls = prop.photos.map((photoStr) => {
+              const photoObj = JSON.parse(photoStr);
+              return photoObj.url;
+            });
+          } catch (err) {
+            console.error("Error parsing photos JSON string:", err);
+          }
+        }
         return {
           ...booking.toJSON(), // convert Sequelize instance to plain object
           property_location: prop ? prop.location : null,
           property_name: prop ? prop.name : null,
+          property_photos: photoUrls,
           room_name: room ? room.room_name : null,
         };
       })
