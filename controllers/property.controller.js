@@ -754,9 +754,28 @@ exports.deleteRoom = async (req, res) => {
 exports.getRoomsByVendor = async (req, res) => {
   try {
     const { vendorId } = req.params;
-    const Rooms = await Room.findAll({ where: { vendorId } });
-    res.json({ success: true, Rooms });
+
+    // 1️⃣ Find properties for this vendor, include their rooms using alias 'rooms'
+    const properties = await Property.findAll({
+      where: { vendorId },
+      include: [
+        {
+          model: Room,
+          as: "rooms", // this is mandatory because of your association
+        },
+      ],
+      attributes: ["id"], // only need property id
+    });
+
+    // 2️⃣ Flatten rooms from each property into a single array
+    const rooms = properties.flatMap((property) => property.rooms);
+
+    res.status(200).json({
+      success: true,
+      rooms,
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
