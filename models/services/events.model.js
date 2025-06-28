@@ -56,8 +56,7 @@ module.exports = (sequelize) =>
 
       additionalThings: {
         type: DataTypes.JSONB,
-        // Example: { ledScreens: true, fireworks: false, liveDJ: true }
-        defaultValue: {},
+        defaultValue: [],
       },
 
       themes: {

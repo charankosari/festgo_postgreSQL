@@ -4,11 +4,11 @@ const eventCtrl = require("../controllers/event.controller");
 const { isAuthorized } = require("../middlewares/auth");
 
 // Event routes
-router.post("/", isAuthorized, eventCtrl.createEvent);
-router.get("/", eventCtrl.getAllEvents);
-router.get("/:id", eventCtrl.getEventById);
-router.put("/:id", eventCtrl.updateEvent);
-router.delete("/:id", eventCtrl.deleteEvent);
+router.post("/e", isAuthorized, eventCtrl.createEvent);
+router.get("/e", eventCtrl.getAllEvents);
+router.get("/e/:id", eventCtrl.getEventById);
+router.put("/e/:id", eventCtrl.updateEvent);
+router.delete("/e/:id", eventCtrl.deleteEvent);
 router.get("/vendor-events/:userId", eventCtrl.getEventsByUserId);
 router.get("/event-type-events/:eventTypeId", eventCtrl.getEventsByEventTypeId);
 

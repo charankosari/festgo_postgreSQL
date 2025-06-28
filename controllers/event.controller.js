@@ -62,7 +62,7 @@ exports.deleteEvent = async (req, res) => {
 exports.getAllEvents = async (req, res) => {
   try {
     const events = await Event.findAll({
-      include: [{ model: EventType, as: "eventType" }],
+      include: [{ model: EventType, as: "EventType" }],
     });
     res.json(events);
   } catch (error) {
@@ -75,7 +75,7 @@ exports.getEventById = async (req, res) => {
   try {
     const { id } = req.params;
     const event = await Event.findByPk(id, {
-      include: [{ model: EventType, as: "eventType" }],
+      include: [{ model: EventType, as: "EventType" }],
     });
 
     if (!event) return res.status(404).json({ message: "Event not found" });
@@ -92,7 +92,7 @@ exports.getEventsByUserId = async (req, res) => {
     const { userId } = req.params;
     const events = await Event.findAll({
       where: { userId: userId },
-      include: [{ model: EventType, as: "eventType" }],
+      include: [{ model: EventType, as: "EventType" }],
     });
 
     res.json(events);
@@ -107,7 +107,7 @@ exports.getEventsByEventTypeId = async (req, res) => {
     const { eventTypeId } = req.params;
     const events = await Event.findAll({
       where: { eventTypeId },
-      include: [{ model: EventType, as: "eventType" }],
+      include: [{ model: EventType, as: "EventType" }],
     });
 
     res.json(events);
