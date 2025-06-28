@@ -272,13 +272,17 @@ exports.getMyBookings = async (req, res) => {
     const bookingsWithLocation = await Promise.all(
       bookings.map(async (booking) => {
         const prop = await Property.findByPk(booking.property_id, {
-          attributes: ["location"],
+          attributes: ["location", "name"],
         });
-
+        const room = await Room.findByPk(booking.room_id, {
+          attributes: ["room_name"],
+        });
         // Add property location to booking data
         return {
           ...booking.toJSON(), // convert Sequelize instance to plain object
           property_location: prop ? prop.location : null,
+          property_name: prop ? prop.name : null,
+          room_name: room ? room.room_name : null,
         };
       })
     );
