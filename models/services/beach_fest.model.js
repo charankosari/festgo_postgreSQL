@@ -18,6 +18,14 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
+      latitude: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+      },
+      longitude: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+      },
 
       available_passes: {
         type: DataTypes.INTEGER,
