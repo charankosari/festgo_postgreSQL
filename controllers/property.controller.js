@@ -676,12 +676,6 @@ exports.getRoomsByPropertyId = async (req, res) => {
     // Fetch rooms by propertyId
     const rooms = await Room.findAll({
       where: { propertyId },
-      include: [
-        {
-          model: room_amenity,
-          as: "roomAmenities", // use the alias you defined in your model
-        },
-      ],
     });
 
     if (!rooms || rooms.length === 0) {
@@ -706,6 +700,7 @@ exports.editRoom = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const vendorId = req.user.id;
 
     // Find room by ID
     const room = await Room.findByPk(id);
@@ -714,7 +709,25 @@ exports.editRoom = async (req, res) => {
       return res.status(404).json({ message: "Room not found" });
     }
 
-    // Update fields
+    // Fetch all property IDs owned by this vendor
+    const vendorProperties = await Property.findAll({
+      where: { vendorId },
+      attributes: ["id"],
+    });
+
+    const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
+
+    // Check if the room.propertyId belongs to this vendor's properties
+    if (!vendorPropertyIds.includes(room.propertyId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to edit this room.",
+      });
+    }
+    if (updates.hasOwnProperty("propertyId")) {
+      delete updates.propertyId;
+    }
+    // Update the room
     await room.update(updates);
 
     res.status(200).json({
@@ -727,15 +740,66 @@ exports.editRoom = async (req, res) => {
     res.status(500).json({ message: "Something went wrong", error });
   }
 };
+exports.createRoom = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const roomData = req.body;
+
+    // Fetch all property IDs owned by this vendor
+    const vendorProperties = await Property.findAll({
+      where: { vendorId },
+      attributes: ["id"],
+    });
+
+    const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
+
+    // Check if the roomData.propertyId is one of the vendor's properties
+    if (!vendorPropertyIds.includes(roomData.propertyId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to add a room to this property.",
+      });
+    }
+
+    // Create a new room
+    const newRoom = await Room.create(roomData);
+
+    res.status(201).json({
+      success: true,
+      message: "Room created successfully",
+      room: newRoom,
+    });
+  } catch (error) {
+    console.error("Error creating room:", error);
+    res.status(500).json({ message: "Something went wrong", error });
+  }
+};
 exports.deleteRoom = async (req, res) => {
   try {
     const { id } = req.params;
+    const vendorId = req.user.id;
 
     // Find room by ID
     const room = await Room.findByPk(id);
 
     if (!room) {
       return res.status(404).json({ message: "Room not found" });
+    }
+
+    // Fetch all property IDs owned by this vendor
+    const vendorProperties = await Property.findAll({
+      where: { vendorId },
+      attributes: ["id"],
+    });
+
+    const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
+
+    // Check if the room.propertyId belongs to this vendor's properties
+    if (!vendorPropertyIds.includes(room.propertyId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this room.",
+      });
     }
 
     // Delete the room

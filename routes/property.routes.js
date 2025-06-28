@@ -47,6 +47,24 @@ router.get(
   propertyController.getRoomsByPropertyId
 );
 router.post(
+  "/r",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.createRoom
+);
+router.put(
+  "/r/:id",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.editRoom
+);
+router.delete(
+  "/r/:id",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.deleteRoom
+);
+router.post(
   "/property-details",
   propertyController.getSelectedPropertyDetailed
 );
