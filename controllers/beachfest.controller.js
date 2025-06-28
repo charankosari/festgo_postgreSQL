@@ -85,6 +85,43 @@ exports.getBeachFestById = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// ✅ Get a Specific by type
+exports.getBeachFestsByType = async (req, res) => {
+  try {
+    const { type } = req.body;
+
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: "Type is required to fetch beach fests",
+      });
+    }
+
+    const fests = await beach_fests.findAll({
+      where: { type },
+      order: [["createdAt", "DESC"]], // optional: latest first
+    });
+
+    if (fests.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No beach fests found for the given type",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Beach fests fetched successfully",
+      data: fests,
+    });
+  } catch (error) {
+    console.error("Error fetching beach fests by type:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 // ✅ Delete a Beach Fest
 exports.deleteBeachFest = async (req, res) => {

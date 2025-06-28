@@ -16,6 +16,7 @@ router.put(
 );
 router.get("/", beachFestController.getAllBeachFests);
 router.get("/:id", beachFestController.getBeachFestById);
+router.post("/type", beachFestController.getBeachFestsByType);
 router.delete(
   "/:id",
   isAuthorized,
