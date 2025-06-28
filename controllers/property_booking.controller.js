@@ -261,17 +261,33 @@ exports.getMyBookings = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Fetch all bookings for the user
     const bookings = await property_booking.findAll({
       where: { user_id: userId },
-
       order: [["createdAt", "DESC"]],
     });
+
+    // For each booking, fetch the related property to get location
+    // Use Promise.all for parallel async fetches
+    const bookingsWithLocation = await Promise.all(
+      bookings.map(async (booking) => {
+        const prop = await Property.findByPk(booking.property_id, {
+          attributes: ["location"],
+        });
+
+        // Add property location to booking data
+        return {
+          ...booking.toJSON(), // convert Sequelize instance to plain object
+          property_location: prop ? prop.location : null,
+        };
+      })
+    );
 
     res.status(200).json({
       status: 200,
       success: true,
       message: "Your bookings fetched successfully.",
-      bookings,
+      bookings: bookingsWithLocation,
     });
   } catch (error) {
     console.error("Error fetching user bookings:", error);
