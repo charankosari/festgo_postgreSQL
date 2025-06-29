@@ -29,7 +29,10 @@ module.exports = (sequelize) =>
         type: DataTypes.DATE,
         allowNull: false,
       },
-
+      eventBudget: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+      },
       numberOfGuests: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -38,19 +41,16 @@ module.exports = (sequelize) =>
       venueOption: {
         type: DataTypes.JSONB,
         allowNull: false,
-        // Example: { needVenue: true, venueName: "" } OR { needVenue: false, venueName: "Existing Venue" }
         defaultValue: {},
       },
 
       soundSystem: {
         type: DataTypes.JSONB,
-        // Example: { required: true, systemName: "" } OR { required: false, systemName: "XYZ Audio Setup" }
         defaultValue: {},
       },
 
       photography: {
         type: DataTypes.JSONB,
-        // Example: { required: true, photographerName: "" } OR { required: false, photographerName: "Lens King" }
         defaultValue: {},
       },
 
