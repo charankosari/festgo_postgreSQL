@@ -8,7 +8,7 @@ const {
 } = require("../models/services");
 
 const { User } = require("../models/users");
-const { createOrder } = require("../libs/payments/razorpay");
+const { createOrder, refundPayment } = require("../libs/payments/razorpay");
 const { FESTGO_COIN_VALUE } = require("../config/festgo_coin");
 const { Op, Transaction } = require("sequelize");
 
