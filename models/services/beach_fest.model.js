@@ -27,6 +27,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
+      total_passes: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+
       available_passes: {
         type: DataTypes.INTEGER,
         allowNull: false,

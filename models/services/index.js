@@ -20,6 +20,9 @@ const MenuItem = require("./menu_item.model")(servicesSequelize);
 const MenuType = require("./menu_type.model")(servicesSequelize);
 // beach fests model
 const beach_fests = require("./beach_fest.model")(servicesSequelize);
+const beachfests_booking = require("./beachfests_booking.model")(
+  servicesSequelize
+);
 
 // city fests models
 const CityFestCategory = require("./city_fest_category.model")(
@@ -143,6 +146,17 @@ property_booking.belongsTo(Room, {
   onDelete: "CASCADE",
 });
 
+beach_fests.hasMany(beachfests_booking, {
+  foreignKey: "beachfest_id",
+  as: "bookings",
+  onDelete: "CASCADE",
+});
+
+beachfests_booking.belongsTo(beach_fests, {
+  foreignKey: "beachfest_id",
+  as: "beachfest",
+  onDelete: "CASCADE",
+});
 // Setup DB object
 const db = {
   sequelize: servicesSequelize,
@@ -160,6 +174,7 @@ const db = {
   Festbite,
   RoomBookedDate,
   beach_fests,
+  beachfests_booking,
   city_fest,
   city_fest_category,
   property_booking,

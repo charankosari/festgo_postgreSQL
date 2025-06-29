@@ -12,6 +12,7 @@ const reviewRoutes = require("./routes/review.route");
 const beachfestRoutes = require("./routes/beachfest.routes");
 const captureHook = require("./libs/payments/paymentWebhook.controller");
 const propertyBookingRoutes = require("./routes/property_booking.routes");
+const beachfestBookingRoutes = require("./routes/beachfest_booking.routes");
 const errorMiddleware = require("./middlewares/error");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
@@ -32,6 +33,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/festbite", festbiteRoutes);
 app.use("/api/upload", upload);
 app.use("/api/property-booking", propertyBookingRoutes);
+app.use("/api/beachfest-booking", beachfestBookingRoutes);
 app.post("/api/payment/hook", captureHook);
 app.use(errorMiddleware);
 

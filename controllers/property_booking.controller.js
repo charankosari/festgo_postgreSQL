@@ -11,6 +11,7 @@ const { User } = require("../models/users");
 const { createOrder, refundPayment } = require("../libs/payments/razorpay");
 const { FESTGO_COIN_VALUE } = require("../config/festgo_coin");
 const { Op, Transaction } = require("sequelize");
+const moment = require("moment");
 
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
@@ -96,17 +97,20 @@ exports.bookProperty = async (req, res) => {
     // Calculate total and apply coins
     const total_amount = room.discounted_price * num_rooms;
     let gst_rate = 0;
-    if (room.discounted_price >= 7500) {
+
+    if (room.discounted_price >= 8000) {
       gst_rate = 18;
-    } else {
+    } else if (room.discounted_price >= 1000) {
       gst_rate = 12;
+    } else {
+      gst_rate = 0;
     }
 
     // Calculate GST
     const gst_amount = (total_amount * gst_rate) / 100;
 
     // Determine Service Fee based on room price
-    let service_fee = 0;
+    let service_fee = 50;
     if (room.discounted_price >= 1000 && room.discounted_price <= 1999) {
       service_fee = 50;
     } else if (room.discounted_price >= 2000 && room.discounted_price <= 4999) {
