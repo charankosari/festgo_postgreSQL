@@ -55,14 +55,22 @@ router.get("/me", isAuthorized, userController.getUserDetails);
 
 // wishlist.routes.js
 // ✅ Create a wishlist item
-router.post("/", isAuthorized, wishlistController.createWishlist);
+router.post("/wishlist", isAuthorized, wishlistController.createWishlist);
 
 // ✅ Get all wishlist items for logged-in user
-router.get("/", isAuthorized, wishlistController.getWishlist);
+router.get("/wishlist", isAuthorized, wishlistController.getWishlist);
 
 // ✅ Update wishlist item (usually type)
-router.put("/:id", isAuthorized, wishlistController.updateWishlistItem);
+router.put(
+  "/wishlist/:id",
+  isAuthorized,
+  wishlistController.updateWishlistItem
+);
 
 // ✅ Delete a wishlist item by ID
-router.delete("/:id", isAuthorized, wishlistController.deleteWishlistItem);
+router.delete(
+  "/wishlist/:id",
+  isAuthorized,
+  wishlistController.deleteWishlistItem
+);
 module.exports = router;
