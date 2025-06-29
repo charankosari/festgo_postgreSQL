@@ -6,7 +6,11 @@ const { isAuthorized } = require("../middlewares/auth");
 
 // 📦 Create a property booking — protected route
 router.post("/", isAuthorized, propertyBookingController.bookProperty);
-router.post("/:id", isAuthorized, propertyBookingController.cancelBooking);
+router.post(
+  "/cancel/:id",
+  isAuthorized,
+  propertyBookingController.cancelBooking
+);
 // You can add more endpoints later — e.g. get bookings, cancel, etc.
 router.get(
   "/my-bookings",

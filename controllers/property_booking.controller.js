@@ -263,10 +263,14 @@ exports.getMyBookings = async (req, res) => {
 
     // Fetch all bookings for the user
     const bookings = await property_booking.findAll({
-      where: { user_id: userId },
+      where: {
+        user_id: userId,
+        payment_status: {
+          [Op.in]: ["paid", "refunded"],
+        },
+      },
       order: [["createdAt", "DESC"]],
     });
-
     // For each booking, fetch the related property to get location
     // Use Promise.all for parallel async fetches
     const bookingsWithLocation = await Promise.all(
