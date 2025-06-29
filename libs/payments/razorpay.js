@@ -43,6 +43,14 @@ const validateSignature = ({ webhook_signature, webhook_secret, payload }) => {
   const generated_signature = hmac.digest("hex");
   return webhook_signature === generated_signature;
 };
+const refundPayment = async ({ payment_id, amount }) => {
+  const refundData = amount
+    ? { amount: Math.round(amount * 100) } // partial refund
+    : {}; // full refund
+
+  const refund = await razorpayInstance.payments.refund(payment_id, refundData);
+  return refund;
+};
 
 module.exports = {
   createOrder,
@@ -50,4 +58,5 @@ module.exports = {
   capturePayment,
   orderStatus,
   validateSignature,
+  refundPayment,
 };

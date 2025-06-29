@@ -314,3 +314,86 @@ exports.getMyBookings = async (req, res) => {
     });
   }
 };
+
+exports.cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch booking
+    const booking = await property_booking.findOne({ where: { id } });
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found." });
+    }
+
+    const today = moment();
+    const checkInDate = moment(booking.check_in_date);
+    const daysBeforeCheckin = checkInDate.diff(today, "days");
+
+    // Determine refund eligibility and percentage
+    let refundPercentage = 0;
+
+    if (daysBeforeCheckin >= 4) {
+      refundPercentage = 100;
+    } else if (daysBeforeCheckin >= 2) {
+      refundPercentage = 50;
+    } else {
+      refundPercentage = 0;
+    }
+
+    let refundAmount = 0;
+
+    // If eligible for refund and payment was online
+    if (
+      booking.payment_method === "online" &&
+      refundPercentage > 0 &&
+      booking.transaction_id
+    ) {
+      // Exclude service charge from refund calculation
+      const refundableAmount = booking.amount_paid - booking.service_charge;
+
+      refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
+
+      // Only refund if refundAmount > 0
+      if (refundAmount > 0) {
+        const refund = await refundPayment({
+          payment_id: booking.transaction_id,
+          amount: refundAmount,
+        });
+
+        console.log("Refund processed:", refund);
+      }
+    }
+
+    // Delete booked room dates
+    await RoomBookedDate.destroy({ where: { bookingId: id } });
+
+    // Update booking status and payment status
+    await booking.update({
+      booking_status: "cancelled",
+      payment_status:
+        booking.payment_method === "online"
+          ? refundPercentage > 0
+            ? "refunded"
+            : "cancelled"
+          : "cancelled",
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        refundPercentage > 0
+          ? `Booking cancelled successfully. ₹${
+              refundAmount / 100
+            } refunded (excluding service charges).`
+          : "Booking cancelled successfully. No refund applicable.",
+      refundAmount: refundAmount / 100, // in rupees
+      refundPercentage,
+    });
+  } catch (error) {
+    console.error("Error cancelling booking:", error);
+    res.status(500).json({ success: false, message: "Something went wrong." });
+  }
+};
