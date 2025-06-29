@@ -1,4 +1,5 @@
 const { User } = require("../models/users");
+const { property_booking, beachfests_booking } = require("../models/services");
 const { Sequelize } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
 const sendEmail = require("../libs/mailgun/mailGun");
@@ -388,12 +389,31 @@ exports.getUserDetails = async (req, res) => {
       });
     }
 
+    let cleanUser;
+
     if (user.role === "user") {
+      // 📌 Clean user data
       cleanUser = safeUser(
         user,
         ["username"],
         ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
       );
+
+      // 📌 Fetch property bookings count (confirmed only)
+      const propertyBookingsCount = await property_booking.count({
+        where: { user_id: userId, booking_status: "confirmed" },
+      });
+
+      // 📌 Fetch beachfest bookings count (confirmed only)
+      const beachfestBookingsCount = await beachfests_booking.count({
+        where: { user_id: userId, booking_status: "confirmed" },
+      });
+
+      // 📌 Sum total bookings count
+      const bookingsCount = propertyBookingsCount + beachfestBookingsCount;
+
+      // 📌 Attach bookingsCount into user object
+      cleanUser.bookingsCount = bookingsCount;
     } else {
       cleanUser = safeUser(user, [
         "firstname",
@@ -403,6 +423,8 @@ exports.getUserDetails = async (req, res) => {
         "date_of_birth",
       ]);
     }
+
+    // 📌 Final response
     res.status(200).json({
       success: true,
       user: cleanUser,
