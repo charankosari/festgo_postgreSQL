@@ -680,8 +680,8 @@ exports.getRoomsByPropertyId = async (req, res) => {
 
     if (!rooms || rooms.length === 0) {
       return res
-        .status(404)
-        .json({ message: "No rooms found for this property", status: 404 });
+        .status(200)
+        .json({ message: "No rooms found for this property", status: 200 });
     }
 
     res.status(200).json({
