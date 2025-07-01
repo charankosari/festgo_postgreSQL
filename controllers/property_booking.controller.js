@@ -3,6 +3,9 @@ const {
   RoomBookedDate,
   Property,
   Room,
+  beachfests_booking,
+  beach_fests,
+  Event,
   CronThing,
   sequelize, // your services sequelize instance
 } = require("../models/services");
@@ -265,8 +268,8 @@ exports.getMyBookings = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Fetch all bookings for the user
-    const bookings = await property_booking.findAll({
+    // 📌 Fetch property bookings (paid/refunded)
+    const propertyBookings = await property_booking.findAll({
       where: {
         user_id: userId,
         payment_status: {
@@ -275,16 +278,17 @@ exports.getMyBookings = async (req, res) => {
       },
       order: [["createdAt", "DESC"]],
     });
-    // For each booking, fetch the related property to get location
-    // Use Promise.all for parallel async fetches
-    const bookingsWithLocation = await Promise.all(
-      bookings.map(async (booking) => {
+
+    const propertyBookingsWithDetails = await Promise.all(
+      propertyBookings.map(async (booking) => {
         const prop = await Property.findByPk(booking.property_id, {
           attributes: ["location", "name", "photos"],
         });
+
         const room = await Room.findByPk(booking.room_id, {
           attributes: ["room_name"],
         });
+
         let photoUrls = [];
         if (prop && prop.photos && Array.isArray(prop.photos)) {
           try {
@@ -293,11 +297,12 @@ exports.getMyBookings = async (req, res) => {
               return photoObj.url;
             });
           } catch (err) {
-            console.error("Error parsing photos JSON string:", err);
+            console.error("Error parsing property photos JSON string:", err);
           }
         }
+
         return {
-          ...booking.toJSON(), // convert Sequelize instance to plain object
+          ...booking.toJSON(),
           property_location: prop ? prop.location : null,
           property_name: prop ? prop.name : null,
           property_photos: photoUrls,
@@ -306,11 +311,69 @@ exports.getMyBookings = async (req, res) => {
       })
     );
 
+    // 📌 Fetch beachfest bookings (paid/refunded)
+    const beachfestBookings = await beachfests_booking.findAll({
+      where: {
+        user_id: userId,
+        payment_status: {
+          [Op.in]: ["paid", "refunded"],
+        },
+      },
+      order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: beach_fests,
+          as: "beachfest",
+          attributes: [
+            "type",
+            "image_urls",
+            "gmap_url",
+            "latitude",
+            "longitude",
+            "location",
+          ],
+        },
+      ],
+    });
+
+    const beachfestBookingsWithDetails = beachfestBookings.map((booking) => {
+      const imageUrlsStr = booking.beachfest?.image_urls;
+      let imageUrls = [];
+
+      if (typeof imageUrlsStr === "string" && imageUrlsStr.trim() !== "") {
+        imageUrls = imageUrlsStr
+          .replace(/{|}/g, "")
+          .split(",")
+          .map((url) => url.trim());
+      }
+
+      return {
+        ...booking.toJSON(),
+        beachfest_name: booking.beachfest ? booking.beachfest.type : null,
+        beachfest_location: booking.beachfest
+          ? booking.beachfest.location
+          : null,
+        beachfest_images: imageUrls,
+        gmap_url: booking.beachfest ? booking.beachfest.gmap_url : null,
+        latitude: booking.beachfest ? booking.beachfest.latitude : null,
+        longitude: booking.beachfest ? booking.beachfest.longitude : null,
+      };
+    });
+
+    // 📌 Fetch Events
+    const events = await Event.findAll({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    // 📌 Final response
     res.status(200).json({
       status: 200,
       success: true,
       message: "Your bookings fetched successfully.",
-      bookings: bookingsWithLocation,
+      propertyBookings: propertyBookingsWithDetails,
+      beachfestBookings: beachfestBookingsWithDetails,
+      events,
     });
   } catch (error) {
     console.error("Error fetching user bookings:", error);
