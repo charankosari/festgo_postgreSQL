@@ -27,11 +27,11 @@ router.put(
 // ✅ Get all properties
 router.get("/", propertyController.getAllProperties);
 router.get("/active", propertyController.getAllActiveProperties);
-router.post("/active-r", propertyController.getAllActivePropertiesByRange);
-router.post("/details", propertyController.getAmenitiesForProperty);
+router.post("/p/active-r", propertyController.getAllActivePropertiesByRange);
+router.post("/p/details", propertyController.getAmenitiesForProperty);
 
 // ✅ Get property by ID
-router.get("/:id", propertyController.getPropertyById);
+router.get("/p/:id", propertyController.getPropertyById);
 
 // ✅ Get properties by vendor
 router.get(
@@ -71,7 +71,7 @@ router.delete(
   propertyController.deleteRoom
 );
 router.post(
-  "/property-details",
+  "/p/property-details",
   propertyController.getSelectedPropertyDetailed
 );
 
