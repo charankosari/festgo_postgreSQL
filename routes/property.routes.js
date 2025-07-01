@@ -9,6 +9,12 @@ router.post(
   authorizedRoles("vendor"),
   propertyController.createProperty
 );
+router.post(
+  "/:id",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.updateProperty
+);
 
 // ✅ Update property by ID
 router.put(
