@@ -744,7 +744,7 @@ exports.createRoom = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const roomData = req.body;
-
+    console.log("Room Data:", roomData);
     // Fetch all property IDs owned by this vendor
     const vendorProperties = await Property.findAll({
       where: { vendorId },
@@ -763,7 +763,7 @@ exports.createRoom = async (req, res) => {
 
     // Create a new room
     const newRoom = await Room.create(roomData);
-
+    console.log("Room Data:", newRoom);
     res.status(201).json({
       success: true,
       message: "Room created successfully",
