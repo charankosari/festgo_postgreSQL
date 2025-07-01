@@ -743,8 +743,15 @@ exports.editRoom = async (req, res) => {
 exports.createRoom = async (req, res) => {
   try {
     const vendorId = req.user.id;
-    const roomData = req.body;
-    console.log("Room Data:", roomData);
+    const {
+      propertyId,
+      roomDetailsFormInfo,
+      selectedRoomFormInfo,
+      bathroomDetailsFormInfo,
+      mealPlanDetailsFormInfo,
+      roomAmenities,
+    } = req.body;
+
     // Fetch all property IDs owned by this vendor
     const vendorProperties = await Property.findAll({
       where: { vendorId },
@@ -753,17 +760,40 @@ exports.createRoom = async (req, res) => {
 
     const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
 
-    // Check if the roomData.propertyId is one of the vendor's properties
-    if (!vendorPropertyIds.includes(roomData.propertyId)) {
+    // Check if the propertyId belongs to this vendor
+    if (!vendorPropertyIds.includes(propertyId)) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to add a room to this property.",
       });
     }
 
+    // Map incoming nested request body to Room model fields
+    const roomData = {
+      propertyId,
+      room_type: roomDetailsFormInfo.type,
+      view: roomDetailsFormInfo.view,
+      area: `${roomDetailsFormInfo.size} ${roomDetailsFormInfo.sizeUnit}`,
+      room_name: roomDetailsFormInfo.name,
+      number_of_rooms: roomDetailsFormInfo.numberOfRooms,
+      description: roomDetailsFormInfo.description,
+      original_price: mealPlanDetailsFormInfo.baseRateFor2Adults,
+      discounted_price: mealPlanDetailsFormInfo.baseRateFor2Adults, // you can adjust this if discount logic exists
+      max_adults: selectedRoomFormInfo.maxAdults,
+      max_children: selectedRoomFormInfo.maxChildren,
+      max_people: selectedRoomFormInfo.maxOccupancy,
+      bathroom_details: `${bathroomDetailsFormInfo.numberOfBathrooms} Bathroom(s)`,
+      meal_plans: [mealPlanDetailsFormInfo.mealPlan],
+      room_amenities: roomAmenities,
+      photos: roomDetailsFormInfo.images,
+      // optionally include videos or other fields if available
+    };
+
+    console.log("Mapped Room Data:", roomData);
+
     // Create a new room
     const newRoom = await Room.create(roomData);
-    console.log("Room Data:", newRoom);
+
     res.status(201).json({
       success: true,
       message: "Room created successfully",
@@ -774,6 +804,7 @@ exports.createRoom = async (req, res) => {
     res.status(500).json({ message: "Something went wrong", error });
   }
 };
+
 exports.deleteRoom = async (req, res) => {
   try {
     const { id } = req.params;
