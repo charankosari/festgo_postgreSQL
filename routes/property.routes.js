@@ -53,7 +53,7 @@ router.get(
   propertyController.getRoomsByPropertyId
 );
 router.post(
-  "/r",
+  "/r/create",
   isAuthorized,
   authorizedRoles("vendor"),
   propertyController.createRoom
