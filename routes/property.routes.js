@@ -31,7 +31,7 @@ router.post("/p/active-r", propertyController.getAllActivePropertiesByRange);
 router.post("/p/details", propertyController.getAmenitiesForProperty);
 
 // ✅ Get property by ID
-router.get("/p/:id", propertyController.getPropertyById);
+router.get("/prop/:id", propertyController.getPropertyById);
 
 // ✅ Get properties by vendor
 router.get(
@@ -53,7 +53,7 @@ router.get(
   propertyController.getRoomsByPropertyId
 );
 router.post(
-  "/r/create",
+  "/r/c",
   isAuthorized,
   authorizedRoles("vendor"),
   propertyController.createRoom
