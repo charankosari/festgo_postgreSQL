@@ -1,6 +1,7 @@
 const { servicesSequelize, usersSequelize } = require("../../db");
 const city_fest = require("./city_fest.model");
 const city_fest_category = require("./city_fest_category.model");
+const ContactMessage = require("./ContactMessage")(servicesSequelize);
 
 // Import models
 const amenity_category = require("./amenity_category.model")(servicesSequelize);
@@ -179,6 +180,7 @@ const db = {
   city_fest_category,
   property_booking,
   CronThing,
+  ContactMessage,
 };
 
 // Sync all models
