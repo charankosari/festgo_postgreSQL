@@ -734,100 +734,91 @@ exports.editRoom = async (req, res) => {
 
     // Find room by ID
     const room = await Room.findByPk(id);
-
     if (!room) {
       return res.status(404).json({ message: "Room not found" });
     }
 
-    // Fetch all property IDs owned by this vendor
-    const vendorProperties = await Property.findAll({
-      where: { vendorId },
-      attributes: ["id"],
-    });
+    // Fetch property and verify vendor ownership
+    const property = await Property.findByPk(room.propertyId);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
 
-    const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
-
-    // Check if the room.propertyId belongs to this vendor's properties
-    if (!vendorPropertyIds.includes(room.propertyId)) {
+    if (property.vendorId !== vendorId) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to edit this room.",
       });
     }
+
     if (updates.hasOwnProperty("propertyId")) {
       delete updates.propertyId;
     }
-    // Update the room
-    await room.update(updates);
+
+    // ✅ Normalize the data to save into Room table
+    const normalizedRoomData = normalizeRoomData(updates);
+
+    // ✅ Update the Room record in DB
+    await room.update(normalizedRoomData);
+
+    // ✅ Update the raw strdata.step_4 (not normalized)
+    const updatedStrdata = updateStrdata(property.strdata, 4, updates);
+    await property.update({ strdata: updatedStrdata });
 
     res.status(200).json({
       success: true,
       message: "Room updated successfully",
       room,
+      str: updatedStrdata,
     });
   } catch (error) {
     console.error("Error updating room:", error);
     res.status(500).json({ message: "Something went wrong", error });
   }
 };
+
 exports.createRoom = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const {
       propertyId,
-      roomDetailsFormInfo,
-      selectedRoomFormInfo,
-      bathroomDetailsFormInfo,
-      mealPlanDetailsFormInfo,
-      roomAmenities,
+      current_step = 4, // assuming this is always 4 for room data
+      ...incomingRoomData
     } = req.body;
 
-    // Fetch all property IDs owned by this vendor
-    const vendorProperties = await Property.findAll({
-      where: { vendorId },
-      attributes: ["id"],
-    });
+    // Fetch the property and verify ownership
+    const property = await Property.findByPk(propertyId);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
 
-    const vendorPropertyIds = vendorProperties.map((prop) => prop.id);
-
-    // Check if the propertyId belongs to this vendor
-    if (!vendorPropertyIds.includes(propertyId)) {
+    if (property.vendorId !== vendorId) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to add a room to this property.",
       });
     }
 
-    // Map incoming nested request body to Room model fields
-    const roomData = {
-      propertyId,
-      room_type: roomDetailsFormInfo.type,
-      view: roomDetailsFormInfo.view,
-      area: `${roomDetailsFormInfo.size} ${roomDetailsFormInfo.sizeUnit}`,
-      room_name: roomDetailsFormInfo.name,
-      number_of_rooms: roomDetailsFormInfo.numberOfRooms,
-      description: roomDetailsFormInfo.description,
-      original_price: mealPlanDetailsFormInfo.baseRateFor2Adults,
-      discounted_price: mealPlanDetailsFormInfo.baseRateFor2Adults, // you can adjust this if discount logic exists
-      max_adults: selectedRoomFormInfo.maxAdults,
-      max_children: selectedRoomFormInfo.maxChildren,
-      max_people: selectedRoomFormInfo.maxOccupancy,
-      bathroom_details: `${bathroomDetailsFormInfo.numberOfBathrooms} Bathroom(s)`,
-      meal_plans: [mealPlanDetailsFormInfo.mealPlan],
-      room_amenities: roomAmenities,
-      photos: roomDetailsFormInfo.images,
-      // optionally include videos or other fields if available
-    };
+    // 📌 Update strdata for step 4 with incoming roomData
+    const newStrdata = updateStrdata(
+      property.strdata,
+      current_step,
+      incomingRoomData
+    );
 
-    console.log("Mapped Room Data:", roomData);
+    await property.update({ strdata: newStrdata });
 
-    // Create a new room
-    const newRoom = await Room.create(roomData);
+    // 📌 Now normalize room data and save Room model record
+    const normalizedRoomData = normalizeRoomData(incomingRoomData);
+    console.log("Normalized Room Data:", normalizedRoomData);
+
+    const newRoom = await Room.create(normalizedRoomData);
 
     res.status(201).json({
       success: true,
       message: "Room created successfully",
       room: newRoom,
+      str: newStrdata,
     });
   } catch (error) {
     console.error("Error creating room:", error);
