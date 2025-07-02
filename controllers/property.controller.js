@@ -181,7 +181,10 @@ function updateStrdata(existingStrdata, step, newStepData) {
 
 exports.createProperty = async (req, res) => {
   try {
-    const { current_step = 1, strdata = {} } = req.body;
+    const { current_step = 1, strdata, ...rest } = req.body;
+    const finalStrdata =
+      strdata && Object.keys(strdata).length ? strdata : rest;
+
     const vendorId = req.user.id;
 
     const vendor = await User.findByPk(vendorId);
@@ -194,14 +197,15 @@ exports.createProperty = async (req, res) => {
     const status = calculateStatus(current_step);
     const in_progress = status < 100;
     const is_completed = status === 100;
-    console.log(req.body);
-    // 📌 save strdata first
-    const newStrdata = updateStrdata({}, current_step, strdata);
+
+    // Update strdata with this step's data
+    const newStrdata = updateStrdata({}, current_step, finalStrdata);
     console.log(newStrdata);
-    // 📌 normalize the incoming strdata (structured data)
-    const normalizedDetails = normalizePropertyData(strdata);
+    // 📌 pick only this step's data for normalization
+    const stepData = newStrdata[`step_${current_step}`] || {};
+    const normalizedDetails = normalizePropertyData(stepData);
     console.log(normalizedDetails);
-    // 📌 now create property record with both
+    // Now create property with both
     const property = await Property.create({
       vendorId,
       current_step,
