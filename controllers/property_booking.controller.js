@@ -267,7 +267,22 @@ exports.handlePaymentFailure = async (bookingId) => {
 exports.getMyBookings = async (req, res) => {
   try {
     const userId = req.user.id;
-
+    const user = await User.findByPk(userId, {
+      attributes: {
+        exclude: [
+          "password",
+          "email_otp",
+          "mobile_otp",
+          "email_otp_expire",
+          "mobile_otp_expire",
+          "resetPasswordToken",
+          "resetPasswordExpire",
+          "tokenExpire",
+          "token",
+          "username",
+        ],
+      },
+    });
     // 📌 Fetch property bookings (paid/refunded)
     const propertyBookings = await property_booking.findAll({
       where: {
@@ -374,6 +389,7 @@ exports.getMyBookings = async (req, res) => {
       propertyBookings: propertyBookingsWithDetails,
       beachfestBookings: beachfestBookingsWithDetails,
       events,
+      user: user,
     });
   } catch (error) {
     console.error("Error fetching user bookings:", error);
