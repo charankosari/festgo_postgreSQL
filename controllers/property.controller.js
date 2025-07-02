@@ -193,13 +193,13 @@ exports.createProperty = async (req, res) => {
     const status = calculateStatus(current_step);
     const in_progress = status < 100;
     const is_completed = status === 100;
-
+    console.log(req.body);
     // 📌 save strdata first
     const newStrdata = updateStrdata({}, current_step, strdata);
-
+    console.log(newStrdata);
     // 📌 normalize the incoming strdata (structured data)
     const normalizedDetails = normalizePropertyData(strdata);
-
+    console.log(normalizedDetails);
     // 📌 now create property record with both
     const property = await Property.create({
       vendorId,
