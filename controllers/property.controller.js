@@ -172,9 +172,10 @@ const formatPropertyResponse = async (property) => {
 };
 function updateStrdata(existingStrdata, step, newStepData) {
   const updatedStrdata = { ...existingStrdata };
-
-  updatedStrdata[`step_${step}`] = JSON.stringify(newStepData || {});
-
+  updatedStrdata[`step_${step}`] = {
+    ...(existingStrdata[`step_${step}`] || {}),
+    ...newStepData,
+  };
   return updatedStrdata;
 }
 
