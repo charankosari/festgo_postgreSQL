@@ -9,6 +9,10 @@ const {
   RoomBookedDate,
 } = require("../models/services/index");
 const { review } = require("../models/users/index");
+const {
+  normalizePropertyData,
+  normalizeRoomData,
+} = require("../utils/normalizePropertyData");
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
@@ -100,7 +104,9 @@ const enrichProperties = async (properties) => {
 
     // Clean up ownership_details
     delete plain.ownership_details;
-
+    delete plain.bank_details;
+    delete plain.tax_details;
+    delete plain.strdata;
     // Format final response
     const formattedProperty = await formatPropertyResponse(plain);
     if (formattedProperty) enriched.push(formattedProperty);
@@ -164,12 +170,19 @@ const formatPropertyResponse = async (property) => {
     imageList,
   };
 };
+function updateStrdata(existingStrdata, step, newStepData) {
+  const updatedStrdata = { ...existingStrdata };
 
-// ✅ Create Property
+  updatedStrdata[`step_${step}`] = JSON.stringify(newStepData || {});
+
+  return updatedStrdata;
+}
+
 exports.createProperty = async (req, res) => {
   try {
-    const { current_step = 1, ...details } = req.body;
+    const { current_step = 1, strdata = {} } = req.body;
     const vendorId = req.user.id;
+
     const vendor = await User.findByPk(vendorId);
     if (!vendor) return res.status(404).json({ message: "Vendor not found" });
     if (vendor.role !== "vendor")
@@ -181,13 +194,21 @@ exports.createProperty = async (req, res) => {
     const in_progress = status < 100;
     const is_completed = status === 100;
 
+    // 📌 save strdata first
+    const newStrdata = updateStrdata({}, current_step, strdata);
+
+    // 📌 normalize the incoming strdata (structured data)
+    const normalizedDetails = normalizePropertyData(strdata);
+
+    // 📌 now create property record with both
     const property = await Property.create({
       vendorId,
       current_step,
       status,
       in_progress,
       is_completed,
-      ...details,
+      strdata: newStrdata,
+      ...normalizedDetails,
     });
 
     res.status(201).json({ success: true, property });
@@ -201,50 +222,56 @@ exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const incomingStep = updates.current_step;
 
     const property = await Property.findByPk(id);
     if (!property)
       return res.status(404).json({ message: "Property not found" });
 
-    // If rooms are included in update request
-    if (updates.rooms && Array.isArray(updates.rooms)) {
-      // Create new room records for this property without deleting existing ones
-      await Promise.all(
-        updates.rooms.map((room) =>
-          Room.create({
-            ...room,
-            propertyId: id,
-          })
-        )
-      );
-
-      // Remove rooms key from updates so it doesn't touch Property model's 'rooms' JSONB field
-      delete updates.rooms;
+    let currentStep = property.current_step;
+    if (incomingStep !== undefined) {
+      currentStep = Math.min(incomingStep, 7);
+    } else if (currentStep < 7) {
+      currentStep += 1;
     }
 
-    // Update other property fields
-    await property.update(updates);
+    // Load existing strdata
+    let newStrdata = property.strdata || {};
 
-    // recalculate status and completion state
-    let currentStep = property.current_step;
+    // Merge incoming updates into corresponding step's strdata
+    newStrdata[`step_${currentStep}`] = {
+      ...(newStrdata[`step_${currentStep}`] || {}),
+      ...updates,
+    };
 
-    // If update value exists and is ≤ 7, use it
-    if (updates.current_step !== undefined) {
-      currentStep = Math.min(updates.current_step, 7);
-    } else if (currentStep < 7) {
-      // If no update provided, increment only if less than 7
-      currentStep += 1;
+    // Special case: step 4 → normalize and save rooms, but don't save normalized data in strdata
+    if (currentStep === 4 && updates.rooms && Array.isArray(updates.rooms)) {
+      await Promise.all(
+        updates.rooms.map((room) => {
+          const normalizedRoom = normalizeRoomData(room); // Assuming you have this function imported
+          return Room.create({
+            ...normalizedRoom,
+            propertyId: id,
+          });
+        })
+      );
+
+      // Remove rooms key so it doesn't affect Property model
+      delete updates.rooms;
     }
 
     const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
 
+    // Update Property fields
     await property.update({
+      ...updates,
       current_step: currentStep,
       status,
       in_progress,
       is_completed,
+      strdata: newStrdata,
     });
 
     res.json({ success: true, property });

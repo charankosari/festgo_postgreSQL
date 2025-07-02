@@ -21,6 +21,12 @@ module.exports = (sequelize) =>
     accepting_bookings_since: DataTypes.DATE,
     mobile_number: DataTypes.STRING,
     landline_number: DataTypes.STRING,
+    channelManagerName: DataTypes.STRING,
+    sameAsWhatsapp: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    channelManager: DataTypes.BOOLEAN,
     current_step: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
@@ -72,8 +78,27 @@ module.exports = (sequelize) =>
       type: DataTypes.JSONB,
       defaultValue: {},
     },
+    bank_details: {
+      type: DataTypes.JSONB, // accountNumber, ifscCode, bankName, etc.
+      defaultValue: {},
+    },
+
+    tax_details: {
+      type: DataTypes.JSONB, // hasGSTIN, gstin, pan, hasTAN, tan
+      defaultValue: {},
+    },
+
+    consent: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+
     review_count: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+    },
+    strdata: {
+      type: DataTypes.JSONB,
+      defaultValue: {},
     },
   });

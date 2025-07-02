@@ -25,7 +25,12 @@ router.put(
 );
 
 // ✅ Get all properties
-router.get("/", propertyController.getAllProperties);
+router.get(
+  "/",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.getAllProperties
+);
 router.get("/active", propertyController.getAllActiveProperties);
 router.post("/p/active-r", propertyController.getAllActivePropertiesByRange);
 router.post("/p/details", propertyController.getAmenitiesForProperty);
