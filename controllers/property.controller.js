@@ -200,11 +200,9 @@ exports.createProperty = async (req, res) => {
 
     // Update strdata with this step's data
     const newStrdata = updateStrdata({}, current_step, finalStrdata);
-    console.log(newStrdata);
     // 📌 pick only this step's data for normalization
     const stepData = newStrdata[`step_${current_step}`] || {};
     const normalizedDetails = normalizePropertyData(stepData);
-    console.log(normalizedDetails);
     // Now create property with both
     const property = await Property.create({
       vendorId,
