@@ -20,6 +20,7 @@ exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
   });
+  const userId = req.user.id;
 
   try {
     const {
@@ -195,11 +196,27 @@ exports.bookProperty = async (req, res) => {
     );
 
     await t.commit();
-
+    const u = await User.findByPk(userId, {
+      attributes: {
+        exclude: [
+          "password",
+          "email_otp",
+          "mobile_otp",
+          "email_otp_expire",
+          "mobile_otp_expire",
+          "resetPasswordToken",
+          "resetPasswordExpire",
+          "tokenExpire",
+          "token",
+          "username",
+        ],
+      },
+    });
     return res.status(201).json({
       message: "Booking created successfully",
       booking: newBooking,
       razorpayOrder,
+      user: u,
       status: 201,
     });
   } catch (error) {
@@ -267,22 +284,7 @@ exports.handlePaymentFailure = async (bookingId) => {
 exports.getMyBookings = async (req, res) => {
   try {
     const userId = req.user.id;
-    const user = await User.findByPk(userId, {
-      attributes: {
-        exclude: [
-          "password",
-          "email_otp",
-          "mobile_otp",
-          "email_otp_expire",
-          "mobile_otp_expire",
-          "resetPasswordToken",
-          "resetPasswordExpire",
-          "tokenExpire",
-          "token",
-          "username",
-        ],
-      },
-    });
+
     // 📌 Fetch property bookings (paid/refunded)
     const propertyBookings = await property_booking.findAll({
       where: {
@@ -389,7 +391,6 @@ exports.getMyBookings = async (req, res) => {
       propertyBookings: propertyBookingsWithDetails,
       beachfestBookings: beachfestBookingsWithDetails,
       events,
-      user: user,
     });
   } catch (error) {
     console.error("Error fetching user bookings:", error);
