@@ -32,6 +32,10 @@ const CityFestCategory = require("./city_fest_category.model")(
 const CityFest = require("./city_fest.model")(servicesSequelize);
 // property booking
 const property_booking = require("./property_booking.model")(servicesSequelize);
+
+const city_fest_booking = require("./city_fest_booking.model")(
+  servicesSequelize
+);
 // cron
 const CronThing = require("./cron_things")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
@@ -122,6 +126,32 @@ CityFestCategory.hasMany(CityFest, {
   foreignKey: "categoryId",
   as: "cityFests",
 });
+// City Fest Booking Associations
+
+city_fest_booking.belongsTo(CityFest, {
+  foreignKey: "cityfest_id",
+  as: "cityFest",
+  onDelete: "CASCADE",
+});
+
+CityFest.hasMany(city_fest_booking, {
+  foreignKey: "cityfest_id",
+  as: "bookings",
+  onDelete: "CASCADE",
+});
+
+// Optional — if booking also directly stores categoryId:
+city_fest_booking.belongsTo(CityFestCategory, {
+  foreignKey: "category_id",
+  as: "festCategory",
+  onDelete: "CASCADE",
+});
+
+CityFestCategory.hasMany(city_fest_booking, {
+  foreignKey: "category_id",
+  as: "bookings",
+  onDelete: "CASCADE",
+});
 
 // Property-Booking Association
 Property.hasMany(property_booking, {
@@ -167,6 +197,7 @@ const db = {
   room_amenity_category,
   room_amenity,
   Property,
+  property_booking,
   Room,
   Event,
   EventType,
@@ -178,7 +209,7 @@ const db = {
   beachfests_booking,
   city_fest,
   city_fest_category,
-  property_booking,
+  city_fest_booking,
   CronThing,
   ContactMessage,
 };
