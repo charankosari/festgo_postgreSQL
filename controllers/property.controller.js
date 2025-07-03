@@ -282,10 +282,14 @@ exports.updateProperty = async (req, res) => {
     const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
+    let normalizedData = {};
+    if ([1, 2, 3, 5, 6, 7].includes(currentStep)) {
+      normalizedData = normalizePropertyData(updates);
+    }
 
     // ✅ 3️⃣ Update Property fields with updates and updated strdata
     await property.update({
-      ...updates,
+      ...normalizedData,
       current_step: currentStep,
       status,
       in_progress,
