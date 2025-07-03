@@ -12,11 +12,209 @@ const {
 } = require("../models/services");
 
 const { User } = require("../models/users");
-const { createOrder, refundPayment } = require("../libs/payments/razorpay");
+const { createOrder } = require("../libs/payments/razorpay");
 const { FESTGO_COIN_VALUE } = require("../config/festgo_coin");
 const { Op, Transaction } = require("sequelize");
-const moment = require("moment");
+const {
+  cancelBeachFestBooking,
+  cancelPropertyBooking,
+  cancelEventBooking,
+} = require("../utils/cancelBookings");
+// const cancelPropertyBooking = async (req, res) => {
+//   try {
+//     const { id } = req.params;
 
+//     const booking = await property_booking.findOne({ where: { id } });
+
+//     if (!booking) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Booking not found." });
+//     }
+
+//     const today = moment();
+//     const checkInDate = moment(booking.check_in_date);
+//     const daysBeforeCheckin = checkInDate.diff(today, "days");
+
+//     let refundPercentage = 0;
+//     if (daysBeforeCheckin >= 4) refundPercentage = 100;
+//     else if (daysBeforeCheckin >= 2) refundPercentage = 50;
+
+//     let refundAmount = 0;
+
+//     if (
+//       booking.payment_method === "online" &&
+//       refundPercentage > 0 &&
+//       booking.transaction_id
+//     ) {
+//       const refundableAmount = booking.amount_paid - booking.service_charge;
+//       refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
+
+//       if (refundAmount > 0) {
+//         const refund = await refundPayment({
+//           payment_id: booking.transaction_id,
+//           amount: refundAmount,
+//         });
+
+//         console.log("Refund processed:", refund);
+//       }
+//     }
+
+//     await RoomBookedDate.destroy({ where: { bookingId: id } });
+
+//     await booking.update({
+//       booking_status: "cancelled",
+//       payment_status:
+//         booking.payment_method === "online"
+//           ? refundPercentage > 0
+//             ? "refunded"
+//             : "cancelled"
+//           : "cancelled",
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message:
+//         refundPercentage > 0
+//           ? `Booking cancelled successfully. ₹${
+//               refundAmount / 100
+//             } refunded (excluding service charges).`
+//           : "Booking cancelled successfully. No refund applicable.",
+//       refundAmount: refundAmount / 100,
+//       refundPercentage,
+//     });
+//   } catch (error) {
+//     console.error("Error cancelling property booking:", error);
+//     res.status(500).json({ success: false, message: "Something went wrong." });
+//   }
+// };
+
+// // Event booking cancel placeholder
+// const cancelEventBooking = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const userId = req.user.id;
+
+//     const event = await Event.findByPk(id);
+
+//     if (!event) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Event not found." });
+//     }
+
+//     if (event.userId !== userId) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You don't have permission to cancel this event booking.",
+//       });
+//     }
+
+//     await event.destroy();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Event booking cancelled successfully.",
+//     });
+//   } catch (error) {
+//     console.error("Error cancelling event booking:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Something went wrong while cancelling event booking.",
+//     });
+//   }
+// };
+
+// // Beach fest booking cancel placeholder
+// const cancelBeachFestBooking = async (req, res) => {
+//   const t = await sequelize.transaction();
+//   try {
+//     const { id } = req.params;
+
+//     const booking = await beachfests_booking.findByPk(id, { transaction: t });
+//     if (!booking) {
+//       await t.rollback();
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Booking not found." });
+//     }
+
+//     const fest = await beach_fests.findByPk(booking.beachfest_id, {
+//       transaction: t,
+//     });
+//     if (!fest) {
+//       await t.rollback();
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Beachfest not found." });
+//     }
+
+//     const today = moment();
+//     const eventStartDate = moment(booking.event_start);
+//     const daysBeforeEvent = eventStartDate.diff(today, "days");
+
+//     let refundPercentage = 0;
+//     if (daysBeforeEvent >= 4) {
+//       refundPercentage = 100;
+//     } else if (daysBeforeEvent >= 2) {
+//       refundPercentage = 50;
+//     }
+
+//     let refundAmount = 0;
+
+//     if (
+//       booking.payment_method === "online" &&
+//       refundPercentage > 0 &&
+//       booking.transaction_id
+//     ) {
+//       const refundableAmount = booking.amount_paid - booking.service_fee;
+//       refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
+
+//       if (refundAmount > 0) {
+//         const refund = await refundPayment({
+//           payment_id: booking.transaction_id,
+//           amount: refundAmount,
+//         });
+
+//         console.log("Beachfest refund processed:", refund);
+//       }
+//     }
+
+//     // 👉 Update fest's available_passes (release the reserved passes)
+//     fest.available_passes += booking.passes;
+//     await fest.save({ transaction: t });
+
+//     // 👉 Update booking status and payment status
+//     await booking.update(
+//       {
+//         booking_status: "cancelled",
+//         payment_status:
+//           booking.payment_method === "online"
+//             ? refundPercentage > 0
+//               ? "refunded"
+//               : "cancelled"
+//             : "cancelled",
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     res.status(200).json({
+//       success: true,
+//       message:
+//         refundPercentage > 0
+//           ? `Beach Fest booking cancelled successfully. ₹${refundAmount} refunded (excluding service fee).`
+//           : "Beach Fest booking cancelled successfully. No refund applicable.",
+//       refundAmount,
+//       refundPercentage,
+//     });
+//   } catch (error) {
+//     console.error("Error cancelling beach fest booking:", error);
+//     await t.rollback();
+//     res.status(500).json({ success: false, message: "Something went wrong." });
+//   }
+// };
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
@@ -430,84 +628,27 @@ exports.getMyBookings = async (req, res) => {
 };
 
 exports.cancelBooking = async (req, res) => {
-  try {
-    const { id } = req.params;
+  const { type } = req.body;
 
-    // Fetch booking
-    const booking = await property_booking.findOne({ where: { id } });
+  if (!type) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Type is required in request body." });
+  }
 
-    if (!booking) {
+  switch (type) {
+    case "property_booking":
+      return cancelPropertyBooking(req, res);
+
+    case "event":
+      return cancelEventBooking(req, res);
+
+    case "beach_fest":
+      return cancelBeachFestBooking(req, res);
+
+    default:
       return res
-        .status(404)
-        .json({ success: false, message: "Booking not found." });
-    }
-
-    const today = moment();
-    const checkInDate = moment(booking.check_in_date);
-    const daysBeforeCheckin = checkInDate.diff(today, "days");
-
-    // Determine refund eligibility and percentage
-    let refundPercentage = 0;
-
-    if (daysBeforeCheckin >= 4) {
-      refundPercentage = 100;
-    } else if (daysBeforeCheckin >= 2) {
-      refundPercentage = 50;
-    } else {
-      refundPercentage = 0;
-    }
-
-    let refundAmount = 0;
-
-    // If eligible for refund and payment was online
-    if (
-      booking.payment_method === "online" &&
-      refundPercentage > 0 &&
-      booking.transaction_id
-    ) {
-      // Exclude service charge from refund calculation
-      const refundableAmount = booking.amount_paid - booking.service_charge;
-
-      refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
-
-      // Only refund if refundAmount > 0
-      if (refundAmount > 0) {
-        const refund = await refundPayment({
-          payment_id: booking.transaction_id,
-          amount: refundAmount,
-        });
-
-        console.log("Refund processed:", refund);
-      }
-    }
-
-    // Delete booked room dates
-    await RoomBookedDate.destroy({ where: { bookingId: id } });
-
-    // Update booking status and payment status
-    await booking.update({
-      booking_status: "cancelled",
-      payment_status:
-        booking.payment_method === "online"
-          ? refundPercentage > 0
-            ? "refunded"
-            : "cancelled"
-          : "cancelled",
-    });
-
-    res.status(200).json({
-      success: true,
-      message:
-        refundPercentage > 0
-          ? `Booking cancelled successfully. ₹${
-              refundAmount / 100
-            } refunded (excluding service charges).`
-          : "Booking cancelled successfully. No refund applicable.",
-      refundAmount: refundAmount / 100, // in rupees
-      refundPercentage,
-    });
-  } catch (error) {
-    console.error("Error cancelling booking:", error);
-    res.status(500).json({ success: false, message: "Something went wrong." });
+        .status(400)
+        .json({ success: false, message: "Invalid booking type provided." });
   }
 };

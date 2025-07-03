@@ -1,5 +1,9 @@
 const { User } = require("../models/users");
-const { property_booking, beachfests_booking } = require("../models/services");
+const {
+  property_booking,
+  beachfests_booking,
+  Event,
+} = require("../models/services");
 const { Sequelize } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
 const sendEmail = require("../libs/mailgun/mailGun");
@@ -408,9 +412,12 @@ exports.getUserDetails = async (req, res) => {
       const beachfestBookingsCount = await beachfests_booking.count({
         where: { user_id: userId, booking_status: "confirmed" },
       });
-
+      const eventsCount = await Event.count({
+        where: { user_id: userId },
+      });
       // 📌 Sum total bookings count
-      const bookingsCount = propertyBookingsCount + beachfestBookingsCount;
+      const bookingsCount =
+        propertyBookingsCount + beachfestBookingsCount + eventsCount;
 
       // 📌 Attach bookingsCount into user object
       cleanUser.bookingsCount = bookingsCount;
