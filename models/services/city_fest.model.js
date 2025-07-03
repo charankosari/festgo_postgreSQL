@@ -22,6 +22,12 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
+
+      total_passes: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+
       price_per_pass: {
         type: DataTypes.FLOAT,
         allowNull: false,

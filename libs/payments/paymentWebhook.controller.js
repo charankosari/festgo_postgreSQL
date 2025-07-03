@@ -10,6 +10,10 @@ const {
   handleBeachfestPaymentFailure,
   handleBeachfestPaymentSuccess,
 } = require("../../controllers/beachfests_booking.controller");
+const {
+  handleCityfestPaymentFailure,
+  handleCityfestPaymentSuccess,
+} = require("../../controllers/city_fest_booking.controller");
 dotenv.config({ path: path.resolve("./config/config.env") });
 
 const captureHook = async (req, res) => {
@@ -76,6 +80,19 @@ const captureHook = async (req, res) => {
           default:
             console.log("Unhandled event for beachfest_booking:", event);
             break;
+        }
+        break;
+      case "cityfest_booking": // 👈 added case for cityfest_booking
+        switch (event) {
+          case "payment.captured":
+            if (bookingId)
+              await handleCityfestPaymentSuccess(bookingId, transactionId);
+            break;
+          case "payment.failed":
+            if (bookingId) await handleCityfestPaymentFailure(bookingId);
+            break;
+          default:
+            console.log("Unhandled event for cityfest_booking:", event);
         }
         break;
       default:
