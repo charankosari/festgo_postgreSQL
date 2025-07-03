@@ -795,13 +795,9 @@ exports.editRoom = async (req, res) => {
 exports.createRoom = async (req, res) => {
   try {
     const vendorId = req.user.id;
-    const {
-      propertyId,
-      current_step = 4, // assuming this is always 4 for room data
-      ...incomingRoomData
-    } = req.body;
+    const { propertyId, current_step = 4, ...incomingRoomData } = req.body;
 
-    // Fetch the property and verify ownership
+    // 📌 Fetch the property
     const property = await Property.findByPk(propertyId);
     if (!property) {
       return res.status(404).json({ message: "Property not found" });
@@ -814,26 +810,37 @@ exports.createRoom = async (req, res) => {
       });
     }
 
-    // 📌 Update strdata for step 4 with incoming roomData
-    const newStrdata = updateStrdata(
-      property.strdata,
-      current_step,
-      incomingRoomData
-    );
+    // 📌 Load existing strdata and deep clone it
+    let newStrdata = JSON.parse(JSON.stringify(property.strdata || {}));
 
+    // 📌 Ensure step_4 exists
+    if (!newStrdata[`step_${current_step}`]) {
+      newStrdata[`step_${current_step}`] = {};
+    }
+
+    // 📌 Ensure rooms array exists under step_4
+    if (!Array.isArray(newStrdata[`step_${current_step}`].rooms)) {
+      newStrdata[`step_${current_step}`].rooms = [];
+    }
+
+    // 📌 Push the new room data
+    newStrdata[`step_${current_step}`].rooms.push(incomingRoomData);
+
+    // 📌 Update property strdata
     await property.update({ strdata: newStrdata });
 
-    // 📌 Now normalize room data and save Room model record
+    // 📌 Normalize room data and save to Room table
     const normalizedRoomData = normalizeRoomData(incomingRoomData);
-    console.log("Normalized Room Data:", normalizedRoomData);
-
-    const newRoom = await Room.create(normalizedRoomData);
+    const newRoom = await Room.create({
+      ...normalizedRoomData,
+      propertyId,
+    });
 
     res.status(201).json({
       success: true,
       message: "Room created successfully",
       room: newRoom,
-      str: newStrdata,
+      strdata: newStrdata,
     });
   } catch (error) {
     console.error("Error creating room:", error);

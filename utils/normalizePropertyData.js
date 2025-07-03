@@ -81,7 +81,8 @@ export function normalizeRoomData(data) {
       : null,
     number_of_rooms: roomDetailsFormInfo.numberOfRooms,
     description: roomDetailsFormInfo.description,
-
+    max_adults: selectedRoomFormInfo.maxAdults || 0,
+    max_children: selectedRoomFormInfo.maxChildren || 0,
     // New structured sleeping arrangement
     sleeping_arrangement: {
       base_adults: selectedRoomFormInfo.baseAdults || 0,
