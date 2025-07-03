@@ -504,7 +504,7 @@ exports.getMyBookings = async (req, res) => {
       where: {
         user_id: userId,
         payment_status: {
-          [Op.in]: ["paid", "refunded"],
+          [Op.in]: ["paid", "refunded", "norefund"],
         },
       },
       order: [["createdAt", "DESC"]],
@@ -547,7 +547,7 @@ exports.getMyBookings = async (req, res) => {
       where: {
         user_id: userId,
         payment_status: {
-          [Op.in]: ["paid", "refunded"],
+          [Op.in]: ["paid", "refunded", "norefund"],
         },
       },
       order: [["createdAt", "DESC"]],

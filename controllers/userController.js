@@ -413,7 +413,7 @@ exports.getUserDetails = async (req, res) => {
         where: { user_id: userId, booking_status: "confirmed" },
       });
       const eventsCount = await Event.count({
-        where: { user_id: userId },
+        where: { userId: userId },
       });
       // 📌 Sum total bookings count
       const bookingsCount =

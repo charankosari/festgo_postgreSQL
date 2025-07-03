@@ -37,7 +37,7 @@ const cancelPropertyBooking = async (req, res) => {
       booking.transaction_id
     ) {
       const refundableAmount = booking.amount_paid - booking.service_charge;
-      refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
+      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
 
       if (refundAmount > 0) {
         const refund = await refundPayment({
@@ -57,8 +57,8 @@ const cancelPropertyBooking = async (req, res) => {
         booking.payment_method === "online"
           ? refundPercentage > 0
             ? "refunded"
-            : "cancelled"
-          : "cancelled",
+            : "norefund"
+          : "norefund",
     });
 
     res.status(200).json({
@@ -157,7 +157,7 @@ const cancelBeachFestBooking = async (req, res) => {
       booking.transaction_id
     ) {
       const refundableAmount = booking.amount_paid - booking.service_fee;
-      refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
+      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
 
       if (refundAmount > 0) {
         const refund = await refundPayment({
@@ -181,8 +181,8 @@ const cancelBeachFestBooking = async (req, res) => {
           booking.payment_method === "online"
             ? refundPercentage > 0
               ? "refunded"
-              : "cancelled"
-            : "cancelled",
+              : "norefund"
+            : "norefund",
       },
       { transaction: t }
     );
