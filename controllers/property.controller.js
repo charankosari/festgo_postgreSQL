@@ -241,7 +241,6 @@ exports.createProperty = async (req, res) => {
   }
 };
 
-// ✅ Update Property by ID
 exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
@@ -259,19 +258,17 @@ exports.updateProperty = async (req, res) => {
       currentStep += 1;
     }
 
-    // ✅ Load existing strdata
+    // Load existing strdata
     let newStrdata = property.strdata || {};
 
-    // ✅ 1️⃣ Merge incoming updates into corresponding step's strdata first
+    // 1️⃣ Merge incoming updates into existing step's strdata without losing previous step data
     newStrdata = updateStrdata(newStrdata, currentStep, updates);
 
-    // ✅ 2️⃣ Special case: step 4 — normalize and save rooms
+    // 2️⃣ Special case: step 4 — merge and store rooms in strdata & DB
     if (currentStep === 4 && updates.rooms && Array.isArray(updates.rooms)) {
-      // Merge new rooms into existing strdata step_4.rooms array
       const existingRooms = newStrdata[`step_4`]?.rooms || [];
       newStrdata[`step_4`].rooms = [...existingRooms, ...updates.rooms];
 
-      // Save normalized rooms in DB
       await Promise.all(
         updates.rooms.map((room) => {
           const normalizedRoom = normalizeRoomData(room);
@@ -282,26 +279,32 @@ exports.updateProperty = async (req, res) => {
         })
       );
 
-      // Remove rooms key from updates before normalization
       delete updates.rooms;
     }
 
-    // Remove current_step key before normalization
     delete updates.current_step;
 
-    // ✅ 3️⃣ Normalize based on existing property + updates
-    let normalizedData = {};
-    if ([1, 2, 3, 5, 6, 7].includes(currentStep)) {
-      const existingData = property.get({ plain: true });
-      normalizedData = normalizePropertyData({ ...existingData, ...updates });
-    }
+    // 3️⃣ Build cumulative data from all strdata steps
+    const cumulativeData = Object.values(newStrdata).reduce(
+      (acc, val) => ({ ...acc, ...val }),
+      {}
+    );
 
-    // ✅ 4️⃣ Compute progress status
+    // 4️⃣ Merge current request updates into cumulative data
+    const mergedDataForNormalization = {
+      ...cumulativeData,
+      ...updates,
+    };
+
+    // 5️⃣ Normalize final cumulative+update merged data
+    const normalizedData = normalizePropertyData(mergedDataForNormalization);
+
+    // 6️⃣ Compute progress status
     const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
 
-    // ✅ 5️⃣ Update Property model with normalized data + updated strdata
+    // 7️⃣ Update property with normalized data + updated strdata
     await property.update({
       ...normalizedData,
       current_step: currentStep,
