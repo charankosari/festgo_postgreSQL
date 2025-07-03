@@ -13,6 +13,7 @@ const beachfestRoutes = require("./routes/beachfest.routes");
 const captureHook = require("./libs/payments/paymentWebhook.controller");
 const propertyBookingRoutes = require("./routes/property_booking.routes");
 const beachfestBookingRoutes = require("./routes/beachfest_booking.routes");
+const cityfestBookingRoutes = require("./routes/cityfest_booking.routes");
 const ContactRoutes = require("./routes/contactMessage.routes");
 const errorMiddleware = require("./middlewares/error");
 const cookieParser = require("cookie-parser");
@@ -36,6 +37,7 @@ app.use("/api/festbite", festbiteRoutes);
 app.use("/api/upload", upload);
 app.use("/api/property-booking", propertyBookingRoutes);
 app.use("/api/beachfest-booking", beachfestBookingRoutes);
+app.use("/api/cityfest-booking", cityfestBookingRoutes);
 app.post("/api/payment/hook", captureHook);
 app.use(errorMiddleware);
 
