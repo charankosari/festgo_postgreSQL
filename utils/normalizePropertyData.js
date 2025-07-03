@@ -1,4 +1,5 @@
 export function normalizePropertyData(data) {
+  console.log("Normalizing property data:", data);
   return {
     property_type: data.hotelType,
     name: data.propertyName,

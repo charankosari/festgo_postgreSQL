@@ -284,7 +284,8 @@ exports.updateProperty = async (req, res) => {
     const is_completed = status === 100;
     let normalizedData = {};
     if ([1, 2, 3, 5, 6, 7].includes(currentStep)) {
-      normalizedData = normalizePropertyData(updates);
+      const existingData = property.get({ plain: true });
+      normalizedData = normalizePropertyData({ ...existingData, ...updates });
     }
 
     // ✅ 3️⃣ Update Property fields with updates and updated strdata
