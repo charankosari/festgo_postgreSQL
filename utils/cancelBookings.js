@@ -151,21 +151,15 @@ const cancelBeachFestBooking = async (req, res) => {
 
     let refundAmount = 0;
 
-    if (
-      booking.payment_method === "online" &&
-      refundPercentage > 0 &&
-      booking.transaction_id
-    ) {
+    if (refundPercentage > 0 && booking.transaction_id) {
       const refundableAmount = booking.amount_paid - booking.service_fee;
-      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
 
+      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
       if (refundAmount > 0) {
         const refund = await refundPayment({
           payment_id: booking.transaction_id,
           amount: refundAmount,
         });
-
-        console.log("Beachfest refund processed:", refund);
       }
     }
 
