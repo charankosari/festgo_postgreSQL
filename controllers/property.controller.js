@@ -30,22 +30,51 @@ const checkAvailableRooms = async (
   startDate,
   finalDate
 ) => {
-  const roomConditions = { propertyId: property.id };
+  const roomConditions = {
+    propertyId: property.id,
+  };
 
   const totalPeople =
     (!isNaN(parseInt(adult)) ? parseInt(adult) : 0) +
     (!isNaN(parseInt(child)) ? parseInt(child) : 0);
+
+  const where = {
+    propertyId: property.id,
+    [Op.and]: [],
+  };
+
+  // Total people (compare against sleeping_arrangement->max_occupancy)
   if (totalPeople > 0) {
-    roomConditions.max_people = { [Op.gte]: totalPeople };
-  }
-  if (adult !== null && adult !== undefined && !isNaN(adult)) {
-    roomConditions.max_adults = { [Op.gte]: parseInt(adult) };
-  }
-  if (child !== null && child !== undefined && !isNaN(child)) {
-    roomConditions.max_children = { [Op.gte]: parseInt(child) };
+    where[Op.and].push(
+      Sequelize.literal(
+        `(sleeping_arrangement->>'max_occupancy')::int >= ${totalPeople}`
+      )
+    );
   }
 
-  const roomsInProperty = await Room.findAll({ where: roomConditions });
+  // Adults
+  if (adult !== null && adult !== undefined && !isNaN(adult)) {
+    where[Op.and].push(
+      Sequelize.literal(
+        `(sleeping_arrangement->>'max_adults')::int >= ${parseInt(adult)}`
+      )
+    );
+  }
+
+  // Children
+  if (child !== null && child !== undefined && !isNaN(child)) {
+    where[Op.and].push(
+      Sequelize.literal(
+        `(sleeping_arrangement->>'max_children')::int >= ${parseInt(child)}`
+      )
+    );
+  }
+
+  // Remove empty [Op.and] if no conditions
+  if (where[Op.and].length === 0) delete where[Op.and];
+
+  const roomsInProperty = await Room.findAll({ where });
+
   if (!roomsInProperty.length) return null;
 
   const roomIds = roomsInProperty.map((room) => room.id);
@@ -87,21 +116,7 @@ const enrichProperties = async (properties) => {
 
   for (const p of properties) {
     const plain = p.get ? p.get({ plain: true }) : p;
-    // Fetch amenities by IDs
-    const amenityIds = plain.amenities?.map((a) => a.amenityId) || [];
-
-    let amenities = [];
-    if (amenityIds.length) {
-      const foundAmenities = await amenity.findAll({
-        where: { id: { [Op.in]: amenityIds } },
-        attributes: ["name"],
-      });
-      amenities = foundAmenities.map((a) => a.name);
-    }
-
-    // Attach amenities as 'facilities'
-    plain.facilities = amenities;
-
+    plain.facilities = plain.amenities;
     // Clean up ownership_details
     delete plain.ownership_details;
     delete plain.bank_details;
@@ -224,7 +239,7 @@ exports.createProperty = async (req, res) => {
 exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    let updates = { ...req.body };
     const incomingStep = updates.current_step;
 
     const property = await Property.findByPk(id);
@@ -241,17 +256,14 @@ exports.updateProperty = async (req, res) => {
     // Load existing strdata
     let newStrdata = property.strdata || {};
 
-    // Merge incoming updates into corresponding step's strdata
-    newStrdata[`step_${currentStep}`] = {
-      ...(newStrdata[`step_${currentStep}`] || {}),
-      ...updates,
-    };
+    // ✅ 1️⃣ Merge incoming updates into corresponding step's strdata first
+    newStrdata = updateStrdata(newStrdata, currentStep, updates);
 
-    // Special case: step 4 → normalize and save rooms, but don't save normalized data in strdata
+    // ✅ 2️⃣ Special case: step 4 — normalize and save rooms
     if (currentStep === 4 && updates.rooms && Array.isArray(updates.rooms)) {
       await Promise.all(
         updates.rooms.map((room) => {
-          const normalizedRoom = normalizeRoomData(room); // Assuming you have this function imported
+          const normalizedRoom = normalizeRoomData(room);
           return Room.create({
             ...normalizedRoom,
             propertyId: id,
@@ -259,15 +271,19 @@ exports.updateProperty = async (req, res) => {
         })
       );
 
-      // Remove rooms key so it doesn't affect Property model
+      // Remove rooms key so it doesn't affect Property model update
       delete updates.rooms;
     }
 
+    // Remove current_step key before updating the model
+    delete updates.current_step;
+
+    // Compute status
     const status = Math.floor((currentStep / 7) * 100);
     const in_progress = status < 100;
     const is_completed = status === 100;
 
-    // Update Property fields
+    // ✅ 3️⃣ Update Property fields with updates and updated strdata
     await property.update({
       ...updates,
       current_step: currentStep,
@@ -463,7 +479,18 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
         limit: 20 - availableProperties.length,
       });
 
-      availableProperties.push(...fallbackProperties);
+      for (const property of fallbackProperties) {
+        const available = await checkAvailableRooms(
+          property,
+          adult,
+          child,
+          requestedRooms,
+          startDate,
+          finalDate
+        );
+        if (available) availableProperties.push(available);
+        if (availableProperties.length === 20) break;
+      }
     }
 
     // Step 4: Enrich final properties
@@ -601,18 +628,6 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
 
     const plainProperty = property.get({ plain: true });
 
-    // Get common facilities (amenities) via amenityIds inside property.amenities array
-    const amenityIds = (plainProperty.amenities || []).map((a) => a.amenityId);
-    const amenityRecords = await amenity.findAll({
-      where: { id: { [Op.in]: amenityIds } },
-      attributes: ["name", "image"],
-    });
-
-    const commonFacilities = amenityRecords.map((a) => ({
-      name: a.name,
-      iconRes: a.image,
-    }));
-
     // Property rules (policies)
     const propertyRules = (plainProperty.policies || []).map((p) => ({
       rulesData: `${p.title}: ${p.description}`,
@@ -624,28 +639,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       include: [{ model: room_amenity, as: "roomAmenities" }],
     });
 
-    const formattedRooms = await Promise.all(
-      rooms.map(async (r) => {
-        const room = r.get({ plain: true });
-
-        // Fetch room amenity details by roomAmenities
-        const amenityIds = (room.room_amenities || []).map(
-          (ra) => ra.roomAmenityId
-        );
-        const roomAmenityRecords = await room_amenity.findAll({
-          where: { id: { [Op.in]: amenityIds } },
-          attributes: ["name", "image"],
-        });
-
-        return {
-          ...room,
-          roomAmenities: roomAmenityRecords.map((a) => ({
-            name: a.name,
-            iconRes: a.image,
-          })),
-        };
-      })
-    );
+    const formattedRooms = rooms.map((r) => r.get({ plain: true }));
 
     // Fetch reviews
     const reviewRecords = await review.findAll({
@@ -678,8 +672,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
         currency: "INR",
         perNight: true,
       },
-      description: firstRoom.description || "",
-      commonFacilities,
+      commonFacilities: plainProperty.amenities,
       totalReviewRate: parseFloat(totalReviewRate.toFixed(1)),
       review: reviews,
       propertyRules,

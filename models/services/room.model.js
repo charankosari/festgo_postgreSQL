@@ -19,23 +19,34 @@ module.exports = (sequelize) =>
     room_name: DataTypes.STRING,
     number_of_rooms: DataTypes.INTEGER,
     description: DataTypes.TEXT,
-    max_people: DataTypes.INTEGER,
-    sleeping_arrangement: DataTypes.STRING,
-    bathroom_details: DataTypes.STRING,
+    sleeping_arrangement: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        base_adults: 0,
+        max_adults: 0,
+        max_children: 0,
+        max_occupancy: 0,
+        max_extra_beds: 0,
+      },
+    },
+    bathroom_available: DataTypes.INTEGER,
     // newly added things
-    original_price: DataTypes.FLOAT,
-    discounted_price: DataTypes.FLOAT,
+    price: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        base_price_for_2_adults: 0,
+        extra_adult_charge: 0,
+        child_charge: 0,
+      },
+    },
     max_adults: DataTypes.INTEGER,
     max_children: DataTypes.INTEGER,
-    discount: DataTypes.STRING,
     free_cancellation: DataTypes.STRING,
     additional_info: DataTypes.STRING,
-    free_breakfast: DataTypes.STRING,
     //end
-
-    meal_plans: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
+    meal_plan: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
 
     // rates: DataTypes.FLOAT,

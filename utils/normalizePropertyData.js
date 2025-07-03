@@ -72,7 +72,6 @@ export function normalizeRoomData(data) {
 
   return {
     propertyId: data.propertyId,
-
     room_name: roomDetailsFormInfo.name,
     room_type: roomDetailsFormInfo.type,
     view: roomDetailsFormInfo.view,
@@ -82,43 +81,29 @@ export function normalizeRoomData(data) {
     number_of_rooms: roomDetailsFormInfo.numberOfRooms,
     description: roomDetailsFormInfo.description,
 
-    // people capacity
-    max_people: selectedRoomFormInfo.maxOccupancy,
-    max_adults: selectedRoomFormInfo.maxAdults,
-    max_children: selectedRoomFormInfo.maxChildren,
+    // New structured sleeping arrangement
+    sleeping_arrangement: {
+      base_adults: selectedRoomFormInfo.baseAdults || 0,
+      max_adults: selectedRoomFormInfo.maxAdults || 0,
+      max_children: selectedRoomFormInfo.maxChildren || 0,
+      max_occupancy: selectedRoomFormInfo.maxOccupancy || 0,
+      max_extra_beds: selectedRoomFormInfo.maxExtraBeds || 0,
+    },
 
-    // sleeping arrangement: convert bed info to a string summary
-    sleeping_arrangement: selectedRoomFormInfo.beds
-      .map((b) => `${b.quantity} x ${b.bedType}`)
-      .join(", "),
+    bathroom_available: bathroomDetailsFormInfo.numberOfBathrooms || 0,
 
-    // bathroom details
-    bathroom_details: `${bathroomDetailsFormInfo.numberOfBathrooms} Bathroom(s)`,
+    price: {
+      base_price_for_2_adults: mealPlanDetailsFormInfo.baseRateFor2Adults || 0,
+      extra_adult_charge: mealPlanDetailsFormInfo.extraAdultCharge || 0,
+      child_charge: mealPlanDetailsFormInfo.childCharge || 0,
+    },
 
-    // meal plans
-    meal_plans: mealPlanDetailsFormInfo.mealPlan
-      ? [mealPlanDetailsFormInfo.mealPlan]
-      : [],
+    free_cancellation: mealPlanDetailsFormInfo.freeCancellation || "No",
+    additional_info: roomDetailsFormInfo.additionalInfo || "",
 
-    original_price: mealPlanDetailsFormInfo.baseRateFor2Adults || 0,
-    discounted_price: null, // you can compute this elsewhere if needed
-    free_cancellation: "No",
-    free_breakfast:
-      mealPlanDetailsFormInfo.mealPlan === "breakfast_only" ? "Yes" : "No",
-
-    // room amenities
-    room_amenities: roomAmenities.map((a) => ({
-      amenityId: a.amenityId,
-      name: a.otaName,
-      isSelected: a.isSelected,
-      chargeType: a.chargeType,
-      category: a.category,
-      selectedSubAmenities: a.selectedSubAmenities,
-    })),
-
-    // photos (if images array available in roomDetailsFormInfo)
+    meal_plan: mealPlanDetailsFormInfo.mealPlan || null,
+    room_amenities: roomAmenities || [],
     photos: (roomDetailsFormInfo.images || []).map((url) => ({ url, tag: "" })),
-
-    videos: [], // none in your payload now
+    videos: [], // no video input yet
   };
 }
