@@ -197,9 +197,6 @@ function updateStrdata(existingStrdata, step, newStepData) {
 exports.createProperty = async (req, res) => {
   try {
     const { current_step = 1, strdata, ...rest } = req.body;
-    const finalStrdata =
-      strdata && Object.keys(strdata).length ? strdata : rest;
-
     const vendorId = req.user.id;
 
     const vendor = await User.findByPk(vendorId);
@@ -213,12 +210,20 @@ exports.createProperty = async (req, res) => {
     const in_progress = status < 100;
     const is_completed = status === 100;
 
-    // Update strdata with this step's data
-    const newStrdata = updateStrdata({}, current_step, finalStrdata);
-    // 📌 pick only this step's data for normalization
-    const stepData = newStrdata[`step_${current_step}`] || {};
-    const normalizedDetails = normalizePropertyData(stepData);
-    // Now create property with both
+    // 📌 Merge provided strdata (if any) and current_step data
+    let newStrdata = strdata && Object.keys(strdata).length ? strdata : {};
+    newStrdata = updateStrdata(newStrdata, current_step, rest);
+
+    // 📌 Flatten combined strdata into one object for normalization
+    const flattenedData = Object.values(newStrdata).reduce(
+      (acc, val) => ({ ...acc, ...val }),
+      {}
+    );
+
+    // 📌 Now normalize the full flattened data
+    const normalizedDetails = normalizePropertyData(flattenedData);
+
+    // 📌 Now create the property record
     const property = await Property.create({
       vendorId,
       current_step,
@@ -231,6 +236,7 @@ exports.createProperty = async (req, res) => {
 
     res.status(201).json({ success: true, property });
   } catch (err) {
+    console.error("Error in createProperty:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -253,7 +259,7 @@ exports.updateProperty = async (req, res) => {
       currentStep += 1;
     }
 
-    // Load existing strdata
+    // ✅ Load existing strdata
     let newStrdata = property.strdata || {};
 
     // ✅ 1️⃣ Merge incoming updates into corresponding step's strdata first
@@ -261,6 +267,11 @@ exports.updateProperty = async (req, res) => {
 
     // ✅ 2️⃣ Special case: step 4 — normalize and save rooms
     if (currentStep === 4 && updates.rooms && Array.isArray(updates.rooms)) {
+      // Merge new rooms into existing strdata step_4.rooms array
+      const existingRooms = newStrdata[`step_4`]?.rooms || [];
+      newStrdata[`step_4`].rooms = [...existingRooms, ...updates.rooms];
+
+      // Save normalized rooms in DB
       await Promise.all(
         updates.rooms.map((room) => {
           const normalizedRoom = normalizeRoomData(room);
@@ -271,24 +282,26 @@ exports.updateProperty = async (req, res) => {
         })
       );
 
-      // Remove rooms key so it doesn't affect Property model update
+      // Remove rooms key from updates before normalization
       delete updates.rooms;
     }
 
-    // Remove current_step key before updating the model
+    // Remove current_step key before normalization
     delete updates.current_step;
 
-    // Compute status
-    const status = Math.floor((currentStep / 7) * 100);
-    const in_progress = status < 100;
-    const is_completed = status === 100;
+    // ✅ 3️⃣ Normalize based on existing property + updates
     let normalizedData = {};
     if ([1, 2, 3, 5, 6, 7].includes(currentStep)) {
       const existingData = property.get({ plain: true });
       normalizedData = normalizePropertyData({ ...existingData, ...updates });
     }
 
-    // ✅ 3️⃣ Update Property fields with updates and updated strdata
+    // ✅ 4️⃣ Compute progress status
+    const status = Math.floor((currentStep / 7) * 100);
+    const in_progress = status < 100;
+    const is_completed = status === 100;
+
+    // ✅ 5️⃣ Update Property model with normalized data + updated strdata
     await property.update({
       ...normalizedData,
       current_step: currentStep,
@@ -300,6 +313,7 @@ exports.updateProperty = async (req, res) => {
 
     res.json({ success: true, property });
   } catch (err) {
+    console.error("Error in updateProperty:", err);
     res.status(500).json({ message: err.message });
   }
 };
