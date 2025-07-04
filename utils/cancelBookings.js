@@ -66,10 +66,10 @@ const cancelPropertyBooking = async (req, res) => {
       message:
         refundPercentage > 0
           ? `Booking cancelled successfully. ₹${
-              refundAmount / 100
+              refundAmount > 0 ? refundAmount : 0
             } refunded (excluding service charges).`
           : "Booking cancelled successfully. No refund applicable.",
-      refundAmount: refundAmount / 100,
+      refundAmount: refundAmount,
       refundPercentage,
     });
   } catch (error) {
