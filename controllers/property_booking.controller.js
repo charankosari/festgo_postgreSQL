@@ -20,201 +20,7 @@ const {
   cancelPropertyBooking,
   cancelEventBooking,
 } = require("../utils/cancelBookings");
-// const cancelPropertyBooking = async (req, res) => {
-//   try {
-//     const { id } = req.params;
 
-//     const booking = await property_booking.findOne({ where: { id } });
-
-//     if (!booking) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Booking not found." });
-//     }
-
-//     const today = moment();
-//     const checkInDate = moment(booking.check_in_date);
-//     const daysBeforeCheckin = checkInDate.diff(today, "days");
-
-//     let refundPercentage = 0;
-//     if (daysBeforeCheckin >= 4) refundPercentage = 100;
-//     else if (daysBeforeCheckin >= 2) refundPercentage = 50;
-
-//     let refundAmount = 0;
-
-//     if (
-//       booking.payment_method === "online" &&
-//       refundPercentage > 0 &&
-//       booking.transaction_id
-//     ) {
-//       const refundableAmount = booking.amount_paid - booking.service_charge;
-//       refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
-
-//       if (refundAmount > 0) {
-//         const refund = await refundPayment({
-//           payment_id: booking.transaction_id,
-//           amount: refundAmount,
-//         });
-
-//         console.log("Refund processed:", refund);
-//       }
-//     }
-
-//     await RoomBookedDate.destroy({ where: { bookingId: id } });
-
-//     await booking.update({
-//       booking_status: "cancelled",
-//       payment_status:
-//         booking.payment_method === "online"
-//           ? refundPercentage > 0
-//             ? "refunded"
-//             : "cancelled"
-//           : "cancelled",
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       message:
-//         refundPercentage > 0
-//           ? `Booking cancelled successfully. ₹${
-//               refundAmount / 100
-//             } refunded (excluding service charges).`
-//           : "Booking cancelled successfully. No refund applicable.",
-//       refundAmount: refundAmount / 100,
-//       refundPercentage,
-//     });
-//   } catch (error) {
-//     console.error("Error cancelling property booking:", error);
-//     res.status(500).json({ success: false, message: "Something went wrong." });
-//   }
-// };
-
-// // Event booking cancel placeholder
-// const cancelEventBooking = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const userId = req.user.id;
-
-//     const event = await Event.findByPk(id);
-
-//     if (!event) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Event not found." });
-//     }
-
-//     if (event.userId !== userId) {
-//       return res.status(403).json({
-//         success: false,
-//         message: "You don't have permission to cancel this event booking.",
-//       });
-//     }
-
-//     await event.destroy();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Event booking cancelled successfully.",
-//     });
-//   } catch (error) {
-//     console.error("Error cancelling event booking:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Something went wrong while cancelling event booking.",
-//     });
-//   }
-// };
-
-// // Beach fest booking cancel placeholder
-// const cancelBeachFestBooking = async (req, res) => {
-//   const t = await sequelize.transaction();
-//   try {
-//     const { id } = req.params;
-
-//     const booking = await beachfests_booking.findByPk(id, { transaction: t });
-//     if (!booking) {
-//       await t.rollback();
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Booking not found." });
-//     }
-
-//     const fest = await beach_fests.findByPk(booking.beachfest_id, {
-//       transaction: t,
-//     });
-//     if (!fest) {
-//       await t.rollback();
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Beachfest not found." });
-//     }
-
-//     const today = moment();
-//     const eventStartDate = moment(booking.event_start);
-//     const daysBeforeEvent = eventStartDate.diff(today, "days");
-
-//     let refundPercentage = 0;
-//     if (daysBeforeEvent >= 4) {
-//       refundPercentage = 100;
-//     } else if (daysBeforeEvent >= 2) {
-//       refundPercentage = 50;
-//     }
-
-//     let refundAmount = 0;
-
-//     if (
-//       booking.payment_method === "online" &&
-//       refundPercentage > 0 &&
-//       booking.transaction_id
-//     ) {
-//       const refundableAmount = booking.amount_paid - booking.service_fee;
-//       refundAmount = Math.round((refundableAmount * refundPercentage) / 100);
-
-//       if (refundAmount > 0) {
-//         const refund = await refundPayment({
-//           payment_id: booking.transaction_id,
-//           amount: refundAmount,
-//         });
-
-//         console.log("Beachfest refund processed:", refund);
-//       }
-//     }
-
-//     // 👉 Update fest's available_passes (release the reserved passes)
-//     fest.available_passes += booking.passes;
-//     await fest.save({ transaction: t });
-
-//     // 👉 Update booking status and payment status
-//     await booking.update(
-//       {
-//         booking_status: "cancelled",
-//         payment_status:
-//           booking.payment_method === "online"
-//             ? refundPercentage > 0
-//               ? "refunded"
-//               : "cancelled"
-//             : "cancelled",
-//       },
-//       { transaction: t }
-//     );
-
-//     await t.commit();
-
-//     res.status(200).json({
-//       success: true,
-//       message:
-//         refundPercentage > 0
-//           ? `Beach Fest booking cancelled successfully. ₹${refundAmount} refunded (excluding service fee).`
-//           : "Beach Fest booking cancelled successfully. No refund applicable.",
-//       refundAmount,
-//       refundPercentage,
-//     });
-//   } catch (error) {
-//     console.error("Error cancelling beach fest booking:", error);
-//     await t.rollback();
-//     res.status(500).json({ success: false, message: "Something went wrong." });
-//   }
-// };
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
@@ -292,39 +98,43 @@ exports.bookProperty = async (req, res) => {
         message: `Only ${availableRooms} room(s) available for the selected dates.`,
       });
     }
+    // Prices from room.price JSON
+    const price = room.price || {};
+    const base_price_per_room = Number(price.base_price_for_2_adults) || 0;
+    const extra_adult_charge_per = Number(price.extra_adult_charge) || 0;
+    const child_charge_per = Number(price.child_charge) || 0;
 
-    // Pricing calculations
-    const base_price_per_room = room.base_price_for_2_adults;
+    // Total price calculation
     const total_base_price = base_price_per_room * num_rooms;
 
     const max_included_adults = 2 * num_rooms;
     const extra_adults = Math.max(num_adults - max_included_adults, 0);
-    const extra_adult_charge = extra_adults * (room.extra_adult_charge || 0);
+    const total_extra_adult_charge = extra_adults * extra_adult_charge_per;
 
-    const child_charge = num_children * (room.child_charge || 0);
+    const total_child_charge = num_children * child_charge_per;
 
     const total_room_price =
-      total_base_price + extra_adult_charge + child_charge;
+      total_base_price + total_extra_adult_charge + total_child_charge;
 
-    // GST calculation based on total room price
+    // ✅ GST slab on total cumulative price
     let gst_rate = 0;
-    if (base_price_per_room >= 8000) gst_rate = 18;
-    else if (base_price_per_room >= 1000) gst_rate = 12;
+    if (total_room_price >= 8000) gst_rate = 18;
+    else if (total_room_price >= 1000) gst_rate = 12;
 
     const gst_amount = (total_room_price * gst_rate) / 100;
 
-    // Service fee slab based on base price
+    // ✅ Service Fee slab on total cumulative price
     let service_fee = 50;
-    if (base_price_per_room >= 1000 && base_price_per_room <= 1999)
-      service_fee = 50;
-    else if (base_price_per_room >= 2000 && base_price_per_room <= 4999)
+    if (total_room_price >= 1000 && total_room_price <= 1999) service_fee = 50;
+    else if (total_room_price >= 2000 && total_room_price <= 4999)
       service_fee = 100;
-    else if (base_price_per_room >= 5000 && base_price_per_room <= 7499)
+    else if (total_room_price >= 5000 && total_room_price <= 7499)
       service_fee = 150;
-    else if (base_price_per_room >= 7500 && base_price_per_room <= 9999)
+    else if (total_room_price >= 7500 && total_room_price <= 9999)
       service_fee = 200;
-    else if (base_price_per_room >= 10000) service_fee = 250;
+    else if (total_room_price >= 10000) service_fee = 250;
 
+    // ✅ Gross amount to be paid before discounts or coins
     const gross_payable = total_room_price + gst_amount + service_fee;
 
     // Apply FestGo coins
