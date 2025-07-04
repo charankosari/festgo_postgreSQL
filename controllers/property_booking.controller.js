@@ -257,9 +257,8 @@ exports.bookProperty = async (req, res) => {
     }
 
     // Fetch user
-    const user = await User.findOne({ where: { id: userId }, transaction: t });
+    const user = await User.findOne({ where: { id: userId } });
     if (!user) {
-      await t.rollback();
       return res.status(404).json({ message: "User not found" });
     }
 
@@ -289,11 +288,9 @@ exports.bookProperty = async (req, res) => {
 
     if (num_rooms > availableRooms) {
       await t.rollback();
-      return res
-        .status(400)
-        .json({
-          message: `Only ${availableRooms} room(s) available for the selected dates.`,
-        });
+      return res.status(400).json({
+        message: `Only ${availableRooms} room(s) available for the selected dates.`,
+      });
     }
 
     // Pricing calculations
