@@ -240,7 +240,6 @@ exports.createProperty = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 exports.updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
@@ -261,10 +260,10 @@ exports.updateProperty = async (req, res) => {
     // Load existing strdata
     let newStrdata = property.strdata || {};
 
-    // 1️⃣ Merge incoming updates into existing step's strdata without losing previous step data
+    // 1️⃣ Merge incoming updates into existing step's strdata
     newStrdata = updateStrdata(newStrdata, currentStep, updates);
 
-    // 2️⃣ Special case: step 4 — merge and store rooms in strdata & DB
+    // 2️⃣ Special case: Step 4 — merge and store rooms
     if (currentStep === 4 && updates.rooms && Array.isArray(updates.rooms)) {
       const existingRooms = newStrdata[`step_4`]?.rooms || [];
       newStrdata[`step_4`].rooms = [...existingRooms, ...updates.rooms];
@@ -282,21 +281,76 @@ exports.updateProperty = async (req, res) => {
       delete updates.rooms;
     }
 
+    // 3️⃣ Special case: Step 5 — process mediaItems
+    if (
+      currentStep === 5 &&
+      updates.mediaItems &&
+      Array.isArray(updates.mediaItems)
+    ) {
+      const mediaItems = updates.mediaItems;
+
+      // Update Property.photos with coverPhoto items
+      const coverPhotos = mediaItems
+        .filter((item) => item.coverPhoto)
+        .map((item) => item.imageURL);
+
+      const existingPhotos = property.photos || [];
+      const updatedPhotos = [...existingPhotos, ...coverPhotos];
+
+      // Prepare room photo mappings
+      const roomPhotosMap = {};
+
+      mediaItems.forEach((item) => {
+        if (item.tags && item.tags.length) {
+          item.tags.forEach((tag) => {
+            if (!roomPhotosMap[tag]) roomPhotosMap[tag] = [];
+            roomPhotosMap[tag].push({
+              url: item.imageURL,
+              tag,
+            });
+          });
+        }
+      });
+
+      // Update strdata step_5 with room photos
+      if (!newStrdata[`step_5`]) {
+        newStrdata[`step_5`] = {};
+      }
+
+      // Append roomPhotosMap to step_5
+      if (!newStrdata[`step_5`].roomPhotos) {
+        newStrdata[`step_5`].roomPhotos = {};
+      }
+
+      for (const [roomTag, photos] of Object.entries(roomPhotosMap)) {
+        if (!newStrdata[`step_5`].roomPhotos[roomTag]) {
+          newStrdata[`step_5`].roomPhotos[roomTag] = [];
+        }
+        newStrdata[`step_5`].roomPhotos[roomTag].push(...photos);
+      }
+
+      delete updates.mediaItems;
+
+      // ✅ Update Property photos field now
+      await property.update({
+        photos: updatedPhotos,
+      });
+    }
+
     delete updates.current_step;
 
-    // 3️⃣ Build cumulative data from all strdata steps
+    // 4️⃣ Merge cumulative strdata for normalization
     const cumulativeData = Object.values(newStrdata).reduce(
       (acc, val) => ({ ...acc, ...val }),
       {}
     );
 
-    // 4️⃣ Merge current request updates into cumulative data
     const mergedDataForNormalization = {
       ...cumulativeData,
       ...updates,
     };
 
-    // 5️⃣ Normalize final cumulative+update merged data
+    // 5️⃣ Normalize data
     const normalizedData = normalizePropertyData(mergedDataForNormalization);
 
     // 6️⃣ Compute progress status
@@ -304,7 +358,7 @@ exports.updateProperty = async (req, res) => {
     const in_progress = status < 100;
     const is_completed = status === 100;
 
-    // 7️⃣ Update property with normalized data + updated strdata
+    // 7️⃣ Update property with normalizedData and newStrdata
     await property.update({
       ...normalizedData,
       current_step: currentStep,
