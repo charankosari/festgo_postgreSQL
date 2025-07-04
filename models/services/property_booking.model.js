@@ -63,7 +63,18 @@ module.exports = (sequelize) => {
         type: DataTypes.FLOAT,
         defaultValue: 0,
       },
-
+      total_amount: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+      },
+      child_charges: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+      extra_child_charges: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
       service_fee: {
         type: DataTypes.FLOAT,
         defaultValue: 0,
