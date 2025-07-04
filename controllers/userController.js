@@ -261,7 +261,7 @@ exports.sendEmailOtp = async (req, res) => {
 
   try {
     // Send email via Mailgun
-    await sendEmail(user.email, "Your Festgo Email OTP", htmlContent);
+    await sendEmail(req.body.email, "Your Festgo Email OTP", htmlContent);
   } catch (error) {
     console.error("❌ Failed to send email:", error);
     return next(new errorHandler("Failed to send OTP email", 500));
