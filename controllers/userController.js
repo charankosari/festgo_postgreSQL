@@ -249,7 +249,7 @@ exports.updateProfile = async (req, res) => {
 
 // Send Email OTP
 exports.sendEmailOtp = async (req, res) => {
-  const user = await User.findOne({ where: { email: req.body.email } });
+  const user = await User.findByPk(req.user.id);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -257,7 +257,7 @@ exports.sendEmailOtp = async (req, res) => {
   user.email_otp_expire = Date.now() + 10 * 60 * 1000;
   await user.save();
 
-  const htmlContent = otpTemplate(user.username, otp);
+  const htmlContent = otpTemplate(user.username || "User", otp);
 
   try {
     // Send email via Mailgun
@@ -271,7 +271,7 @@ exports.sendEmailOtp = async (req, res) => {
 
 // Verify Email OTP
 exports.verifyEmailOtp = async (req, res) => {
-  const user = await User.findOne({ where: { email: req.body.email } });
+  const user = await User.findByPk(req.user.id);
   if (
     !user ||
     user.email_otp !== req.body.otp ||
@@ -279,7 +279,6 @@ exports.verifyEmailOtp = async (req, res) => {
   )
     return res.status(400).json({ message: "Invalid or expired OTP" });
 
-  user.email_verified = true;
   user.email_otp = null;
   user.email_otp_expire = null;
   await user.save();
@@ -290,7 +289,7 @@ exports.verifyEmailOtp = async (req, res) => {
 // Send Mobile OTP
 exports.sendMobileOtp = async (req, res) => {
   try {
-    const user = await User.findOne({ where: { number: req.body.number } });
+    const user = await User.findByPk(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -300,7 +299,7 @@ exports.sendMobileOtp = async (req, res) => {
 
     const message = loginOtpTemplate(otp);
 
-    const smsResponse = await sendSMS(user.number, message);
+    const smsResponse = await sendSMS(req.body.number, message);
 
     if (smsResponse.status === "failed") {
       console.error("SMS sending failed:", smsResponse.error);
@@ -317,7 +316,7 @@ exports.sendMobileOtp = async (req, res) => {
 
 // Verify Mobile OTP
 exports.verifyMobileOtp = async (req, res) => {
-  const user = await User.findOne({ where: { number: req.body.number } });
+  const user = await User.findByPk(req.user.id);
   if (
     !user ||
     user.mobile_otp !== req.body.otp ||

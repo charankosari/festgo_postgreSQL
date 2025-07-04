@@ -29,16 +29,16 @@ router.put("/update-password", isAuthorized, userController.updatePassword);
 router.put("/update-profile", isAuthorized, userController.updateProfile);
 
 // SEND EMAIL OTP vendor
-router.post("/send-email-otp", userController.sendEmailOtp);
+router.post("/send-email-otp", isAuthorized, userController.sendEmailOtp);
 
 // VERIFY EMAIL OTP vendor
-router.post("/verify-email-otp", userController.verifyEmailOtp);
+router.post("/verify-email-otp", isAuthorized, userController.verifyEmailOtp);
 
 // SEND MOBILE OTP vendor
-router.post("/send-mobile-otp", userController.sendMobileOtp);
+router.post("/send-mobile-otp", isAuthorized, userController.sendMobileOtp);
 
 // VERIFY MOBILE OTP vendor
-router.post("/verify-mobile-otp", userController.verifyMobileOtp);
+router.post("/verify-mobile-otp", isAuthorized, userController.verifyMobileOtp);
 
 // LOGIN VIA MOBILE OTP - Send OTP vendor
 router.post("/login-via-otp", userController.loginViaOtp);
