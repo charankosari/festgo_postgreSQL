@@ -36,7 +36,7 @@ const cancelPropertyBooking = async (req, res) => {
       refundPercentage > 0 &&
       booking.transaction_id
     ) {
-      const refundableAmount = booking.amount_paid - booking.service_charge;
+      const refundableAmount = booking.amount_paid - booking.service_fee;
       refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
 
       if (refundAmount > 0) {
