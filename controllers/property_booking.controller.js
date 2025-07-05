@@ -108,7 +108,22 @@ exports.bookProperty = async (req, res) => {
     const total_base_price = base_price_per_room * num_rooms;
 
     const max_included_adults = 2 * num_rooms;
-    const extra_adults = Math.max(num_adults - max_included_adults, 0);
+    // Calculate included adults per room based on sleeping arrangement
+    const base_adults_per_room = room.sleeping_arrangement?.base_adults || 2; // fallback 2 if not defined
+    const max_adults_per_room = room.sleeping_arrangement?.max_adults || 2;
+
+    const total_base_adults_included = base_adults_per_room * num_rooms;
+    const total_max_adults_allowed = max_adults_per_room * num_rooms;
+
+    if (num_adults > total_max_adults_allowed) {
+      await t.rollback();
+      return res.status(400).json({
+        message: `Maximum ${total_max_adults_allowed} adults allowed for selected number of rooms.`,
+      });
+    }
+
+    // Calculate extra adults beyond base included
+    const extra_adults = Math.max(num_adults - total_base_adults_included, 0);
     const total_extra_adult_charge = extra_adults * extra_adult_charge_per;
 
     const total_child_charge = num_children * child_charge_per;

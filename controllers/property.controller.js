@@ -1121,11 +1121,9 @@ exports.updateRoomPrices = async (req, res) => {
 
     // Check vendor ownership
     if (property.vendorId !== req.user.id) {
-      return res
-        .status(403)
-        .json({
-          message: "You are not authorized to update prices for this room.",
-        });
+      return res.status(403).json({
+        message: "You are not authorized to update prices for this room.",
+      });
     }
 
     // Merge new price with existing room.price
