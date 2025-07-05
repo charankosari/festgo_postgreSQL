@@ -1075,6 +1075,7 @@ exports.getPropertyRoomInventories = async (req, res) => {
           rates,
           defaultInventory,
           defaultRates,
+          beds: room.beds,
         });
       }
 
