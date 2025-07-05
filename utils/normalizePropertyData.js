@@ -90,6 +90,7 @@ export function normalizeRoomData(data) {
       max_children: selectedRoomFormInfo.maxChildren || 0,
       max_occupancy: selectedRoomFormInfo.maxOccupancy || 0,
       max_extra_beds: selectedRoomFormInfo.maxExtraBeds || 0,
+      beds: selectedRoomFormInfo.beds || [],
     },
 
     bathroom_available: bathroomDetailsFormInfo.numberOfBathrooms || 0,
