@@ -971,3 +971,125 @@ exports.getRoomsByVendor = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// merchants inventory
+exports.getPropertyRoomInventories = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "startDate and endDate are required" });
+    }
+
+    // Get properties owned by this vendor
+    const properties = await Property.findAll({
+      where: { vendorId: req.user.id },
+    });
+
+    if (!properties.length) {
+      return res
+        .status(404)
+        .json({ message: "No properties found for vendor" });
+    }
+
+    const result = [];
+
+    for (const property of properties) {
+      const rooms = await Room.findAll({
+        where: { propertyId: property.id },
+      });
+
+      const roomsData = [];
+
+      for (const room of rooms) {
+        // Default inventory from room.number_of_rooms
+        const defaultInventory = room.number_of_rooms;
+
+        // Default rates
+        const defaultRates = {
+          base: room.price.base_price_for_2_adults,
+          extra: room.price.extra_adult_charge,
+          child: room.price.child_charge,
+        };
+
+        // Initialize inventory & rates for given date range
+        const inventory = {};
+        const rates = {};
+
+        let currentDate = new Date(startDate);
+        const end = new Date(endDate);
+
+        while (currentDate <= end) {
+          const dateStr = currentDate.toISOString().split("T")[0];
+          inventory[dateStr] = defaultInventory;
+          rates[dateStr] = {
+            base: defaultRates.base,
+            extra: defaultRates.extra,
+            child: defaultRates.child,
+          };
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Fetch bookings of this room in date range
+        const bookings = await RoomBookedDate.findAll({
+          where: {
+            roomId: room.id,
+            status: { [Op.in]: ["confirmed", "pending"] },
+            [Op.or]: [
+              {
+                checkIn: { [Op.between]: [startDate, endDate] },
+              },
+              {
+                checkOut: { [Op.between]: [startDate, endDate] },
+              },
+              {
+                checkIn: { [Op.lte]: startDate },
+                checkOut: { [Op.gte]: endDate },
+              },
+            ],
+          },
+        });
+
+        // Adjust inventory based on bookings
+        for (const booking of bookings) {
+          const checkIn = new Date(booking.checkIn);
+          const checkOut = new Date(booking.checkOut);
+
+          let date = new Date(checkIn);
+          while (date < checkOut) {
+            const dateStr = date.toISOString().split("T")[0];
+            if (inventory[dateStr] !== undefined) {
+              inventory[dateStr] = Math.max(inventory[dateStr] - 1, 0);
+            }
+            date.setDate(date.getDate() + 1);
+          }
+        }
+
+        // Assemble room data
+        roomsData.push({
+          id: room.id,
+          name: room.room_name,
+          inventory,
+          rates,
+          defaultInventory,
+          defaultRates,
+        });
+      }
+
+      // Assemble property data
+      result.push({
+        id: property.id,
+        name: property.name,
+        type: property.property_type,
+        rooms: roomsData,
+      });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching inventory:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};

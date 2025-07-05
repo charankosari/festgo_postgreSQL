@@ -88,4 +88,12 @@ router.delete(
   propertyController.deleteProperty
 );
 
+// get inventory by vendor
+router.get(
+  "/inventory",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.getPropertyRoomInventories
+);
+
 module.exports = router;
