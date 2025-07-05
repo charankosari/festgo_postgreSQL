@@ -1093,3 +1093,87 @@ exports.getPropertyRoomInventories = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+exports.updateRoomPrices = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { price } = req.body;
+
+    if (!price || typeof price !== "object") {
+      return res
+        .status(400)
+        .json({ message: "Price object is required in request body." });
+    }
+
+    // Find room
+    const room = await Room.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Room not found." });
+    }
+
+    // Find property
+    const property = await Property.findByPk(room.propertyId);
+    if (!property) {
+      return res
+        .status(404)
+        .json({ message: "Property for this room not found." });
+    }
+
+    // Check vendor ownership
+    if (property.vendorId !== req.user.id) {
+      return res
+        .status(403)
+        .json({
+          message: "You are not authorized to update prices for this room.",
+        });
+    }
+
+    // Merge new price with existing room.price
+    const updatedPrice = { ...room.price, ...price };
+    room.price = updatedPrice;
+    await room.save();
+
+    // Work directly with property.strdata object
+    if (
+      property.strdata?.step_4?.rooms &&
+      Array.isArray(property.strdata.step_4.rooms)
+    ) {
+      // Find room by name in strdata.step_4.rooms
+      const roomInStrdata = property.strdata.step_4.rooms.find(
+        (r) => r.roomDetailsFormInfo?.name === room.room_name
+      );
+
+      if (roomInStrdata) {
+        // Update pricing fields if present
+        if (!roomInStrdata.mealPlanDetailsFormInfo) {
+          roomInStrdata.mealPlanDetailsFormInfo = {};
+        }
+
+        if (price.base_price_for_2_adults !== undefined) {
+          roomInStrdata.mealPlanDetailsFormInfo.baseRateFor2Adults =
+            price.base_price_for_2_adults;
+        }
+        if (price.extra_adult_charge !== undefined) {
+          roomInStrdata.mealPlanDetailsFormInfo.extraAdultCharge =
+            price.extra_adult_charge;
+        }
+        if (price.child_charge !== undefined) {
+          roomInStrdata.mealPlanDetailsFormInfo.paidChildCharge =
+            price.child_charge;
+        }
+
+        // Save property since strdata is a JSONB field directly
+        await property.save();
+      }
+    }
+
+    res.status(200).json({
+      message: "Room price and property strdata updated successfully.",
+      roomId: room.id,
+      updatedPrice: room.price,
+    });
+  } catch (error) {
+    console.error("Error updating room price and property strdata:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
