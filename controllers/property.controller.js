@@ -137,7 +137,7 @@ const formatPropertyResponse = async (property) => {
     name,
     property_type,
     email,
-    description,
+    // description,
     star_rating,
     location,
     photos,
@@ -151,31 +151,32 @@ const formatPropertyResponse = async (property) => {
   // Fetch room
   const room = await Room.findOne({
     where: { propertyId: id },
-    order: [["discounted_price", "ASC"]],
+    // order: [["discounted_price", "ASC"]],
   });
 
   // If no room found, skip property
   if (!room) return null;
 
   // Extract room details
-  const pricePerNight = `${room.discounted_price}`;
-  const originalPrice = `${room.original_price}`;
-  const discount = room.discount;
+  // const pricePerNight = `${room.discounted_price}`;
+  // const originalPrice = `${room.original_price}`;
+  // const discount = room.discount;
   const additionalInfo = room.additional_info || "";
   const freeBreakfast = room.free_breakfast;
   const freeCancellation = room.free_cancellation;
-
+  const price = room.price;
   return {
     id,
     vendorId,
     name,
     property_type,
     email,
-    description,
+    // description,
     star_rating,
-    pricePerNight,
-    originalPrice,
-    discount,
+    // pricePerNight,
+    // originalPrice,
+    // discount,
+    price,
     additionalInfo,
     freeBreakfast,
     freeCancellation,
