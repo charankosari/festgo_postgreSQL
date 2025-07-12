@@ -283,6 +283,7 @@ exports.updateProperty = async (req, res) => {
     }
 
     // 3️⃣ Special case: Step 5 — process mediaItems
+    // 3️⃣ Special case: Step 5 — process mediaItems
     if (
       currentStep === 5 &&
       updates.mediaItems &&
@@ -290,18 +291,22 @@ exports.updateProperty = async (req, res) => {
     ) {
       const mediaItems = updates.mediaItems;
 
-      // Update Property.photos with coverPhoto items
-      const coverPhotos = mediaItems
-        .filter((item) => item.coverPhoto)
-        .map((item) => item.imageURL);
+      // Separate coverPhoto:true items first
+      const coverPhotoItems = mediaItems.filter((item) => item.coverPhoto);
+      const otherItems = mediaItems.filter((item) => !item.coverPhoto);
 
+      // Combine them with coverPhoto items first
+      const sortedMediaItems = [...coverPhotoItems, ...otherItems];
+
+      // Update Property.photos with coverPhoto imageURLs (order matters)
+      const coverPhotos = coverPhotoItems.map((item) => item.imageURL);
       const existingPhotos = property.photos || [];
       const updatedPhotos = [...existingPhotos, ...coverPhotos];
 
       // Prepare room photo mappings
       const roomPhotosMap = {};
 
-      mediaItems.forEach((item) => {
+      sortedMediaItems.forEach((item) => {
         if (item.tags && item.tags.length) {
           item.tags.forEach((tag) => {
             if (!roomPhotosMap[tag]) roomPhotosMap[tag] = [];
@@ -318,7 +323,6 @@ exports.updateProperty = async (req, res) => {
         newStrdata[`step_5`] = {};
       }
 
-      // Append roomPhotosMap to step_5
       if (!newStrdata[`step_5`].roomPhotos) {
         newStrdata[`step_5`].roomPhotos = {};
       }
@@ -332,7 +336,7 @@ exports.updateProperty = async (req, res) => {
 
       delete updates.mediaItems;
 
-      // ✅ Update Property photos field now
+      // ✅ Update Property photos field now (only adding cover photos here)
       await property.update({
         photos: updatedPhotos,
       });
