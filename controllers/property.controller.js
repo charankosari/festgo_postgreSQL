@@ -283,7 +283,6 @@ exports.updateProperty = async (req, res) => {
     }
 
     // 3️⃣ Special case: Step 5 — process mediaItems
-    // 3️⃣ Special case: Step 5 — process mediaItems
     if (
       currentStep === 5 &&
       updates.mediaItems &&
@@ -291,52 +290,27 @@ exports.updateProperty = async (req, res) => {
     ) {
       const mediaItems = updates.mediaItems;
 
-      // Separate coverPhoto:true items first
+      // Split coverPhoto:true and others
       const coverPhotoItems = mediaItems.filter((item) => item.coverPhoto);
       const otherItems = mediaItems.filter((item) => !item.coverPhoto);
 
-      // Combine them with coverPhoto items first
+      // Combine them — coverPhoto images first
       const sortedMediaItems = [...coverPhotoItems, ...otherItems];
 
-      // Update Property.photos with coverPhoto imageURLs (order matters)
-      const coverPhotos = coverPhotoItems.map((item) => item.imageURL);
+      // Update photos — push full object as-is (not just imageURL)
       const existingPhotos = property.photos || [];
-      const updatedPhotos = [...existingPhotos, ...coverPhotos];
+      const updatedPhotos = [...existingPhotos, ...sortedMediaItems];
 
-      // Prepare room photo mappings
-      const roomPhotosMap = {};
-
-      sortedMediaItems.forEach((item) => {
-        if (item.tags && item.tags.length) {
-          item.tags.forEach((tag) => {
-            if (!roomPhotosMap[tag]) roomPhotosMap[tag] = [];
-            roomPhotosMap[tag].push({
-              url: item.imageURL,
-              tag,
-            });
-          });
-        }
-      });
-
-      // Update strdata step_5 with room photos
+      // Save sortedMediaItems as-is into strdata.step_5.mediaItems
       if (!newStrdata[`step_5`]) {
         newStrdata[`step_5`] = {};
       }
+      newStrdata[`step_5`].mediaItems = sortedMediaItems;
 
-      if (!newStrdata[`step_5`].roomPhotos) {
-        newStrdata[`step_5`].roomPhotos = {};
-      }
-
-      for (const [roomTag, photos] of Object.entries(roomPhotosMap)) {
-        if (!newStrdata[`step_5`].roomPhotos[roomTag]) {
-          newStrdata[`step_5`].roomPhotos[roomTag] = [];
-        }
-        newStrdata[`step_5`].roomPhotos[roomTag].push(...photos);
-      }
-
+      // Remove mediaItems from updates
       delete updates.mediaItems;
 
-      // ✅ Update Property photos field now (only adding cover photos here)
+      // ✅ Update property photos field now
       await property.update({
         photos: updatedPhotos,
       });
