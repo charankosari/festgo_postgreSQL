@@ -103,6 +103,15 @@ exports.loginUser = async (req, res) => {
   if (!user || !(await user.comparePassword(password))) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
+  // Allowed roles for this login route
+  const allowedRoles = ["vendor", "admin"];
+
+  if (!allowedRoles.includes(user.role)) {
+    return res.status(400).json({
+      message: `This email is registered as a ${user.role}, not allowed to login here`,
+      status: 400,
+    });
+  }
 
   const message = "Login successful";
   const cleanUser = safeUser(user, [
@@ -363,6 +372,15 @@ exports.verifyLoginViaOtp = async (req, res) => {
     Date.now() > user.mobile_otp_expire
   )
     return res.status(400).json({ message: "Invalid or expired OTP" });
+  // Allowed roles for this login route
+  const allowedRoles = ["vendor", "admin"];
+
+  if (!allowedRoles.includes(user.role)) {
+    return res.status(400).json({
+      message: `This email is registered as a ${user.role}, not allowed to login here`,
+      status: 400,
+    });
+  }
 
   user.mobile_otp = null;
   user.mobile_otp_expire = null;
@@ -493,6 +511,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       user = await User.findOne({ where: { email } });
 
       if (user) {
+        if (user.role !== "user") {
+          return res.status(400).json({
+            message: "Email already registered with a different role",
+            status: 400,
+          });
+        }
+
         const cleanUser = safeUser(
           user,
           ["username"],
@@ -541,6 +566,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       const tokenExpire = new Date(Date.now() + 10 * 60 * 1000);
 
       if (user) {
+        if (user.role !== "user") {
+          return res.status(400).json({
+            message: "Email already registered with a different role",
+            status: 400,
+          });
+        }
+
         user.token = token;
         user.tokenExpire = tokenExpire;
         await user.save();
@@ -581,6 +613,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       const otpExpire = Date.now() + 10 * 60 * 1000;
 
       if (user) {
+        if (user.role !== "user") {
+          return res.status(400).json({
+            message: "Email already registered with a different role",
+            status: 400,
+          });
+        }
+
         user.mobile_otp = otp;
         user.mobile_otp_expire = otpExpire;
         await user.save();
@@ -628,6 +667,12 @@ exports.verifyEmailToken = async (req, res) => {
   try {
     // Find user by token
     const user = await User.findOne({ where: { token } });
+    if (user.role !== "user") {
+      return res.status(400).json({
+        message: "Email already registered with a different role",
+        status: 400,
+      });
+    }
 
     if (!user)
       return res
@@ -658,6 +703,13 @@ exports.verifyEmailToken = async (req, res) => {
 };
 exports.verifyOtp = async (req, res) => {
   const user = await User.findOne({ where: { number: req.body.number } });
+  if (user.role !== "user") {
+    return res.status(400).json({
+      message: "Email already registered with a different role",
+      status: 400,
+    });
+  }
+
   if (
     !user ||
     user.mobile_otp !== req.body.otp ||
