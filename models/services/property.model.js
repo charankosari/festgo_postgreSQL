@@ -31,6 +31,7 @@ module.exports = (sequelize) =>
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
+    description: DataTypes.TEXT,
     status: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
