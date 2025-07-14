@@ -31,20 +31,13 @@ const checkAvailableRooms = async (
   startDate,
   finalDate
 ) => {
-  const roomConditions = {
-    propertyId: property.id,
-  };
-
-  const totalPeople =
-    (!isNaN(parseInt(adult)) ? parseInt(adult) : 0) +
-    (!isNaN(parseInt(child)) ? parseInt(child) : 0);
+  const totalPeople = (parseInt(adult) || 0) + (parseInt(child) || 0);
 
   const where = {
     propertyId: property.id,
     [Op.and]: [],
   };
 
-  // Total people (compare against sleeping_arrangement->max_occupancy)
   if (totalPeople > 0) {
     where[Op.and].push(
       Sequelize.literal(
@@ -52,18 +45,14 @@ const checkAvailableRooms = async (
       )
     );
   }
-
-  // Adults
-  if (adult !== null && adult !== undefined && !isNaN(adult)) {
+  if (adult) {
     where[Op.and].push(
       Sequelize.literal(
         `(sleeping_arrangement->>'max_adults')::int >= ${parseInt(adult)}`
       )
     );
   }
-
-  // Children
-  if (child !== null && child !== undefined && !isNaN(child)) {
+  if (child) {
     where[Op.and].push(
       Sequelize.literal(
         `(sleeping_arrangement->>'max_children')::int >= ${parseInt(child)}`
@@ -71,8 +60,7 @@ const checkAvailableRooms = async (
     );
   }
 
-  // Remove empty [Op.and] if no conditions
-  if (where[Op.and].length === 0) delete where[Op.and];
+  if (!where[Op.and].length) delete where[Op.and];
 
   const roomsInProperty = await Room.findAll({ where });
 
@@ -80,6 +68,7 @@ const checkAvailableRooms = async (
 
   const roomIds = roomsInProperty.map((room) => room.id);
 
+  // Fetch booked counts
   const bookedRooms = await RoomBookedDate.findAll({
     where: {
       roomId: { [Op.in]: roomIds },
@@ -97,18 +86,38 @@ const checkAvailableRooms = async (
       (bookedRoomCounts[booking.roomId] || 0) + 1;
   });
 
+  // Fetch room rates for the given date in one query
+  const roomRates = await RoomRateInventory.findAll({
+    where: {
+      propertyId: property.id,
+      roomId: { [Op.in]: roomIds },
+      date: startDate,
+    },
+  });
+
+  const roomRateMap = {};
+  roomRates.forEach((rate) => {
+    roomRateMap[rate.roomId] = rate.inventory;
+  });
+
+  // Calculate availability
   const availableRooms = roomsInProperty.filter((room) => {
     const alreadyBooked = bookedRoomCounts[room.id] || 0;
-    return (
-      room.number_of_rooms - alreadyBooked >=
-      (isNaN(requestedRooms) ? 1 : requestedRooms)
-    );
+    const totalAvailable =
+      roomRateMap[room.id] !== undefined
+        ? roomRateMap[room.id]
+        : room.number_of_rooms;
+
+    const remainingAvailable = totalAvailable - alreadyBooked;
+
+    return remainingAvailable >= (isNaN(requestedRooms) ? 1 : requestedRooms);
   });
 
   if (!availableRooms.length) return null;
 
   const plainProperty = property.get({ plain: true });
   delete plainProperty.ownership_details;
+
   return plainProperty;
 };
 
