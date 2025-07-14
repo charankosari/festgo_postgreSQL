@@ -180,7 +180,6 @@ const formatPropertyResponse = async (property, startDate) => {
   const additionalInfo = room.additional_info || "";
   const freeBreakfast = room.free_breakfast;
   const freeCancellation = room.free_cancellation;
-  const price = room.price;
   return {
     id,
     vendorId,
@@ -192,7 +191,6 @@ const formatPropertyResponse = async (property, startDate) => {
     pricePerNight,
     originalPrice,
     // discount,
-    price,
     additionalInfo,
     freeBreakfast,
     freeCancellation,
