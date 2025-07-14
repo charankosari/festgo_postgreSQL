@@ -7,6 +7,7 @@ const {
   room_amenity,
   room_amenity_category,
   RoomBookedDate,
+  RoomRateInventory,
 } = require("../models/services/index");
 const { review } = require("../models/users/index");
 const {
@@ -111,7 +112,7 @@ const checkAvailableRooms = async (
   return plainProperty;
 };
 
-const enrichProperties = async (properties) => {
+const enrichProperties = async (properties, startDate) => {
   const enriched = [];
 
   for (const p of properties) {
@@ -123,21 +124,21 @@ const enrichProperties = async (properties) => {
     delete plain.tax_details;
     delete plain.strdata;
     // Format final response
-    const formattedProperty = await formatPropertyResponse(plain);
+    const formattedProperty = await formatPropertyResponse(plain, startDate);
     if (formattedProperty) enriched.push(formattedProperty);
   }
 
   return enriched;
 };
 
-const formatPropertyResponse = async (property) => {
+const formatPropertyResponse = async (property, startDate) => {
   const {
     id,
     vendorId,
     name,
     property_type,
     email,
-    // description,
+    description,
     star_rating,
     location,
     photos,
@@ -156,7 +157,22 @@ const formatPropertyResponse = async (property) => {
 
   // If no room found, skip property
   if (!room) return null;
+  const roomRateEntry = await RoomRateInventory.findOne({
+    where: {
+      propertyId: id,
+      roomId: room.id,
+      date: startDate,
+    },
+  });
+  const basePrice = room.price?.base_price_for_2_adults || 0;
+  const pricePerNight = roomRateEntry
+    ? roomRateEntry.price.offerBaseRate
+    : basePrice;
 
+  // original (strikethrough) price
+  const originalPrice = roomRateEntry
+    ? roomRateEntry.price.base
+    : parseFloat((basePrice * 1.05).toFixed(2)); // adding 5%
   // Extract room details
   // const pricePerNight = `${room.discounted_price}`;
   // const originalPrice = `${room.original_price}`;
@@ -171,10 +187,10 @@ const formatPropertyResponse = async (property) => {
     name,
     property_type,
     email,
-    // description,
+    description,
     star_rating,
-    // pricePerNight,
-    // originalPrice,
+    pricePerNight,
+    originalPrice,
     // discount,
     price,
     additionalInfo,
@@ -583,7 +599,10 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     }
 
     // Step 4: Enrich final properties
-    const finalProperties = await enrichProperties(availableProperties);
+    const finalProperties = await enrichProperties(
+      availableProperties,
+      startDate
+    );
 
     return res.json({
       success: true,
