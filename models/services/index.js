@@ -38,6 +38,10 @@ const property_booking = require("./property_booking.model")(servicesSequelize);
 const city_fest_booking = require("./city_fest_booking.model")(
   servicesSequelize
 );
+// room rate inventory
+const RoomRateInventory = require("./room_rate_inventory.model")(
+  servicesSequelize
+);
 // cron
 const CronThing = require("./cron_things")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
@@ -190,6 +194,30 @@ beachfests_booking.belongsTo(beach_fests, {
   as: "beachfest",
   onDelete: "CASCADE",
 });
+
+// Setup associations for RoomRateInventory
+Property.hasMany(RoomRateInventory, {
+  foreignKey: "propertyId",
+  as: "roomRateInventories",
+  onDelete: "CASCADE",
+});
+RoomRateInventory.belongsTo(Property, {
+  foreignKey: "propertyId",
+  as: "property",
+  onDelete: "CASCADE",
+});
+
+Room.hasMany(RoomRateInventory, {
+  foreignKey: "roomId",
+  as: "rateInventories",
+  onDelete: "CASCADE",
+});
+RoomRateInventory.belongsTo(Room, {
+  foreignKey: "roomId",
+  as: "room",
+  onDelete: "CASCADE",
+});
+
 // Setup DB object
 const db = {
   sequelize: servicesSequelize,
@@ -214,6 +242,7 @@ const db = {
   city_fest_booking,
   CronThing,
   ContactMessage,
+  RoomRateInventory,
 };
 
 // Sync all models
