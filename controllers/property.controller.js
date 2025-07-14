@@ -290,30 +290,64 @@ exports.updateProperty = async (req, res) => {
     ) {
       const mediaItems = updates.mediaItems;
 
-      // Split coverPhoto:true and others
-      const coverPhotoItems = mediaItems.filter((item) => item.coverPhoto);
-      const otherItems = mediaItems.filter((item) => !item.coverPhoto);
+      // Fetch all rooms for this property
+      const rooms = await Room.findAll({ where: { propertyId: id } });
 
-      // Combine them — coverPhoto images first
-      const sortedMediaItems = [...coverPhotoItems, ...otherItems];
+      // Map of room names for quick lookup
+      const roomNameMap = {};
+      rooms.forEach((room) => {
+        roomNameMap[room.room_name] = room;
+      });
 
-      // Update photos — push full object as-is (not just imageURL)
-      const existingPhotos = property.photos || [];
-      const updatedPhotos = [...existingPhotos, ...sortedMediaItems];
+      // Arrays to hold property photos and room photo updates
+      const propertyPhotos = property.photos || [];
+      const newPropertyPhotos = [];
+      const roomMediaPromises = [];
 
-      // Save sortedMediaItems as-is into strdata.step_5.mediaItems
+      // Process each mediaItem
+      mediaItems.forEach((item) => {
+        let assignedToRoom = false;
+
+        if (item.tags && Array.isArray(item.tags)) {
+          // Check if any tag matches a room_name
+          item.tags.forEach((tag) => {
+            const matchedRoom = roomNameMap[tag];
+            if (matchedRoom) {
+              // Found matching room — push image to room's photos
+              let roomPhotos = matchedRoom.photos || [];
+              roomPhotos.push(item);
+              matchedRoom.photos = roomPhotos;
+
+              // Queue room save
+              roomMediaPromises.push(matchedRoom.save());
+
+              assignedToRoom = true;
+            }
+          });
+        }
+
+        // If not assigned to any room, add to property photos
+        if (!assignedToRoom) {
+          newPropertyPhotos.push(item);
+        }
+      });
+
+      // Save all room photo updates
+      await Promise.all(roomMediaPromises);
+
+      // Update property photos (append newPropertyPhotos)
+      await property.update({
+        photos: [...propertyPhotos, ...newPropertyPhotos],
+      });
+
+      // ✅ Save strdata.step_5 as-is from req.body
       if (!newStrdata[`step_5`]) {
         newStrdata[`step_5`] = {};
       }
-      newStrdata[`step_5`].mediaItems = sortedMediaItems;
+      newStrdata[`step_5`] = { ...updates }; // the whole req.body contents
 
-      // Remove mediaItems from updates
+      // Remove mediaItems from updates so it's not processed further
       delete updates.mediaItems;
-
-      // ✅ Update property photos field now
-      await property.update({
-        photos: updatedPhotos,
-      });
     }
 
     delete updates.current_step;
