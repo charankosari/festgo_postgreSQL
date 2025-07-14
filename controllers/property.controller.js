@@ -17,7 +17,7 @@ const {
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
-
+const moment = require("moment");
 // helper function to calculate status
 const calculateStatus = (currentStep) => {
   return Math.floor((currentStep / TOTAL_STEPS) * 100);
@@ -497,8 +497,8 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       property_type,
     } = req.body;
 
-    const startDate = new Date(todate);
-    const finalDate = new Date(enddate);
+    const startDate = moment(todate, "DD-MM-YYYY").format("YYYY-MM-DD");
+    const finalDate = moment(enddate, "DD-MM-YYYY").format("YYYY-MM-DD");
     const requestedRooms = parseInt(rooms);
 
     // Prepare property_type filter if given
