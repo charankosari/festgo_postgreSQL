@@ -272,27 +272,108 @@ exports.bookProperty = async (req, res) => {
 };
 
 exports.handlePaymentSuccess = async (bookingId, transactionId) => {
+  const t = await sequelize.transaction({
+    isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
+  });
+
   try {
-    // Update booking status
+    // Fetch booking details
+    const booking = await property_booking.findOne({
+      where: { id: bookingId },
+      transaction: t,
+    });
+
+    if (!booking) {
+      await t.rollback();
+      console.error("Booking not found");
+      return false;
+    }
+
+    // Fetch room and property info
+    const room = await Room.findOne({
+      where: { id: booking.room_id },
+      transaction: t,
+    });
+
+    const roomRate = await RoomRateInventory.findOne({
+      where: {
+        propertyId: booking.property_id,
+        roomId: booking.room_id,
+        date: booking.check_in_date,
+      },
+      transaction: t,
+    });
+
+    // Calculate current available inventory
+    const totalBookedRooms = await RoomBookedDate.count({
+      where: {
+        roomId: booking.room_id,
+        [Op.and]: [
+          { checkIn: { [Op.lt]: booking.check_out_date } },
+          { checkOut: { [Op.gt]: booking.check_in_date } },
+        ],
+        status: { [Op.in]: ["pending", "confirmed"] },
+      },
+      transaction: t,
+    });
+
+    const totalAvailableRooms = roomRate
+      ? roomRate.inventory
+      : room.number_of_rooms;
+
+    const availableRooms = totalAvailableRooms - totalBookedRooms;
+
+    // If insufficient inventory, trigger refund
+    if (availableRooms < booking.num_rooms) {
+      // Cancel booking and mark payment as failed
+      await property_booking.update(
+        {
+          payment_status: "failed",
+          booking_status: "cancelled",
+          transaction_id: transactionId,
+        },
+        { where: { id: bookingId }, transaction: t }
+      );
+
+      await RoomBookedDate.update(
+        { status: "cancelled" },
+        { where: { bookingId }, transaction: t }
+      );
+
+      // Trigger refund API
+      await refundPayment({
+        payment_id: transactionId,
+        amount: booking.amount_paid,
+      });
+
+      await t.commit();
+      console.log(
+        `❌ Booking ${bookingId} cancelled due to overbooking, refund initiated.`
+      );
+      return false;
+    }
+
+    // Else, confirm the booking
     await property_booking.update(
       {
         payment_status: "paid",
         booking_status: "confirmed",
         transaction_id: transactionId,
       },
-      { where: { id: bookingId } }
+      { where: { id: bookingId }, transaction: t }
     );
 
-    // Confirm room holds
     await RoomBookedDate.update(
       { status: "confirmed" },
-      { where: { bookingId, status: "pending" } }
+      { where: { bookingId, status: "pending" }, transaction: t }
     );
 
+    await t.commit();
     console.log(`✅ Booking ${bookingId} confirmed, rooms blocked.`);
     return true;
   } catch (error) {
     console.error("Error in handlePaymentSuccess:", error);
+    await t.rollback();
     return false;
   }
 };
