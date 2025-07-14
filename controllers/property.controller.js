@@ -744,9 +744,10 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
     const plainProperty = property.get({ plain: true });
 
     // Property rules (policies)
-    const propertyRules = (plainProperty.policies || []).map((p) => ({
-      rulesData: `${p.title}: ${p.description}`,
-    }));
+    const propertyRules = plainProperty.policies;
+    //  (plainProperty.policies || []).map((p) => ({
+    //   rulesData: `${p.title}: ${p.description}`,
+    // }));
 
     // Fetch all rooms for this property, with room amenities
     const rooms = await Room.findAll({
