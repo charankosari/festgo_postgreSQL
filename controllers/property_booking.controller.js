@@ -1,6 +1,7 @@
 const {
   property_booking,
   RoomBookedDate,
+  RoomRateInventory,
   Property,
   Room,
   beachfests_booking,
@@ -81,10 +82,19 @@ exports.bookProperty = async (req, res) => {
       lock: Transaction.LOCK.UPDATE,
       transaction: t,
     });
-
+    const roomRateEntry = await RoomRateInventory.findOne({
+      where: {
+        propertyId: property_id,
+        roomId: room_id,
+        date: check_in_date,
+      },
+      transaction: t,
+    });
     const totalBookedRooms = existingBookings.length;
-    const availableRooms = room.number_of_rooms - totalBookedRooms;
-
+    const totalAvailableRooms = roomRateEntry
+      ? roomRateEntry.inventory
+      : room.number_of_rooms;
+    const availableRooms = totalAvailableRooms - totalBookedRooms;
     if (availableRooms <= 0) {
       await t.rollback();
       return res
@@ -98,16 +108,18 @@ exports.bookProperty = async (req, res) => {
         message: `Only ${availableRooms} room(s) available for the selected dates.`,
       });
     }
-    // Prices from room.price JSON
-    const price = room.price || {};
-    const base_price_per_room = Number(price.base_price_for_2_adults) || 0;
-    const extra_adult_charge_per = Number(price.extra_adult_charge) || 0;
-    const child_charge_per = Number(price.child_charge) || 0;
+    const base_price_per_room = roomRateEntry
+      ? Number(roomRateEntry.price.offerBaseRate) || 0
+      : Number(room.price?.base_price_for_2_adults) || 0;
 
+    const extra_adult_charge_per = roomRateEntry
+      ? Number(roomRateEntry.price.offerPlusOne) || 0
+      : Number(room.price?.extra_adult_charge) || 0;
+
+    const child_charge_per = Number(room.price?.child_charge) || 0;
     // Total price calculation
     const total_base_price = base_price_per_room * num_rooms;
 
-    const max_included_adults = 2 * num_rooms;
     // Calculate included adults per room based on sleeping arrangement
     const base_adults_per_room = room.sleeping_arrangement?.base_adults || 2; // fallback 2 if not defined
     const max_adults_per_room = room.sleeping_arrangement?.max_adults || 2;
