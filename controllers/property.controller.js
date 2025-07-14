@@ -181,7 +181,7 @@ const formatPropertyResponse = async (property, startDate) => {
   // original (strikethrough) price
   const originalPrice = roomRateEntry
     ? roomRateEntry.price.base
-    : parseFloat((basePrice * 1.05).toFixed(2)); // adding 5%
+    : Math.round(basePrice * 1.05);
   // Extract room details
   // const pricePerNight = `${room.discounted_price}`;
   // const originalPrice = `${room.original_price}`;
