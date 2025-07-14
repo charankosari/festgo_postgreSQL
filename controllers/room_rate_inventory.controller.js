@@ -1,5 +1,5 @@
 const { RoomRateInventory, Property } = require("../models/services/index.js");
-
+const moment = require("moment");
 exports.submitRoomRates = async (req, res) => {
   try {
     const { propertyId, date, rooms } = req.body;
@@ -20,7 +20,7 @@ exports.submitRoomRates = async (req, res) => {
         .status(403)
         .json({ message: "Unauthorized: Not your property" });
     }
-
+    const formattedDate = moment(date).format("YYYY-MM-DD");
     // Proceed with upserts
     const upsertPromises = rooms.map(async (room) => {
       const { roomId, inventory, base, extra, offerBaseRate, offerPlusOne } =
@@ -34,7 +34,7 @@ exports.submitRoomRates = async (req, res) => {
         where: {
           propertyId,
           roomId,
-          date,
+          date: formattedDate,
         },
       });
 
@@ -55,7 +55,7 @@ exports.submitRoomRates = async (req, res) => {
           propertyId,
           roomId,
           userId,
-          date,
+          date: formattedDate,
           inventory,
           price: {
             base: parseFloat(base),
