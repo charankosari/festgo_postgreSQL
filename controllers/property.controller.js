@@ -166,13 +166,16 @@ const formatPropertyResponse = async (property, startDate) => {
 
   // If no room found, skip property
   if (!room) return null;
-  const roomRateEntry = await RoomRateInventory.findOne({
-    where: {
-      propertyId: id,
-      roomId: room.id,
-      date: startDate,
-    },
-  });
+  let roomRateEntry = null;
+  if (startDate) {
+    roomRateEntry = await RoomRateInventory.findOne({
+      where: {
+        propertyId: id,
+        roomId: room.id,
+        date: startDate,
+      },
+    });
+  }
   const basePrice = room.price?.base_price_for_2_adults || 0;
   const pricePerNight = roomRateEntry
     ? roomRateEntry.price.offerBaseRate
@@ -497,45 +500,94 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       property_type,
     } = req.body;
 
-    const startDate = moment(todate, "DD-MM-YYYY").format("YYYY-MM-DD");
-    const finalDate = moment(enddate, "DD-MM-YYYY").format("YYYY-MM-DD");
-    const requestedRooms = parseInt(rooms);
+    // 🧹 Clean and normalize incoming params
+    const clean = (val) => (val === "" ? null : val);
 
-    // Prepare property_type filter if given
-    const propertyTypeFilter = property_type
+    const lat = clean(latitude);
+    const long = clean(longitude);
+    const startDate = clean(todate)
+      ? moment(todate, "DD-MM-YYYY").format("YYYY-MM-DD")
+      : null;
+    const finalDate = clean(enddate)
+      ? moment(enddate, "DD-MM-YYYY").format("YYYY-MM-DD")
+      : null;
+    const requestedRooms = parseInt(clean(rooms)) || null;
+    const adults = parseInt(clean(adult)) || 0;
+    const children = parseInt(clean(child)) || 0;
+    const city = clean(location);
+    const propType = clean(property_type);
+
+    const propertyTypeFilter = propType
       ? Sequelize.where(
           Sequelize.fn("lower", Sequelize.col("property_type")),
-          property_type.toLowerCase()
+          propType.toLowerCase()
         )
       : null;
 
-    const availableProperties = [];
+    let availableProperties = [];
 
-    // Step 1: Nearby properties within 10km
-    if (latitude && longitude) {
+    // 🟢 If only lat/long given and no dates — just return active properties within 10km
+    if (lat && long && !startDate && !finalDate) {
       const whereNearby = {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
           Sequelize.literal(`
-            earth_distance(
-              ll_to_earth(${latitude}, ${longitude}),
-              ll_to_earth(
-                (location->>'latitude')::float, 
-                (location->>'longitude')::float
-              )
-            ) <= 10000
-          `),
+      earth_distance(
+        ll_to_earth(${lat}, ${long}),
+        ll_to_earth(
+          (location->>'lat')::float, 
+          (location->>'lng')::float
+        )
+      ) <= 10000
+    `),
         ].filter(Boolean),
       };
 
       const nearbyProperties = await Property.findAll({ where: whereNearby });
+      console.log(
+        "Nearby properties:",
+        nearbyProperties.map((p) => p.id)
+      );
+
+      const finalProperties = await enrichProperties(nearbyProperties, null);
+
+      return res.json({
+        success: true,
+        status: 200,
+        properties: finalProperties,
+      });
+    }
+
+    // ✅ Regular flow if dates provided — Nearby properties within 10km
+    if (lat && long) {
+      const whereNearby = {
+        active: true,
+        [Op.and]: [
+          propertyTypeFilter,
+          Sequelize.literal(`
+      earth_distance(
+        ll_to_earth(${lat}, ${long}),
+        ll_to_earth(
+          (location->>'lat')::float, 
+          (location->>'lng')::float
+        )
+      ) <= 10000
+    `),
+        ].filter(Boolean),
+      };
+
+      const nearbyProperties = await Property.findAll({ where: whereNearby });
+      console.log(
+        "Nearby properties:",
+        nearbyProperties.map((p) => p.id)
+      );
 
       for (const property of nearbyProperties) {
         const available = await checkAvailableRooms(
           property,
-          adult,
-          child,
+          adults,
+          children,
           requestedRooms,
           startDate,
           finalDate
@@ -544,13 +596,13 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
-    // Step 2: If less than 20 and location.city given
-    if (availableProperties.length < 20 && location) {
+    // ✅ Step 2: Search by city if properties < 20 and city provided
+    if (availableProperties.length < 20 && city) {
       const whereCity = {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
-          Sequelize.literal(`(location->>'city') = '${location}'`),
+          Sequelize.literal(`(location->>'city') = '${city}'`),
         ].filter(Boolean),
         id: {
           [Op.notIn]: availableProperties.map((p) => p.id),
@@ -565,8 +617,8 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       for (const property of cityProperties) {
         const available = await checkAvailableRooms(
           property,
-          adult,
-          child,
+          adults,
+          children,
           requestedRooms,
           startDate,
           finalDate
@@ -576,7 +628,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
-    // Step 3: Fallback — fetch default active properties (same type if given)
+    // ✅ Step 3: Fallback active properties (same property_type if given)
     if (availableProperties.length < 20) {
       const whereFallback = {
         active: true,
@@ -594,8 +646,8 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       for (const property of fallbackProperties) {
         const available = await checkAvailableRooms(
           property,
-          adult,
-          child,
+          adults,
+          children,
           requestedRooms,
           startDate,
           finalDate
@@ -605,7 +657,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
-    // Step 4: Enrich final properties
+    // ✅ Final enrichment and response
     const finalProperties = await enrichProperties(
       availableProperties,
       startDate
@@ -617,7 +669,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       properties: finalProperties,
     });
   } catch (err) {
-    console.error("Error fetching nearby properties:", err);
+    console.error("Error fetching properties:", err);
     res.status(500).json({ message: err.message, status: 500 });
   }
 };
