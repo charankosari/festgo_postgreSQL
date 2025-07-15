@@ -1,0 +1,67 @@
+const { DataTypes, Model } = require("sequelize");
+
+module.exports = (sequelize) => {
+  class FestgoCoinTransaction extends Model {}
+
+  FestgoCoinTransaction.init(
+    {
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+      },
+      userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      type: {
+        type: DataTypes.ENUM(
+          "event_referal",
+          "festbite_referal",
+          "beachfest_referal",
+          "property_recommend",
+          "cityfest_referal",
+          "trip_referal",
+          "user_referal"
+        ),
+        allowNull: false,
+      },
+      amount: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      remaining: {
+        type: DataTypes.INTEGER, // track remaining coins from this transaction
+        allowNull: false,
+      },
+      monthlyCoinCap: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      maxTransactions: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      expiresAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+    },
+    {
+      sequelize,
+      modelName: "FestgoCoinTransaction",
+      tableName: "festgo_coin_transactions",
+      timestamps: true,
+    }
+  );
+
+  return FestgoCoinTransaction;
+};
