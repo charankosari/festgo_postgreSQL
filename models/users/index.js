@@ -5,12 +5,15 @@ const Wishlist = require("./wishlist.model")(usersSequelize);
 const FestGoCoinHistory = require("./festgocoins_history.model")(
   usersSequelize
 );
+const LoginHistory = require("./Login_history.model")(usersSequelize);
+
 const ReferralHistory = require("./referral_history.model")(usersSequelize);
 const db = {
   Sequelize: usersSequelize,
   User,
   review,
   Wishlist,
+  LoginHistory,
 };
 review.belongsTo(User, {
   foreignKey: "userId",
@@ -64,6 +67,17 @@ ReferralHistory.belongsTo(User, {
 ReferralHistory.belongsTo(User, {
   foreignKey: "referredId",
   as: "referred",
+});
+LoginHistory.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE",
+});
+
+User.hasMany(LoginHistory, {
+  foreignKey: "userId",
+  as: "loginHistories",
+  onDelete: "CASCADE",
 });
 
 db.Sequelize.sync({ alter: true })
