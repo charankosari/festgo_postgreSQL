@@ -701,7 +701,8 @@ exports.loginWithEmailOrMobile = async (req, res) => {
 };
 
 exports.verifyEmailToken = async (req, res) => {
-  const { token } = req.body;
+  const { token, deviceModel, deviceBrand, osVersion, location, platform } =
+    req.body;
   if (!token)
     return res.status(400).json({ message: "Token is required", status: 400 });
 
@@ -729,6 +730,19 @@ exports.verifyEmailToken = async (req, res) => {
     user.email_verified = true;
     user.status = "active";
     await user.save();
+    await LoginHistory.create({
+      userId: user.id,
+      deviceModel,
+      deviceBrand,
+      osVersion,
+      location,
+      platform,
+      loginTime: new Date(),
+    });
+    const loginHistories = await LoginHistory.findAll({
+      where: { userId: user.id },
+      order: [["loginTime", "DESC"]],
+    });
 
     const message = "Registration successful";
     const cleanUser = safeUser(
@@ -736,6 +750,7 @@ exports.verifyEmailToken = async (req, res) => {
       ["username"],
       ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
     );
+    cleanUser.loginHistories = loginHistories;
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
@@ -743,36 +758,73 @@ exports.verifyEmailToken = async (req, res) => {
   }
 };
 exports.verifyOtp = async (req, res) => {
-  const user = await User.findOne({ where: { number: req.body.number } });
+  const {
+    number,
+    otp,
+    deviceModel,
+    deviceBrand,
+    osVersion,
+    location,
+    platform,
+  } = req.body;
+
+  const user = await User.findOne({ where: { number } });
+
+  if (!user)
+    return res.status(400).json({ message: "User not found", status: 400 });
+
   if (user.role !== "user") {
     return res.status(400).json({
-      message: "Email already registered with a different role",
+      message: "Number already registered with a different role",
       status: 400,
     });
   }
 
   if (
-    !user ||
-    user.mobile_otp !== req.body.otp ||
+    !user.mobile_otp ||
+    user.mobile_otp !== otp ||
     Date.now() > user.mobile_otp_expire
   )
     return res
       .status(400)
       .json({ message: "Invalid or expired OTP", status: 400 });
 
+  // Update user mobile verification status
   user.mobile_otp = null;
   user.mobile_otp_expire = null;
   user.mobile_verified = true;
   user.status = "active";
   await user.save();
+
+  // Save login history
+  await LoginHistory.create({
+    userId: user.id,
+    deviceModel,
+    deviceBrand,
+    osVersion,
+    location,
+    platform,
+    loginTime: new Date(),
+  });
+
+  // Fetch latest login histories
+  const loginHistories = await LoginHistory.findAll({
+    where: { userId: user.id },
+    order: [["loginTime", "DESC"]],
+  });
+
+  // Clean user for response
   const cleanUser = safeUser(
     user,
     ["username"],
     ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
   );
-  const message = "Login successfull";
+  cleanUser.loginHistories = loginHistories;
+
+  const message = "Login successful";
   sendToken(cleanUser, 200, message, res);
 };
+
 // login and signup with google
 
 // exports.googleAuth = async (req, res, next) => {
