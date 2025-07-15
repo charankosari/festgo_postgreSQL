@@ -435,8 +435,11 @@ exports.getUserDetails = async (req, res) => {
       // 📌 Sum total bookings count
       const bookingsCount =
         propertyBookingsCount + beachfestBookingsCount + eventsCount;
-
-      // 📌 Attach bookingsCount into user object
+      const loginHistory = await LoginHistory.findAll({
+        where: { userId: userId },
+        order: [["createdAt", "DESC"]],
+      });
+      cleanUser.loginHistories = loginHistory;
       cleanUser.bookingsCount = bookingsCount;
     } else {
       cleanUser = safeUser(user, [
