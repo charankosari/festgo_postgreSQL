@@ -602,7 +602,11 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
-          Sequelize.literal(`(location->>'city') = '${city}'`),
+          Sequelize.literal(`(
+      lower(location->>'city') = lower('${city}')
+      OR lower(location->>'locality') = lower('${city}')
+      OR lower(location->>'searchLocation') = lower('${city}')
+    )`),
         ].filter(Boolean),
         id: {
           [Op.notIn]: availableProperties.map((p) => p.id),
