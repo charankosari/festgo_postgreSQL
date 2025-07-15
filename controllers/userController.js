@@ -1,4 +1,4 @@
-const { User } = require("../models/users");
+const { User, LoginHistory } = require("../models/users");
 const {
   property_booking,
   beachfests_booking,
@@ -495,7 +495,17 @@ exports.getUserDetails = async (req, res) => {
 
 // for user login or signup with email or number
 exports.loginWithEmailOrMobile = async (req, res) => {
-  const { email, image_url, firstname, lastname } = req.body;
+  const {
+    email,
+    image_url,
+    firstname,
+    lastname,
+    deviceModel,
+    deviceBrand,
+    osVersion,
+    location,
+    platform,
+  } = req.body;
   const loginType = req.body.loginType?.toLowerCase();
 
   if (!email || !loginType) {
@@ -518,28 +528,20 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           });
         }
 
-        const cleanUser = safeUser(
-          user,
-          ["username"],
-          [
-            "billing_address",
-            "pincode",
-            "state",
-            "festgo_coins",
-            "referralCode",
-          ]
-        );
-        const message = "Login successfull";
-        sendToken(cleanUser, 201, message, res);
-      } else {
-        user = await User.create({
-          email,
-          role: "user",
-          status: "pending",
-          image_url,
-          firstname,
-          lastname,
-          logintype: loginType,
+        // Log login history
+        await LoginHistory.create({
+          userId: user.id,
+          deviceModel,
+          deviceBrand,
+          osVersion,
+          location,
+          platform,
+          loginTime: new Date(),
+        });
+
+        const loginHistories = await LoginHistory.findAll({
+          where: { userId: user.id },
+          order: [["loginTime", "DESC"]],
         });
 
         const cleanUser = safeUser(
@@ -553,9 +555,48 @@ exports.loginWithEmailOrMobile = async (req, res) => {
             "referralCode",
           ]
         );
-        const message = "Login successfull";
-        sendToken(cleanUser, 201, message, res);
+        cleanUser.loginHistories = loginHistories;
+
+        const message = "Login successful";
+        return sendToken(cleanUser, 201, message, res);
       }
+
+      // If user doesn't exist, create
+      user = await User.create({
+        email,
+        role: "user",
+        status: "pending",
+        image_url,
+        firstname,
+        lastname,
+        logintype: loginType,
+      });
+
+      // Log login history
+      await LoginHistory.create({
+        userId: user.id,
+        deviceModel,
+        deviceBrand,
+        osVersion,
+        location,
+        platform,
+        loginTime: new Date(),
+      });
+
+      const loginHistories = await LoginHistory.findAll({
+        where: { userId: user.id },
+        order: [["loginTime", "DESC"]],
+      });
+
+      const cleanUser = safeUser(
+        user,
+        ["username"],
+        ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
+      );
+      cleanUser.loginHistories = loginHistories;
+
+      const message = "Login successful";
+      return sendToken(cleanUser, 201, message, res);
     }
 
     // Email link login
