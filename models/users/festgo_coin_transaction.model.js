@@ -34,11 +34,12 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER, // track remaining coins from this transaction
         allowNull: false,
       },
-      monthlyCoinCap: {
-        type: DataTypes.INTEGER,
+      monthlyRefillDate: {
+        type: DataTypes.DATE,
         allowNull: true,
       },
-      maxTransactions: {
+
+      CurrentMonthCount: {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
