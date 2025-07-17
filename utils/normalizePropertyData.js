@@ -110,3 +110,58 @@ export function normalizeRoomData(data) {
     videos: [], // no video input yet
   };
 }
+export function normalizePropertyRules(policies = {}) {
+  const rules = [];
+
+  if (policies.petPolicy) rules.push(`Pet Policy: ${policies.petPolicy}`);
+
+  if (Array.isArray(policies.houseRules)) {
+    rules.push(...policies.houseRules);
+  }
+
+  if (policies.quietHours?.enabled) {
+    const { startTime, endTime } = policies.quietHours;
+    rules.push(`Quiet Hours: ${startTime} - ${endTime}`);
+  }
+
+  if (policies.checkInTime)
+    rules.push(`Check-in Time: ${policies.checkInTime}`);
+
+  if (policies.checkOutTime)
+    rules.push(`Check-out Time: ${policies.checkOutTime}`);
+
+  if (policies.childPolicy) rules.push(`Child Policy: ${policies.childPolicy}`);
+
+  if (policies.eventPolicy) rules.push(`Event Policy: ${policies.eventPolicy}`);
+
+  if (policies.minimumStay)
+    rules.push(`Minimum Stay: ${policies.minimumStay} night(s)`);
+
+  if (policies.maximumStay)
+    rules.push(`Maximum Stay: ${policies.maximumStay} night(s)`);
+
+  if (policies.cleaningFee)
+    rules.push(`Cleaning Fee: ₹${policies.cleaningFee}`);
+
+  if (policies.additionalGuestFee)
+    rules.push(`Additional Guest Fee: ₹${policies.additionalGuestFee}`);
+
+  if (policies.smokingPolicy)
+    rules.push(`Smoking Policy: ${policies.smokingPolicy}`);
+
+  if (policies.cancellationPolicy)
+    rules.push(`Cancellation Policy: ${policies.cancellationPolicy}`);
+
+  if (policies.ageRestriction?.enabled) {
+    rules.push(`Minimum Age: ${policies.ageRestriction.minimumAge}`);
+  }
+
+  if (policies.securityDeposit)
+    rules.push(`Security Deposit: ₹${policies.securityDeposit}`);
+
+  if (Array.isArray(policies.customRules)) {
+    rules.push(...policies.customRules);
+  }
+
+  return rules;
+}

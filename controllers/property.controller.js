@@ -13,6 +13,7 @@ const { review } = require("../models/users/index");
 const {
   normalizePropertyData,
   normalizeRoomData,
+  normalizePropertyRules,
 } = require("../utils/normalizePropertyData");
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
@@ -816,7 +817,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
     const plainProperty = property.get({ plain: true });
 
     // Property rules (policies)
-    const propertyRules = plainProperty.policies;
+    const propertyRules = normalizePropertyRules(plainProperty.policies || []);
     //  (plainProperty.policies || []).map((p) => ({
     //   rulesData: `${p.title}: ${p.description}`,
     // }));
