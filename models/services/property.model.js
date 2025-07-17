@@ -12,7 +12,10 @@ module.exports = (sequelize) =>
       type: DataTypes.UUID,
       allowNull: false,
     },
-
+    cuisines: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
     name: DataTypes.STRING,
     property_type: DataTypes.STRING,
     email: DataTypes.STRING,

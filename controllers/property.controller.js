@@ -304,7 +304,23 @@ exports.updateProperty = async (req, res) => {
           });
         })
       );
+      const existingCuisines = Array.isArray(property.cuisines)
+        ? property.cuisines
+        : [];
+      const newCuisines = [];
 
+      updates.rooms.forEach((room) => {
+        const cuisines = room?.mealPlanDetailsFormInfo?.cuisines || [];
+        newCuisines.push(...cuisines);
+      });
+
+      // ✅ Merge and deduplicate cuisines
+      const mergedCuisines = Array.from(
+        new Set([...existingCuisines, ...newCuisines])
+      );
+
+      // ✅ Update property cuisines now
+      await property.update({ cuisines: mergedCuisines });
       delete updates.rooms;
     }
 

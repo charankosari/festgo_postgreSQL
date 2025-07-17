@@ -106,7 +106,7 @@ export function normalizeRoomData(data) {
 
     meal_plan: mealPlanDetailsFormInfo.mealPlan || null,
     room_amenities: roomAmenities || [],
-    photos: (roomDetailsFormInfo.images || []).map((url) => ({ url, tag: "" })),
+    photos: data.photos || [],
     videos: [], // no video input yet
   };
 }
