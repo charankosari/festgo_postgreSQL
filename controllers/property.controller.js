@@ -127,7 +127,7 @@ const enrichProperties = async (properties, startDate) => {
 
   for (const p of properties) {
     const plain = p.get ? p.get({ plain: true }) : p;
-    plain.facilities = plain.amenities;
+    // plain.facilities = plain.amenities;
     // Clean up ownership_details
     delete plain.ownership_details;
     delete plain.bank_details;
@@ -152,7 +152,7 @@ const formatPropertyResponse = async (property, startDate) => {
     star_rating,
     location,
     photos,
-    facilities,
+    // facilities,
     review_count,
   } = property;
 
@@ -209,7 +209,7 @@ const formatPropertyResponse = async (property, startDate) => {
     freeCancellation,
     review_count,
     location,
-    facilities,
+    // facilities,
     imageList,
   };
 };
