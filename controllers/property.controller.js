@@ -853,6 +853,8 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       success: true,
       status: 200,
       hotelName: plainProperty.name,
+      description: plainProperty.description,
+      cuisines: plainProperty.cuisines || [],
       rating: plainProperty.star_rating || 0,
       latitude: parseFloat(plainProperty.location?.latitude),
       longitude: parseFloat(plainProperty.location?.longitude),
