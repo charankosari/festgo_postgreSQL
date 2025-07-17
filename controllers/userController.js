@@ -479,6 +479,7 @@ exports.getUserDetails = async (req, res) => {
 
     // 📌 Attach profile completion to cleanUser object
     cleanUser.profileCompletion = profileCompletion;
+    cleanUser.offers = 0;
 
     // 📌 Final response
     res.status(200).json({
@@ -559,7 +560,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           ]
         );
         cleanUser.loginHistories = loginHistories;
-
+        cleanUser.offers = 0;
         const message = "Login successful";
         return sendToken(cleanUser, 201, message, res);
       }
@@ -597,7 +598,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
       );
       cleanUser.loginHistories = loginHistories;
-
+      cleanUser.offers = 0;
       const message = "Login successful";
       return sendToken(cleanUser, 201, message, res);
     }
@@ -754,6 +755,7 @@ exports.verifyEmailToken = async (req, res) => {
       ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
     );
     cleanUser.loginHistories = loginHistories;
+    cleanUser.offers = 0;
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
@@ -823,6 +825,7 @@ exports.verifyOtp = async (req, res) => {
     ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
   );
   cleanUser.loginHistories = loginHistories;
+  cleanUser.offers = 0;
 
   const message = "Login successful";
   sendToken(cleanUser, 200, message, res);
