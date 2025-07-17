@@ -993,7 +993,7 @@ exports.createRoom = async (req, res) => {
     newStrdata[`step_${current_step}`].rooms.push(incomingRoomData);
 
     // 📌 Update property strdata
-    await property.update({ strdata: newStrdata });
+    // await property.update({ strdata: newStrdata });
 
     // 📌 Normalize room data and save to Room table
     const normalizedRoomData = normalizeRoomData(incomingRoomData);
@@ -1001,7 +1001,20 @@ exports.createRoom = async (req, res) => {
       ...normalizedRoomData,
       propertyId,
     });
+    const incomingCuisines =
+      incomingRoomData?.mealPlanDetailsFormInfo?.cuisines || [];
+    const existingCuisines = Array.isArray(property.cuisines)
+      ? property.cuisines
+      : [];
+    const mergedCuisines = Array.from(
+      new Set([...existingCuisines, ...incomingCuisines])
+    );
 
+    // 📌 Update property with new cuisines and strdata
+    await property.update({
+      cuisines: mergedCuisines,
+      strdata: newStrdata,
+    });
     res.status(201).json({
       success: true,
       message: "Room created successfully",
