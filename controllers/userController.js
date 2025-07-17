@@ -437,7 +437,7 @@ exports.getUserDetails = async (req, res) => {
         propertyBookingsCount + beachfestBookingsCount + eventsCount;
       const loginHistory = await LoginHistory.findAll({
         where: { userId: userId },
-        order: [["createdAt", "DESC"]],
+        order: [["loginTime", "DESC"]],
       });
       cleanUser.loginHistories = loginHistory;
       cleanUser.bookingsCount = bookingsCount;
