@@ -37,7 +37,7 @@ module.exports = (sequelize) => {
       pincode: { type: DataTypes.STRING, defaultValue: null },
       state: { type: DataTypes.STRING, defaultValue: null },
       referralCode: {
-        type: DataTypes.STRING(6),
+        type: DataTypes.STRING(10),
         unique: true,
       },
       billing_address: { type: DataTypes.STRING, defaultValue: null },
