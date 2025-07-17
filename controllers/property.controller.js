@@ -179,8 +179,8 @@ const formatPropertyResponse = async (property, startDate) => {
   }
   const basePrice = room.price?.base_price_for_2_adults || 0;
   const pricePerNight = roomRateEntry
-    ? roomRateEntry.price.offerBaseRate
-    : basePrice;
+    ? parseInt(roomRateEntry.price.offerBaseRate)
+    : parseInt(basePrice);
 
   // original (strikethrough) price
   const originalPrice = roomRateEntry
