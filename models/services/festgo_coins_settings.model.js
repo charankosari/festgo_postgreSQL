@@ -43,7 +43,6 @@ module.exports = (sequelize) => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: "Maximum coins that can be spent in a single transaction",
       },
       monthly_referral_limit: {
         type: DataTypes.INTEGER,
