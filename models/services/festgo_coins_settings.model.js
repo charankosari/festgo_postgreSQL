@@ -27,7 +27,6 @@ module.exports = (sequelize) => {
           "user_referral"
         ),
         allowNull: false,
-        unique: true, // Ensures there is only one settings entry per service type
       },
 
       monthly_limit_value: {
