@@ -34,7 +34,7 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: "fixed_amount",
       },
-      monthly_spending_limit_value: {
+      monthly_limit_value: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
