@@ -42,6 +42,9 @@ const city_fest_booking = require("./city_fest_booking.model")(
 const RoomRateInventory = require("./room_rate_inventory.model")(
   servicesSequelize
 );
+const festgo_coin_settings = require("./festgo_coins_settings.model")(
+  servicesSequelize
+);
 // cron
 const CronThing = require("./cron_things")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
@@ -243,6 +246,7 @@ const db = {
   CronThing,
   ContactMessage,
   RoomRateInventory,
+  festgo_coin_settings,
 };
 
 // Sync all models
