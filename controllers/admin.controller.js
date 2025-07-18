@@ -1,4 +1,4 @@
-const { Property } = require("../models/services");
+const { Property, FestgoCoinSetting } = require("../models/services");
 const { User } = require("../models/users");
 
 // ✅ Get all vendors
@@ -69,5 +69,67 @@ exports.deleteVendor = async (req, res) => {
     res.status(200).json({ message: "Vendor deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Get all Festgo Coin settings
+exports.createFestgoCoinSettings = async (req, res) => {
+  try {
+    const {
+      type,
+      spending_limit_type,
+      monthly_spending_limit_value,
+      single_transaction_limit_value,
+      monthly_referral_limit,
+    } = req.body;
+
+    if (!type) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Type is required." });
+    }
+
+    // Check if a setting already exists for the given type
+    const [setting, created] = await FestgoCoinSetting.upsert(
+      {
+        type,
+        spending_limit_type,
+        monthly_spending_limit_value,
+        single_transaction_limit_value,
+        monthly_referral_limit,
+      },
+      {
+        returning: true,
+        conflictFields: ["type"], // ensure it updates based on 'type'
+      }
+    );
+
+    res.status(created ? 201 : 200).json({
+      success: true,
+      message: created
+        ? "Setting created successfully."
+        : "Setting updated successfully.",
+      data: setting,
+    });
+  } catch (error) {
+    console.error("Error in createOrUpdateCoinSetting:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+
+// GET: Fetch all FestGo Coin Settings
+exports.getAllCoinSettings = async (req, res) => {
+  try {
+    const settings = await FestgoCoinSetting.findAll({
+      order: [["updatedAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: settings,
+    });
+  } catch (error) {
+    console.error("Error in getAllCoinSettings:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
   }
 };
