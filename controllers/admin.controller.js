@@ -77,7 +77,6 @@ exports.createFestgoCoinSettings = async (req, res) => {
   try {
     const {
       type,
-      spending_limit_type,
       monthly_spending_limit_value,
       single_transaction_limit_value,
       monthly_referral_limit,
@@ -93,7 +92,6 @@ exports.createFestgoCoinSettings = async (req, res) => {
     const [setting, created] = await FestgoCoinSetting.upsert(
       {
         type,
-        spending_limit_type,
         monthly_spending_limit_value,
         single_transaction_limit_value,
         monthly_referral_limit,
