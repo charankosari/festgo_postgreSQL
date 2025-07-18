@@ -46,7 +46,7 @@ router.post(
   "/coin-setting",
   isAuthorized,
   authorizedRoles("admin"),
-  adminController.createOrUpdateCoinSetting
+  adminController.createFestgoCoinSettings
 );
 router.get(
   "/coin-setting",
