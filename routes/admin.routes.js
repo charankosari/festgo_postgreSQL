@@ -42,4 +42,16 @@ router.delete(
   adminController.deleteVendor
 );
 
+router.post(
+  "/coin-setting",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.createOrUpdateCoinSetting
+);
+router.get(
+  "/coin-setting",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getAllCoinSettings
+);
 module.exports = router;
