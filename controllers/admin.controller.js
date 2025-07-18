@@ -81,11 +81,27 @@ exports.createFestgoCoinSettings = async (req, res) => {
       single_transaction_limit_value,
       monthly_referral_limit,
     } = req.body;
-
+    const allowedTypes = [
+      "event",
+      "property",
+      "beach_fest",
+      "city_fest",
+      "festbite",
+      "user_referral",
+    ];
     if (!type) {
       return res
         .status(400)
         .json({ success: false, message: "Type is required." });
+    }
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid type '${type}'. Allowed types are: ${allowedTypes.join(
+          ", "
+        )}`,
+      });
     }
 
     // Check if a setting already exists for the given type
