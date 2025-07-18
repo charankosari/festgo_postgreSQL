@@ -29,11 +29,7 @@ module.exports = (sequelize) => {
         allowNull: false,
         unique: true, // Ensures there is only one settings entry per service type
       },
-      spending_limit_type: {
-        type: DataTypes.ENUM("percentage", "fixed_amount"),
-        allowNull: false,
-        defaultValue: "fixed_amount",
-      },
+
       monthly_limit_value: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
