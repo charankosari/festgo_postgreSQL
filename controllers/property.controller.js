@@ -930,11 +930,11 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       rating: plainProperty.star_rating || 0,
       latitude: parseFloat(plainProperty.location?.latitude),
       longitude: parseFloat(plainProperty.location?.longitude),
-      price: {
-        amount: parseFloat(firstRoom.discounted_price || 0),
-        currency: "INR",
-        perNight: true,
-      },
+      // price: {
+      //   amount: parseFloat(firstRoom.discounted_price || 0),
+      //   currency: "INR",
+      //   perNight: true,
+      // },
       amenities: commonFacilities,
       totalReviewRate: parseFloat(totalReviewRate.toFixed(1)),
       review: reviews,
