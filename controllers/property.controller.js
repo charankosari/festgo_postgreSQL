@@ -123,7 +123,7 @@ const checkAvailableRooms = async (
   return plainProperty;
 };
 
-const enrichProperties = async (properties, startDate) => {
+const enrichProperties = async (properties, startDate, rooms, adult, child) => {
   const enriched = [];
 
   for (const p of properties) {
@@ -135,14 +135,26 @@ const enrichProperties = async (properties, startDate) => {
     delete plain.tax_details;
     delete plain.strdata;
     // Format final response
-    const formattedProperty = await formatPropertyResponse(plain, startDate);
+    const formattedProperty = await formatPropertyResponse(
+      plain,
+      startDate,
+      rooms,
+      adult,
+      child
+    );
     if (formattedProperty) enriched.push(formattedProperty);
   }
 
   return enriched;
 };
 
-const formatPropertyResponse = async (property, startDate) => {
+const formatPropertyResponse = async (
+  property,
+  startDate,
+  rooms = 1,
+  adults = 2,
+  children = 0
+) => {
   const {
     id,
     vendorId,
@@ -153,49 +165,143 @@ const formatPropertyResponse = async (property, startDate) => {
     star_rating,
     location,
     photos,
-    // facilities,
     review_count,
   } = property;
 
-  // Parse image URLs
   const imageList = Array.isArray(photos)
     ? photos.map((p) => p.imageURL || "")
     : [];
 
-  // Fetch room
-  const room = await Room.findOne({
+  const roomsList = await Room.findAll({
     where: { propertyId: id },
-    // order: [["discounted_price", "ASC"]],
   });
 
-  // If no room found, skip property
-  if (!room) return null;
-  let roomRateEntry = null;
-  if (startDate) {
-    roomRateEntry = await RoomRateInventory.findOne({
-      where: {
-        propertyId: id,
-        roomId: room.id,
-        date: startDate,
-      },
-    });
+  if (!roomsList || roomsList.length === 0) {
+    console.log("No rooms found for property:", id);
+    return null;
   }
-  const basePrice = room.price?.base_price_for_2_adults || 0;
-  const pricePerNight = roomRateEntry
-    ? parseInt(roomRateEntry.price.offerBaseRate)
-    : parseInt(basePrice);
 
-  // original (strikethrough) price
-  const originalPrice = roomRateEntry
-    ? roomRateEntry.price.base
-    : Math.round(basePrice * 1.05);
-  // Extract room details
-  // const pricePerNight = `${room.discounted_price}`;
-  // const originalPrice = `${room.original_price}`;
-  // const discount = room.discount;
-  const additionalInfo = room.additional_info || "";
-  const freeBreakfast = room.free_breakfast;
-  const freeCancellation = room.free_cancellation;
+  const totalGuests = parseInt(adults) + parseInt(children);
+  const avgGuestsPerRoom = Math.ceil(totalGuests / rooms);
+  console.log(
+    `Input ➤ Rooms: ${rooms}, Adults: ${adults}, Children: ${children}`
+  );
+  console.log(
+    "Calculated ➤ Total guests:",
+    totalGuests,
+    "Avg guests per room:",
+    avgGuestsPerRoom
+  );
+
+  // Show all room capacities
+  console.log("All rooms:");
+  roomsList.forEach((r, i) => {
+    console.log(`Room ${i + 1}:`, {
+      id: r.id,
+      max_adults: r.max_adults,
+      max_children: r.max_children,
+      price: r.price?.base_price_for_2_adults,
+    });
+  });
+
+  // Filter valid rooms
+  const validRooms = roomsList.filter((room) => {
+    const maxAdults = parseInt(room.max_adults || 0);
+    const maxChildren = parseInt(room.max_children || 0);
+    const totalCapacity = maxAdults + maxChildren;
+    return totalCapacity >= avgGuestsPerRoom;
+  });
+
+  console.log("Filtered valid rooms based on avg guest capacity:");
+  validRooms.forEach((r, i) => {
+    console.log(`Valid Room ${i + 1}:`, {
+      id: r.id,
+      max_adults: r.max_adults,
+      max_children: r.max_children,
+      price: r.price?.base_price_for_2_adults,
+    });
+  });
+
+  if (validRooms.length === 0) {
+    console.log("❌ No valid rooms for the given guest count.");
+    return null;
+  }
+
+  // Select cheapest valid room
+  let selectedRoom = null;
+  let selectedPrice = Infinity;
+  let selectedOriginal = 0;
+
+  for (const room of validRooms) {
+    let basePrice = parseInt(room.price?.base_price_for_2_adults || 0);
+    let originalPrice = Math.round(basePrice * 1.05);
+
+    if (startDate) {
+      const rate = await RoomRateInventory.findOne({
+        where: { propertyId: id, roomId: room.id, date: startDate },
+      });
+      if (rate) {
+        basePrice = parseInt(rate.price.offerBaseRate);
+        originalPrice = parseInt(rate.price.base);
+      }
+    }
+
+    if (basePrice < selectedPrice) {
+      selectedRoom = room;
+      selectedPrice = basePrice;
+      selectedOriginal = originalPrice;
+    }
+  }
+
+  if (!selectedRoom) {
+    console.log("❌ No room selected despite valid room list.");
+    return null;
+  }
+
+  console.log("✅ Selected Room:", {
+    id: selectedRoom.id,
+    base_price: selectedPrice,
+    original_price: selectedOriginal,
+    base_adults: selectedRoom.price?.base_adults,
+    extra_adult_charge: selectedRoom.price?.extra_adult_charge,
+    child_charge: selectedRoom.price?.child_charge,
+  });
+
+  // Price calculation
+  const baseAdults = parseInt(selectedRoom.price?.base_adults || 2);
+  const extraAdultChargePer = parseInt(
+    selectedRoom.price?.extra_adult_charge || 0
+  );
+  const childChargePer = parseInt(selectedRoom.price?.child_charge || 0);
+
+  const includedAdults = baseAdults * rooms;
+  const extraAdults = Math.max(0, adults - includedAdults);
+  const extraAdultCharge = extraAdults * extraAdultChargePer;
+
+  const extraChildCharge = children * childChargePer;
+
+  const pricePerNight =
+    selectedPrice * rooms + extraAdultCharge + extraChildCharge;
+  const originalPrice = selectedOriginal * rooms;
+
+  console.log("💰 Final Price Breakdown:");
+  console.log(
+    "Base price × rooms:",
+    selectedPrice,
+    "×",
+    rooms,
+    "=",
+    selectedPrice * rooms
+  );
+  console.log("Extra adults:", extraAdults, "Charge:", extraAdultCharge);
+  console.log("Extra children:", children, "Charge:", extraChildCharge);
+  console.log(
+    "➤ Final pricePerNight:",
+    pricePerNight,
+    "Original:",
+    originalPrice
+  );
+
   return {
     id,
     vendorId,
@@ -206,16 +312,15 @@ const formatPropertyResponse = async (property, startDate) => {
     star_rating,
     pricePerNight,
     originalPrice,
-    // discount,
-    additionalInfo,
-    freeBreakfast,
-    freeCancellation,
+    additionalInfo: selectedRoom.additional_info || "",
+    freeBreakfast: selectedRoom.free_breakfast,
+    freeCancellation: selectedRoom.free_cancellation,
     review_count,
     location,
-    // facilities,
     imageList,
   };
 };
+
 function updateStrdata(existingStrdata, step, newStepData) {
   const updatedStrdata = { ...existingStrdata };
   updatedStrdata[`step_${step}`] = {
@@ -330,10 +435,11 @@ exports.updateProperty = async (req, res) => {
 
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 STARTS HERE --- 🔄
     if (currentStep === 5) {
-      if (!newStrdata.step_5) newStrdata.step_5 = {};
-      newStrdata.step_5 = { ...updates }; // Store entire body
+      newStrdata.step_5 = {
+        ...(newStrdata.step_5 || {}),
+        ...updates,
+      };
 
-      // Separate image and video objects from updates
       const imageItems = [];
       const videoItems = [];
       const mediaKeys = [];
@@ -341,22 +447,20 @@ exports.updateProperty = async (req, res) => {
       for (const key in updates) {
         const item = updates[key];
         if (!isNaN(parseInt(key)) && typeof item === "object") {
-          if (item?.imageURL) {
+          if (item?.type === "image" && item?.imageURL) {
             imageItems.push(item);
             mediaKeys.push(key);
-          } else if (item?.videoURL) {
+          } else if (item?.type === "video" && item?.imageURL) {
             videoItems.push(item);
             mediaKeys.push(key);
           }
         }
       }
 
-      // Fetch all rooms to assign media
       const rooms = await Room.findAll({ where: { propertyId: id } });
       const roomMap = new Map(rooms.map((room) => [room.id, room]));
       const roomsToUpdate = new Set();
 
-      // ---------- PHOTOS ----------
       let newCoverPhoto = null;
       const newGeneralPhotos = [];
 
@@ -369,7 +473,7 @@ exports.updateProperty = async (req, res) => {
         let assigned = false;
         if (Array.isArray(item.tags)) {
           item.tags.forEach((tag) => {
-            const room = roomMap.get(tag);
+            const room = roomMap.get(tag.id);
             if (room) {
               const updated = [...(room.photos || []), item];
               room.set("photos", updated);
@@ -382,12 +486,11 @@ exports.updateProperty = async (req, res) => {
         if (!assigned) newGeneralPhotos.push(item);
       });
 
-      // ---------- VIDEOS ----------
       let newCoverVideo = null;
       const newGeneralVideos = [];
 
       videoItems.forEach((item) => {
-        if (item.coverVideo) {
+        if (item.coverPhoto) {
           newCoverVideo = item;
           return;
         }
@@ -395,7 +498,7 @@ exports.updateProperty = async (req, res) => {
         let assigned = false;
         if (Array.isArray(item.tags)) {
           item.tags.forEach((tag) => {
-            const room = roomMap.get(tag);
+            const room = roomMap.get(tag.id);
             if (room) {
               const updated = [...(room.videos || []), item];
               room.set("videos", updated);
@@ -408,7 +511,6 @@ exports.updateProperty = async (req, res) => {
         if (!assigned) newGeneralVideos.push(item);
       });
 
-      // ---------- SAVE ROOM MEDIA ----------
       if (roomsToUpdate.size > 0) {
         try {
           await Promise.all(
@@ -419,14 +521,14 @@ exports.updateProperty = async (req, res) => {
         }
       }
 
-      // ---------- UPDATE PROPERTY MEDIA ----------
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        // PHOTOS
-        let existingPhotos = (property.photos || []).filter((p) =>
-          newCoverPhoto ? !p.coverPhoto : true
-        );
+        let existingPhotos = Array.isArray(propertyInstance.photos)
+          ? propertyInstance.photos.filter((p) =>
+              newCoverPhoto ? !p.coverPhoto : true
+            )
+          : [];
         const finalPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
           ...existingPhotos,
@@ -434,10 +536,11 @@ exports.updateProperty = async (req, res) => {
         ];
         propertyInstance.set("photos", finalPhotos);
 
-        // VIDEOS
-        let existingVideos = (property.videos || []).filter((v) =>
-          newCoverVideo ? !v.coverVideo : true
-        );
+        let existingVideos = Array.isArray(propertyInstance.videos)
+          ? propertyInstance.videos.filter((v) =>
+              newCoverVideo ? !v.coverPhoto : true
+            )
+          : [];
         const finalVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...existingVideos,
@@ -450,7 +553,6 @@ exports.updateProperty = async (req, res) => {
         console.error("❌ ERROR updating property media:", error);
       }
 
-      // 🔍 Clean up processed keys
       mediaKeys.forEach((key) => delete updates[key]);
     }
 
@@ -736,7 +838,10 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     // ✅ Final enrichment and response
     const finalProperties = await enrichProperties(
       availableProperties,
-      startDate
+      startDate,
+      rooms,
+      adult,
+      child
     );
 
     return res.json({
