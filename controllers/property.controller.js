@@ -534,27 +534,19 @@ exports.updateProperty = async (req, res) => {
           ? propertyInstance.photos
           : [];
 
-        const existingPhotoMap = new Map(
-          existingPhotos.map((p) => [p.imageURL, p])
-        );
+        const mergedPhotos = [...existingPhotos, ...incomingPhotos];
 
-        const incomingPhotoMap = new Map(
-          incomingPhotos.map((p) => [p.imageURL, p])
-        );
+        const uniquePhotoMap = new Map();
+        for (const photo of mergedPhotos) {
+          if (!uniquePhotoMap.has(photo.imageURL)) {
+            uniquePhotoMap.set(photo.imageURL, photo);
+          }
+        }
 
-        const retainedPhotos = existingPhotos.filter((p) =>
-          incomingPhotoMap.has(p.imageURL)
-        );
-
-        const newPhotosToAdd = incomingPhotos.filter(
-          (p) => !existingPhotoMap.has(p.imageURL)
-        );
-
-        const finalPhotos = [...retainedPhotos, ...newPhotosToAdd];
+        const finalPhotos = Array.from(uniquePhotoMap.values());
         propertyInstance.set("photos", finalPhotos);
 
-        console.log("📸 Final photo count:", finalPhotos.length);
-        console.log("📸 Final photos:", finalPhotos);
+        console.log("📸 Final unique photos:", finalPhotos.length);
 
         // --------- VIDEOS ---------
         const incomingVideos = [
@@ -566,39 +558,23 @@ exports.updateProperty = async (req, res) => {
           ? propertyInstance.videos
           : [];
 
-        const existingVideoMap = new Map(
-          existingVideos.map((v) => [v.imageURL, v])
-        );
+        const mergedVideos = [...existingVideos, ...incomingVideos];
 
-        const incomingVideoMap = new Map(
-          incomingVideos.map((v) => [v.imageURL, v])
-        );
+        const uniqueVideoMap = new Map();
+        for (const video of mergedVideos) {
+          if (!uniqueVideoMap.has(video.imageURL)) {
+            uniqueVideoMap.set(video.imageURL, video);
+          }
+        }
 
-        const retainedVideos = existingVideos.filter((v) =>
-          incomingVideoMap.has(v.imageURL)
-        );
-
-        const newVideosToAdd = incomingVideos.filter(
-          (v) => !existingVideoMap.has(v.imageURL)
-        );
-
-        const finalVideos = [...retainedVideos, ...newVideosToAdd];
+        const finalVideos = Array.from(uniqueVideoMap.values());
         propertyInstance.set("videos", finalVideos);
 
-        console.log("🎥 Final video count:", finalVideos.length);
-        console.log("🎥 Final videos:", finalVideos);
+        console.log("🎥 Final unique videos:", finalVideos.length);
 
-        // Save only if there's any change
-        if (
-          finalPhotos.length !== existingPhotos.length ||
-          finalVideos.length !== existingVideos.length
-        ) {
-          console.log("💾 Saving updated property media...");
-          await propertyInstance.save();
-          console.log("✅ Property media saved successfully.");
-        } else {
-          console.log("🛑 Nothing to save — media unchanged.");
-        }
+        // Save the updated property
+        await propertyInstance.save();
+        console.log("✅ Property media saved successfully.");
       } catch (error) {
         console.error("❌ ERROR updating property media:", error);
       }
