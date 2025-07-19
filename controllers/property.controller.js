@@ -329,6 +329,43 @@ function updateStrdata(existingStrdata, step, newStepData) {
   };
   return updatedStrdata;
 }
+function updateMedia(existingMedia = [], newCover = null, newGeneral = []) {
+  const updated = [];
+
+  // ✅ Add existing general media
+  const existingGeneral = existingMedia.filter((m) => !m.coverPhoto);
+  updated.push(...existingGeneral);
+
+  // ✅ Handle cover media
+  if (newCover) {
+    const existingCover = existingMedia.find(
+      (m) => m.coverPhoto && m.imageURL === newCover.imageURL
+    );
+
+    // Only add if it's different
+    if (!existingCover) {
+      updated.push({ ...newCover, coverPhoto: true });
+    } else {
+      // Retain existing cover
+      const oldCover = existingMedia.find((m) => m.coverPhoto);
+      if (oldCover) updated.push(oldCover);
+    }
+  } else {
+    // No new cover, retain old one if exists
+    const oldCover = existingMedia.find((m) => m.coverPhoto);
+    if (oldCover) updated.push(oldCover);
+  }
+
+  // ✅ Add only truly new general media
+  const existingURLs = new Set(updated.map((m) => m.imageURL));
+  newGeneral.forEach((m) => {
+    if (!existingURLs.has(m.imageURL)) {
+      updated.push({ ...m, coverPhoto: false });
+    }
+  });
+
+  return updated;
+}
 
 exports.createProperty = async (req, res) => {
   try {
@@ -524,58 +561,26 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        // ---- PHOTOS ----
-        let existingPhotos = Array.isArray(propertyInstance.photos)
-          ? propertyInstance.photos
-          : [];
+        // Assuming you parsed from req.body:
+        const newCoverPhoto = req.body.coverPhoto; // { imageURL: "", coverPhoto: true }
+        const newGeneralPhotos = req.body.generalPhotos; // array of { imageURL: "" }
 
-        // Remove old cover photo **only if** a new cover photo with a *different* URL is sent
-        if (newCoverPhoto) {
-          const isNewCoverDifferent = !existingPhotos.some(
-            (p) => p.coverPhoto && p.imageURL === newCoverPhoto.imageURL
-          );
+        const newCoverVideo = req.body.coverVideo;
+        const newGeneralVideos = req.body.generalVideos;
 
-          if (isNewCoverDifferent) {
-            existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
-            existingPhotos.unshift(newCoverPhoto); // Add new one at beginning
-          }
-        }
-
-        // Avoid adding duplicate general photos
-        const existingPhotoURLs = new Set(
-          existingPhotos.map((p) => p.imageURL)
+        const finalPhotos = updateMedia(
+          propertyInstance.photos,
+          newCoverPhoto,
+          newGeneralPhotos
         );
-        const newPhotosToAdd = newGeneralPhotos.filter(
-          (p) => !existingPhotoURLs.has(p.imageURL)
+        const finalVideos = updateMedia(
+          propertyInstance.videos,
+          newCoverVideo,
+          newGeneralVideos
         );
 
-        // Final photo list = existing ones + new ones
-        propertyInstance.set("photos", [...existingPhotos, ...newPhotosToAdd]);
-
-        // ---- VIDEOS ----
-        let existingVideos = Array.isArray(propertyInstance.videos)
-          ? propertyInstance.videos
-          : [];
-
-        if (newCoverVideo) {
-          const isNewCoverDifferent = !existingVideos.some(
-            (v) => v.coverPhoto && v.imageURL === newCoverVideo.imageURL
-          );
-
-          if (isNewCoverDifferent) {
-            existingVideos = existingVideos.filter((v) => !v.coverPhoto);
-            existingVideos.unshift(newCoverVideo);
-          }
-        }
-
-        const existingVideoURLs = new Set(
-          existingVideos.map((v) => v.imageURL)
-        );
-        const newVideosToAdd = newGeneralVideos.filter(
-          (v) => !existingVideoURLs.has(v.imageURL)
-        );
-
-        propertyInstance.set("videos", [...existingVideos, ...newVideosToAdd]);
+        propertyInstance.set("photos", finalPhotos);
+        propertyInstance.set("videos", finalVideos);
 
         await propertyInstance.save();
       } catch (error) {
