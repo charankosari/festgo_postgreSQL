@@ -49,16 +49,12 @@ module.exports = (sequelize) =>
       allowNull: true,
     },
 
-    // rates: DataTypes.FLOAT,
     inventory_details: DataTypes.STRING,
 
     room_amenities: {
       type: DataTypes.JSONB,
       defaultValue: [],
-      // [{ roomAmenityId, value }]
     },
-
-    // ... inside your Room.js model definition
 
     photos: {
       type: DataTypes.JSONB, // CORRECT TYPE
@@ -69,6 +65,4 @@ module.exports = (sequelize) =>
       type: DataTypes.JSONB, // CORRECT TYPE
       defaultValue: [],
     },
-
-    // ...
   });
