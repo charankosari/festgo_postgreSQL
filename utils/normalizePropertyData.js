@@ -162,7 +162,7 @@ export function normalizePropertyRules(policies = {}) {
     rules.push(...policies.customRules);
   }
 
-  return rules;
+  return rules.map((rule) => ({ rulesData: rule }));
 }
 
 export function normalizeAmenitiesdata(rawAmenities = []) {
