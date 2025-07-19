@@ -329,6 +329,8 @@ exports.updateProperty = async (req, res) => {
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 STARTS HERE --- 🔄
 
     if (currentStep === 5) {
+      console.log("\n--- 🟢 Starting Step 5 Photo Processing ---");
+
       // First, save the raw step 5 data to strdata as-is
       if (!newStrdata.step_5) {
         newStrdata.step_5 = {};
@@ -348,18 +350,42 @@ exports.updateProperty = async (req, res) => {
           imageItems.push(updates[key]);
           imageKeys.push(key);
         }
-      } // Fetch all rooms for this property to match by ID
+      }
 
+      console.log(
+        `[1. EXTRACTION] Found ${imageItems.length} image items to process.`
+      );
+      if (imageItems.length === 0) {
+        console.log(
+          "  ⚠️  Warning: No image objects were found in the request body."
+        );
+      }
+
+      // Fetch all rooms for this property to match by ID
       const rooms = await Room.findAll({ where: { propertyId: id } });
       const roomMap = new Map(rooms.map((room) => [room.id, room]));
       const roomsToUpdate = new Set();
 
-      let newCoverPhoto = null;
-      const newGeneralPhotos = []; // 1. Categorize each new image item
+      console.log(
+        `[2. FETCH ROOMS] Found ${rooms.length} rooms for this property.`
+      );
+      console.log("   -> Available Room IDs:", Array.from(roomMap.keys()));
 
-      imageItems.forEach((item) => {
+      let newCoverPhoto = null;
+      const newGeneralPhotos = [];
+
+      console.log(
+        "[3. CATEGORIZING] Looping through images to categorize them..."
+      );
+      imageItems.forEach((item, index) => {
+        console.log(
+          `\n  Processing Image #${index + 1} with URL: ${item.imageURL}`
+        );
+        console.log(`  Tags for this image:`, item.tags);
+
         if (item.coverPhoto) {
           newCoverPhoto = item;
+          console.log(`  ✅ Identified as NEW COVER PHOTO.`);
           return;
         }
 
@@ -372,38 +398,70 @@ exports.updateProperty = async (req, res) => {
               matchedRoom.photos.push(item);
               roomsToUpdate.add(matchedRoom);
               assignedToRoom = true;
+              console.log(
+                `  ✅ Tag '${tag}' MATCHED a Room ID. Photo assigned to Room.`
+              );
             }
           });
         }
 
         if (!assignedToRoom) {
           newGeneralPhotos.push(item);
+          console.log(
+            `  -> No room match found. Classified as a GENERAL photo.`
+          );
         }
-      }); // 2. Save all rooms that have been updated with new photos
+      });
 
+      // 2. Save all rooms that have been updated with new photos
+      console.log(
+        `\n[4. SAVING ROOMS] Found ${roomsToUpdate.size} rooms to update with new photos.`
+      );
       if (roomsToUpdate.size > 0) {
-        const roomUpdatePromises = Array.from(roomsToUpdate).map((room) =>
-          room.save()
-        );
-        await Promise.all(roomUpdatePromises);
-      } // 3. Update the property's main photos array
+        try {
+          const roomUpdatePromises = Array.from(roomsToUpdate).map((room) =>
+            room.save()
+          );
+          await Promise.all(roomUpdatePromises);
+          console.log("  ✅ Successfully saved updated rooms to the database.");
+        } catch (error) {
+          console.error("  ❌ ERROR while saving rooms:", error);
+        }
+      }
 
+      // 3. Update the property's main photos array
+      console.log(
+        "\n[5. SAVING PROPERTY] Assembling final photo list for the property."
+      );
       let existingPhotos = (property.photos || []).filter((photo) =>
         newCoverPhoto ? !photo.coverPhoto : true
       );
 
+      console.log(`  Found ${existingPhotos.length} existing property photos.`);
+      console.log(`  Found ${newGeneralPhotos.length} new general photos.`);
+
       const finalPhotos = [];
       if (newCoverPhoto) {
         finalPhotos.push(newCoverPhoto);
+        console.log("  Added new cover photo to the top of the list.");
       }
       finalPhotos.push(...existingPhotos, ...newGeneralPhotos);
 
-      await property.update({ photos: finalPhotos });
+      console.log(`  Total photos to save to property: ${finalPhotos.length}.`);
+
+      try {
+        await property.update({ photos: finalPhotos });
+        console.log(
+          "  ✅ Successfully updated property photos in the database."
+        );
+      } catch (error) {
+        console.error("  ❌ ERROR while updating property photos:", error);
+      }
 
       // Clean up the processed image keys from the updates object
       imageKeys.forEach((key) => delete updates[key]);
+      console.log("\n--- 🟢 Finished Step 5 Photo Processing ---");
     }
-
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 ENDS HERE --- 🔄
 
     delete updates.current_step;
