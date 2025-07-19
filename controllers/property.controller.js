@@ -524,72 +524,63 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        // ---- PHOTOS ----
-        let existingPhotos = Array.isArray(propertyInstance.photos)
+        const existingPhotos = Array.isArray(propertyInstance.photos)
           ? propertyInstance.photos
           : [];
 
-        const existingPhotoURLs = new Set(
-          existingPhotos.map((p) => p.imageURL)
+        const existingPhotoMap = new Map(
+          existingPhotos.map((p) => [p.imageURL, p])
         );
 
-        // Filter out the existing cover photo only if new is different
-        if (newCoverPhoto) {
-          const existingCover = existingPhotos.find((p) => p.coverPhoto);
+        // Combine new cover and general photos
+        const incomingPhotos = [
+          ...(newCoverPhoto ? [newCoverPhoto] : []),
+          ...newGeneralPhotos,
+        ];
 
-          if (
-            !existingCover ||
-            existingCover.imageURL !== newCoverPhoto.imageURL
-          ) {
-            // Remove existing cover
-            existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
-            // Avoid duplicate addition
-            if (!existingPhotoURLs.has(newCoverPhoto.imageURL)) {
-              existingPhotos.unshift(newCoverPhoto);
-              existingPhotoURLs.add(newCoverPhoto.imageURL);
-            }
+        // Check for new unique images
+        let hasNewPhotos = false;
+        incomingPhotos.forEach((photo) => {
+          if (!existingPhotoMap.has(photo.imageURL)) {
+            existingPhotoMap.set(photo.imageURL, photo);
+            hasNewPhotos = true;
           }
+        });
+
+        if (hasNewPhotos) {
+          propertyInstance.set("photos", Array.from(existingPhotoMap.values()));
         }
 
-        // Add new general photos (skip duplicates)
-        const newPhotosToAdd = newGeneralPhotos.filter(
-          (p) => !existingPhotoURLs.has(p.imageURL)
-        );
-
-        propertyInstance.set("photos", [...existingPhotos, ...newPhotosToAdd]);
-
         // ---- VIDEOS ----
-        let existingVideos = Array.isArray(propertyInstance.videos)
+        const existingVideos = Array.isArray(propertyInstance.videos)
           ? propertyInstance.videos
           : [];
 
-        const existingVideoURLs = new Set(
-          existingVideos.map((v) => v.imageURL)
+        const existingVideoMap = new Map(
+          existingVideos.map((v) => [v.imageURL, v])
         );
 
-        if (newCoverVideo) {
-          const existingCover = existingVideos.find((v) => v.coverPhoto);
+        // Combine new cover and general videos
+        const incomingVideos = [
+          ...(newCoverVideo ? [newCoverVideo] : []),
+          ...newGeneralVideos,
+        ];
 
-          if (
-            !existingCover ||
-            existingCover.imageURL !== newCoverVideo.imageURL
-          ) {
-            // Remove existing cover
-            existingVideos = existingVideos.filter((v) => !v.coverPhoto);
-            if (!existingVideoURLs.has(newCoverVideo.imageURL)) {
-              existingVideos.unshift(newCoverVideo);
-              existingVideoURLs.add(newCoverVideo.imageURL);
-            }
+        let hasNewVideos = false;
+        incomingVideos.forEach((video) => {
+          if (!existingVideoMap.has(video.imageURL)) {
+            existingVideoMap.set(video.imageURL, video);
+            hasNewVideos = true;
           }
+        });
+
+        if (hasNewVideos) {
+          propertyInstance.set("videos", Array.from(existingVideoMap.values()));
         }
 
-        const newVideosToAdd = newGeneralVideos.filter(
-          (v) => !existingVideoURLs.has(v.imageURL)
-        );
-
-        propertyInstance.set("videos", [...existingVideos, ...newVideosToAdd]);
-
-        await propertyInstance.save();
+        if (hasNewPhotos || hasNewVideos) {
+          await propertyInstance.save();
+        }
       } catch (error) {
         console.error("❌ ERROR updating property media:", error);
       }
