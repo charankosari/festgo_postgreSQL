@@ -927,8 +927,8 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       description: plainProperty.description,
       cuisines: plainProperty.cuisines || [],
       rating: plainProperty.star_rating || 0,
-      latitude: parseFloat(plainProperty.location?.latitude),
-      longitude: parseFloat(plainProperty.location?.longitude),
+      latitude: parseFloat(plainProperty.location?.lat),
+      longitude: parseFloat(plainProperty.location?.lng),
 
       amenities: commonFacilities,
       totalReviewRate: parseFloat(totalReviewRate.toFixed(1)),
