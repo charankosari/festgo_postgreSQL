@@ -524,33 +524,42 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
+        // ---- PHOTOS ----
         const existingPhotos = Array.isArray(propertyInstance.photos)
           ? propertyInstance.photos
           : [];
+
+        console.log("📸 Existing photos count:", existingPhotos.length);
 
         const existingPhotoMap = new Map(
           existingPhotos.map((p) => [p.imageURL, p])
         );
 
-        // Combine new cover and general photos
         const incomingPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
           ...newGeneralPhotos,
         ];
 
-        // Check for new unique images
+        console.log("📥 Incoming photos count:", incomingPhotos.length);
+
         let hasNewPhotos =
           existingPhotos.length === 0 && incomingPhotos.length > 0;
 
         incomingPhotos.forEach((photo) => {
           if (!existingPhotoMap.has(photo.imageURL)) {
+            console.log("➕ New unique photo found:", photo.imageURL);
             existingPhotoMap.set(photo.imageURL, photo);
             hasNewPhotos = true;
+          } else {
+            console.log("✅ Duplicate photo skipped:", photo.imageURL);
           }
         });
 
         if (hasNewPhotos) {
+          console.log("✅ Updating property photos with new items...");
           propertyInstance.set("photos", Array.from(existingPhotoMap.values()));
+        } else {
+          console.log("ℹ️ No new photos to update.");
         }
 
         // ---- VIDEOS ----
@@ -558,32 +567,45 @@ exports.updateProperty = async (req, res) => {
           ? propertyInstance.videos
           : [];
 
+        console.log("🎥 Existing videos count:", existingVideos.length);
+
         const existingVideoMap = new Map(
           existingVideos.map((v) => [v.imageURL, v])
         );
 
-        // Combine new cover and general videos
         const incomingVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...newGeneralVideos,
         ];
+
+        console.log("📥 Incoming videos count:", incomingVideos.length);
 
         let hasNewVideos =
           existingVideos.length === 0 && incomingVideos.length > 0;
 
         incomingVideos.forEach((video) => {
           if (!existingVideoMap.has(video.imageURL)) {
+            console.log("➕ New unique video found:", video.imageURL);
             existingVideoMap.set(video.imageURL, video);
             hasNewVideos = true;
+          } else {
+            console.log("✅ Duplicate video skipped:", video.imageURL);
           }
         });
 
         if (hasNewVideos) {
+          console.log("✅ Updating property videos with new items...");
           propertyInstance.set("videos", Array.from(existingVideoMap.values()));
+        } else {
+          console.log("ℹ️ No new videos to update.");
         }
 
         if (hasNewPhotos || hasNewVideos) {
+          console.log("💾 Saving updated property media...");
           await propertyInstance.save();
+          console.log("✅ Property media saved successfully.");
+        } else {
+          console.log("🛑 Nothing to save — media unchanged.");
         }
       } catch (error) {
         console.error("❌ ERROR updating property media:", error);
