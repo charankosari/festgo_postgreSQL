@@ -525,19 +525,29 @@ exports.updateProperty = async (req, res) => {
         const propertyInstance = await Property.findByPk(id);
 
         let existingPhotos = Array.isArray(propertyInstance.photos)
-          ? propertyInstance.photos.filter((p) =>
-              newCoverPhoto ? !p.coverPhoto : true
-            )
+          ? propertyInstance.photos
           : [];
-        const existingImageURLs = new Set(
-          existingPhotos.map((p) => p.imageURL)
+
+        const newImageURLs = new Set(
+          [...newGeneralPhotos, newCoverPhoto]
+            .filter(Boolean)
+            .map((i) => i.imageURL)
         );
+
+        // Remove old coverPhoto only if new one is provided
+        if (newCoverPhoto) {
+          existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
+        }
+
+        // Remove items that are being replaced
+        const filteredExisting = existingPhotos.filter(
+          (p) => !newImageURLs.has(p.imageURL)
+        );
+
         const finalPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...existingPhotos,
-          ...newGeneralPhotos.filter(
-            (item) => !existingImageURLs.has(item.imageURL)
-          ),
+          ...filteredExisting,
+          ...newGeneralPhotos,
         ];
 
         propertyInstance.set("photos", finalPhotos);
@@ -547,9 +557,11 @@ exports.updateProperty = async (req, res) => {
               newCoverVideo ? !v.coverPhoto : true
             )
           : [];
+
         const existingVideoURLs = new Set(
           existingVideos.map((v) => v.imageURL)
         );
+
         const finalVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...existingVideos,
