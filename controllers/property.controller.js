@@ -34,51 +34,43 @@ const checkAvailableRooms = async (
   startDate,
   finalDate
 ) => {
-  const totalPeople = (parseInt(adult) || 0) + (parseInt(child) || 0);
+  const totalAdults = parseInt(adult) || 0;
+  const totalChildren = parseInt(child) || 0;
+  const numRooms = parseInt(requestedRooms) || 1;
+  const totalPeople = totalAdults + totalChildren;
+
+  // If no guests, we can't determine suitability. This can be adjusted if needed.
+  if (totalPeople === 0) return null;
+
+  // ✅ Calculate average guests per room to find suitable room types
+  const avgGuestsPerRoom = Math.ceil(totalPeople / numRooms);
+  const avgAdultsPerRoom = Math.ceil(totalAdults / numRooms);
 
   const where = {
     propertyId: property.id,
-    [Op.and]: [],
+    [Op.and]: [
+      // Find rooms that can hold the average number of guests
+      Sequelize.literal(
+        `(sleeping_arrangement->>'max_occupancy')::int >= ${avgGuestsPerRoom}`
+      ),
+      // And the average number of adults
+      Sequelize.literal(
+        `(sleeping_arrangement->>'max_adults')::int >= ${avgAdultsPerRoom}`
+      ),
+    ],
   };
 
-  if (totalPeople > 0) {
-    where[Op.and].push(
-      Sequelize.literal(
-        `(sleeping_arrangement->>'max_occupancy')::int >= ${totalPeople}`
-      )
-    );
-  }
-  if (adult) {
-    where[Op.and].push(
-      Sequelize.literal(
-        `(sleeping_arrangement->>'max_adults')::int >= ${parseInt(adult)}`
-      )
-    );
-  }
-  if (child) {
-    where[Op.and].push(
-      Sequelize.literal(
-        `(sleeping_arrangement->>'max_children')::int >= ${parseInt(child)}`
-      )
-    );
-  }
+  const candidateRooms = await Room.findAll({ where });
+  if (!candidateRooms.length) return null;
 
-  if (!where[Op.and].length) delete where[Op.and];
+  const roomIds = candidateRooms.map((room) => room.id);
 
-  const roomsInProperty = await Room.findAll({ where });
-
-  if (!roomsInProperty.length) return null;
-
-  const roomIds = roomsInProperty.map((room) => room.id);
-
-  // Fetch booked counts
+  // Fetch all bookings that overlap with the requested dates
   const bookedRooms = await RoomBookedDate.findAll({
     where: {
       roomId: { [Op.in]: roomIds },
-      [Op.and]: [
-        { checkIn: { [Op.lt]: finalDate } },
-        { checkOut: { [Op.gt]: startDate } },
-      ],
+      checkIn: { [Op.lt]: finalDate },
+      checkOut: { [Op.gt]: startDate },
       status: { [Op.in]: ["pending", "confirmed"] },
     },
   });
@@ -89,7 +81,7 @@ const checkAvailableRooms = async (
       (bookedRoomCounts[booking.roomId] || 0) + 1;
   });
 
-  // Fetch room rates for the given date in one query
+  // Fetch room rates/inventory for the specific check-in date
   const roomRates = await RoomRateInventory.findAll({
     where: {
       propertyId: property.id,
@@ -103,28 +95,37 @@ const checkAvailableRooms = async (
     roomRateMap[rate.roomId] = rate.inventory;
   });
 
-  // Calculate availability
-  const availableRooms = roomsInProperty.filter((room) => {
+  // ✅ Check if ANY suitable room type has enough inventory for the request
+  let hasSufficientInventory = false;
+  for (const room of candidateRooms) {
     const alreadyBooked = bookedRoomCounts[room.id] || 0;
-    const totalAvailable =
+    const totalInventory =
       roomRateMap[room.id] !== undefined
         ? roomRateMap[room.id]
-        : room.number_of_rooms;
+        : room.number_of_rooms; // Fallback to base inventory
 
-    const remainingAvailable = totalAvailable - alreadyBooked;
+    const remainingAvailable = totalInventory - alreadyBooked;
 
-    return remainingAvailable >= (isNaN(requestedRooms) ? 1 : requestedRooms);
-  });
+    if (remainingAvailable >= numRooms) {
+      hasSufficientInventory = true;
+      break; // Found a valid option, no need to check further
+    }
+  }
 
-  if (!availableRooms.length) return null;
+  if (!hasSufficientInventory) return null;
 
+  // If checks pass, return the property to be enriched later
   const plainProperty = property.get({ plain: true });
   delete plainProperty.ownership_details;
-
   return plainProperty;
 };
-
-const enrichProperties = async (properties, startDate, rooms, adult, child) => {
+const enrichProperties = async (
+  properties,
+  startDate,
+  requestedRooms,
+  adults,
+  children
+) => {
   const enriched = [];
 
   for (const p of properties) {
@@ -139,23 +140,26 @@ const enrichProperties = async (properties, startDate, rooms, adult, child) => {
     const formattedProperty = await formatPropertyResponse(
       plain,
       startDate,
-      rooms,
-      adult,
-      child
+      requestedRooms,
+      adults,
+      children
     );
     if (formattedProperty) enriched.push(formattedProperty);
   }
 
   return enriched;
 };
-
 const formatPropertyResponse = async (
   property,
   startDate,
-  rooms = 1,
-  adults = 2,
-  children = 0
+  requestedRooms,
+  adults,
+  children
 ) => {
+  // Immediately parse inputs to guarantee they are numbers for all calculations
+  const numRooms = parseInt(requestedRooms) || 1;
+  const numAdults = parseInt(adults) || 0;
+  const numChildren = parseInt(children) || 0;
   const {
     id,
     vendorId,
@@ -169,139 +173,78 @@ const formatPropertyResponse = async (
     review_count,
   } = property;
 
-  const imageList = Array.isArray(photos)
-    ? photos.map((p) => p.imageURL || "")
-    : [];
-
-  const roomsList = await Room.findAll({
-    where: { propertyId: id },
-  });
-
-  if (!roomsList || roomsList.length === 0) {
-    console.log("No rooms found for property:", id);
+  const allRoomsInProperty = await Room.findAll({ where: { propertyId: id } });
+  if (!allRoomsInProperty || allRoomsInProperty.length === 0) {
     return null;
   }
 
-  const totalGuests = parseInt(adults) + parseInt(children);
-  const avgGuestsPerRoom = Math.ceil(totalGuests / rooms);
-  console.log(
-    `Input ➤ Rooms: ${rooms}, Adults: ${adults}, Children: ${children}`
-  );
-  console.log(
-    "Calculated ➤ Total guests:",
-    totalGuests,
-    "Avg guests per room:",
-    avgGuestsPerRoom
-  );
+  // Filter for rooms that can accommodate the request
+  const totalGuests = numAdults + numChildren;
+  const avgGuestsPerRoom = Math.ceil(totalGuests / numRooms);
+  const avgAdultsPerRoom = Math.ceil(numAdults / numRooms);
 
-  // Show all room capacities
-  console.log("All rooms:");
-  roomsList.forEach((r, i) => {
-    console.log(`Room ${i + 1}:`, {
-      id: r.id,
-      max_adults: r.max_adults,
-      max_children: r.max_children,
-      price: r.price?.base_price_for_2_adults,
-    });
-  });
-
-  // Filter valid rooms
-  const validRooms = roomsList.filter((room) => {
-    const maxAdults = parseInt(room.max_adults || 0);
-    const maxChildren = parseInt(room.max_children || 0);
-    const totalCapacity = maxAdults + maxChildren;
-    return totalCapacity >= avgGuestsPerRoom;
-  });
-
-  console.log("Filtered valid rooms based on avg guest capacity:");
-  validRooms.forEach((r, i) => {
-    console.log(`Valid Room ${i + 1}:`, {
-      id: r.id,
-      max_adults: r.max_adults,
-      max_children: r.max_children,
-      price: r.price?.base_price_for_2_adults,
-    });
+  const validRooms = allRoomsInProperty.filter((room) => {
+    const maxAdults = parseInt(room.sleeping_arrangement?.max_adults || 0);
+    const maxOccupancy = parseInt(
+      room.sleeping_arrangement?.max_occupancy || 0
+    );
+    return maxOccupancy >= avgGuestsPerRoom && maxAdults >= avgAdultsPerRoom;
   });
 
   if (validRooms.length === 0) {
-    console.log("❌ No valid rooms for the given guest count.");
     return null;
   }
 
-  // Select cheapest valid room
-  let selectedRoom = null;
-  let selectedPrice = Infinity;
-  let selectedOriginal = 0;
+  let bestFinalPrice = Infinity;
+  let bestOriginalPrice = 0;
+  let bestRoom = null;
 
   for (const room of validRooms) {
-    let basePrice = parseInt(room.price?.base_price_for_2_adults || 0);
-    let originalPrice = Math.round(basePrice * 1.05);
+    // Step 1: Get the base price for THIS specific room
+    let currentBasePrice = parseInt(room.price?.base_price_for_2_adults || 0);
+    let currentOriginalPrice = Math.round(currentBasePrice * 1.05);
 
     if (startDate) {
       const rate = await RoomRateInventory.findOne({
         where: { propertyId: id, roomId: room.id, date: startDate },
       });
-      if (rate) {
-        basePrice = parseInt(rate.price.offerBaseRate);
-        originalPrice = parseInt(rate.price.base);
+      if (rate?.price) {
+        currentBasePrice = parseInt(rate.price.offerBaseRate);
+        currentOriginalPrice = parseInt(rate.price.base);
       }
     }
 
-    if (basePrice < selectedPrice) {
-      selectedRoom = room;
-      selectedPrice = basePrice;
-      selectedOriginal = originalPrice;
+    const baseAdultsPerRoom = parseInt(room.price?.base_adults || 2);
+    const extraAdultChargePerRoom = parseInt(
+      room.price?.extra_adult_charge || 0
+    );
+    const childChargePerChild = parseInt(room.price?.child_charge || 0);
+
+    // Step 2: Calculate the FULL price for THIS room
+    const totalBaseForRooms = currentBasePrice * numRooms;
+    const totalIncludedAdults = baseAdultsPerRoom * numRooms;
+    const extraAdultsCount = Math.max(0, numAdults - totalIncludedAdults);
+
+    const totalExtraAdultCharge = extraAdultsCount * extraAdultChargePerRoom;
+    const totalChildCharge = numChildren * childChargePerChild;
+
+    const finalPriceForThisRoom =
+      totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
+
+    // Step 3: If this room offers a better final price, it becomes the new best option
+    if (finalPriceForThisRoom < bestFinalPrice) {
+      bestFinalPrice = finalPriceForThisRoom;
+      bestOriginalPrice =
+        currentOriginalPrice * numRooms +
+        totalExtraAdultCharge +
+        totalChildCharge;
+      bestRoom = room;
     }
   }
 
-  if (!selectedRoom) {
-    console.log("❌ No room selected despite valid room list.");
-    return null;
-  }
-
-  console.log("✅ Selected Room:", {
-    id: selectedRoom.id,
-    base_price: selectedPrice,
-    original_price: selectedOriginal,
-    base_adults: selectedRoom.price?.base_adults,
-    extra_adult_charge: selectedRoom.price?.extra_adult_charge,
-    child_charge: selectedRoom.price?.child_charge,
-  });
-
-  // Price calculation
-  const baseAdults = parseInt(selectedRoom.price?.base_adults || 2);
-  const extraAdultChargePer = parseInt(
-    selectedRoom.price?.extra_adult_charge || 0
-  );
-  const childChargePer = parseInt(selectedRoom.price?.child_charge || 0);
-
-  const includedAdults = baseAdults * rooms;
-  const extraAdults = Math.max(0, adults - includedAdults);
-  const extraAdultCharge = extraAdults * extraAdultChargePer;
-
-  const extraChildCharge = children * childChargePer;
-
-  const pricePerNight =
-    selectedPrice * rooms + extraAdultCharge + extraChildCharge;
-  const originalPrice = selectedOriginal * rooms;
-
-  console.log("💰 Final Price Breakdown:");
-  console.log(
-    "Base price × rooms:",
-    selectedPrice,
-    "×",
-    rooms,
-    "=",
-    selectedPrice * rooms
-  );
-  console.log("Extra adults:", extraAdults, "Charge:", extraAdultCharge);
-  console.log("Extra children:", children, "Charge:", extraChildCharge);
-  console.log(
-    "➤ Final pricePerNight:",
-    pricePerNight,
-    "Original:",
-    originalPrice
-  );
+  const imageList = Array.isArray(photos)
+    ? photos.map((p) => p.imageURL || "")
+    : [];
 
   return {
     id,
@@ -311,17 +254,16 @@ const formatPropertyResponse = async (
     email,
     description,
     star_rating,
-    pricePerNight,
-    originalPrice,
-    additionalInfo: selectedRoom.additional_info || "",
-    freeBreakfast: selectedRoom.free_breakfast,
-    freeCancellation: selectedRoom.free_cancellation,
+    pricePerNight: bestFinalPrice,
+    originalPrice: bestOriginalPrice,
+    additionalInfo: bestRoom.additional_info || "",
+    freeBreakfast: bestRoom.free_breakfast,
+    freeCancellation: bestRoom.free_cancellation,
     review_count,
     location,
     imageList,
   };
 };
-
 function updateStrdata(existingStrdata, step, newStepData) {
   const updatedStrdata = { ...existingStrdata };
   updatedStrdata[`step_${step}`] = {
@@ -531,7 +473,6 @@ exports.updateProperty = async (req, res) => {
         }
       }
       finalPhotos = Array.from(uniquePhotoMap.values());
-      console.log("📸 Final unique photos to be saved:", finalPhotos.length);
 
       // --------- MERGE & DEDUPLICATE VIDEOS ---------
       const incomingVideos = [
@@ -546,7 +487,6 @@ exports.updateProperty = async (req, res) => {
         }
       }
       finalVideos = Array.from(uniqueVideoMap.values());
-      console.log("🎥 Final unique videos to be saved:", finalVideos.length);
 
       mediaKeys.forEach((key) => delete updates[key]);
     }
@@ -835,9 +775,9 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     const finalProperties = await enrichProperties(
       availableProperties,
       startDate,
-      rooms,
-      adult,
-      child
+      requestedRooms,
+      adults,
+      children
     );
 
     return res.json({
