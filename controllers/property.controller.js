@@ -539,7 +539,9 @@ exports.updateProperty = async (req, res) => {
         ];
 
         // Check for new unique images
-        let hasNewPhotos = false;
+        let hasNewPhotos =
+          existingPhotos.length === 0 && incomingPhotos.length > 0;
+
         incomingPhotos.forEach((photo) => {
           if (!existingPhotoMap.has(photo.imageURL)) {
             existingPhotoMap.set(photo.imageURL, photo);
@@ -566,7 +568,9 @@ exports.updateProperty = async (req, res) => {
           ...newGeneralVideos,
         ];
 
-        let hasNewVideos = false;
+        let hasNewVideos =
+          existingVideos.length === 0 && incomingVideos.length > 0;
+
         incomingVideos.forEach((video) => {
           if (!existingVideoMap.has(video.imageURL)) {
             existingVideoMap.set(video.imageURL, video);
