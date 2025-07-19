@@ -326,73 +326,85 @@ exports.updateProperty = async (req, res) => {
       delete updates.rooms;
     }
 
-    // 3️⃣ Special case: Step 5 — process mediaItems
-    if (
-      currentStep === 5 &&
-      updates.mediaItems &&
-      Array.isArray(updates.mediaItems)
-    ) {
-      const mediaItems = updates.mediaItems;
+    // 🔄 --- REVISED CODE BLOCK FOR STEP 5 STARTS HERE --- 🔄
 
-      // Fetch all rooms for this property
+    if (currentStep === 5) {
+      // First, save the raw step 5 data to strdata as-is
+      if (!newStrdata.step_5) {
+        newStrdata.step_5 = {};
+      }
+      newStrdata.step_5 = { ...updates }; // Store the entire request body
+
+      // Extract image items from the main 'updates' object
+      const imageItems = [];
+      const imageKeys = [];
+      for (const key in updates) {
+        // An image item is an object with an imageURL, and its key is a number
+        if (
+          !isNaN(parseInt(key)) &&
+          typeof updates[key] === "object" &&
+          updates[key]?.imageURL
+        ) {
+          imageItems.push(updates[key]);
+          imageKeys.push(key);
+        }
+      } // Fetch all rooms for this property to match by ID
+
       const rooms = await Room.findAll({ where: { propertyId: id } });
+      const roomMap = new Map(rooms.map((room) => [room.id, room]));
+      const roomsToUpdate = new Set();
 
-      // Map of room names for quick lookup
-      const roomNameMap = {};
-      rooms.forEach((room) => {
-        roomNameMap[room.room_name] = room;
-      });
+      let newCoverPhoto = null;
+      const newGeneralPhotos = []; // 1. Categorize each new image item
 
-      // Arrays to hold property photos and room photo updates
-      const propertyPhotos = property.photos || [];
-      const newPropertyPhotos = [];
-      const roomMediaPromises = [];
+      imageItems.forEach((item) => {
+        if (item.coverPhoto) {
+          newCoverPhoto = item;
+          return;
+        }
 
-      // Process each mediaItem
-      mediaItems.forEach((item) => {
         let assignedToRoom = false;
-
         if (item.tags && Array.isArray(item.tags)) {
-          // Check if any tag matches a room_name
           item.tags.forEach((tag) => {
-            const matchedRoom = roomNameMap[tag];
-            if (matchedRoom) {
-              // Found matching room — push image to room's photos
-              let roomPhotos = matchedRoom.photos || [];
-              roomPhotos.push(item);
-              matchedRoom.photos = roomPhotos;
-
-              // Queue room save
-              roomMediaPromises.push(matchedRoom.save());
-
+            if (roomMap.has(tag)) {
+              const matchedRoom = roomMap.get(tag);
+              matchedRoom.photos = matchedRoom.photos || [];
+              matchedRoom.photos.push(item);
+              roomsToUpdate.add(matchedRoom);
               assignedToRoom = true;
             }
           });
         }
 
-        // If not assigned to any room, add to property photos
         if (!assignedToRoom) {
-          newPropertyPhotos.push(item);
+          newGeneralPhotos.push(item);
         }
-      });
+      }); // 2. Save all rooms that have been updated with new photos
 
-      // Save all room photo updates
-      await Promise.all(roomMediaPromises);
+      if (roomsToUpdate.size > 0) {
+        const roomUpdatePromises = Array.from(roomsToUpdate).map((room) =>
+          room.save()
+        );
+        await Promise.all(roomUpdatePromises);
+      } // 3. Update the property's main photos array
 
-      // Update property photos (append newPropertyPhotos)
-      await property.update({
-        photos: [...propertyPhotos, ...newPropertyPhotos],
-      });
+      let existingPhotos = (property.photos || []).filter((photo) =>
+        newCoverPhoto ? !photo.coverPhoto : true
+      );
 
-      // ✅ Save strdata.step_5 as-is from req.body
-      if (!newStrdata[`step_5`]) {
-        newStrdata[`step_5`] = {};
+      const finalPhotos = [];
+      if (newCoverPhoto) {
+        finalPhotos.push(newCoverPhoto);
       }
-      newStrdata[`step_5`] = { ...updates }; // the whole req.body contents
+      finalPhotos.push(...existingPhotos, ...newGeneralPhotos);
 
-      // Remove mediaItems from updates so it's not processed further
-      delete updates.mediaItems;
+      await property.update({ photos: finalPhotos });
+
+      // Clean up the processed image keys from the updates object
+      imageKeys.forEach((key) => delete updates[key]);
     }
+
+    // 🔄 --- REVISED CODE BLOCK FOR STEP 5 ENDS HERE --- 🔄
 
     delete updates.current_step;
 
