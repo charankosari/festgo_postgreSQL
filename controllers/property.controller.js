@@ -396,6 +396,8 @@ exports.updateProperty = async (req, res) => {
 
     // Load existing strdata
     let newStrdata = property.strdata || {};
+    let finalPhotos = property.photos || [];
+    let finalVideos = property.videos || [];
 
     // 1️⃣ Merge incoming updates into existing step's strdata
     newStrdata = updateStrdata(newStrdata, currentStep, updates);
@@ -447,7 +449,11 @@ exports.updateProperty = async (req, res) => {
 
       for (const key in updates) {
         const item = updates[key];
-        if (!isNaN(parseInt(key)) && typeof item === "object") {
+        if (
+          !isNaN(parseInt(key)) &&
+          typeof item === "object" &&
+          item !== null
+        ) {
           if (item?.type === "image" && item?.imageURL) {
             imageItems.push(item);
             mediaKeys.push(key);
@@ -470,20 +476,18 @@ exports.updateProperty = async (req, res) => {
           newCoverPhoto = item;
           return;
         }
-
         let assigned = false;
         if (Array.isArray(item.tags)) {
           item.tags.forEach((tag) => {
             const room = roomMap.get(tag.id);
             if (room) {
-              const updated = [...(room.photos || []), item];
-              room.set("photos", updated);
+              const updatedPhotos = [...(room.photos || []), item];
+              room.set("photos", updatedPhotos);
               roomsToUpdate.add(room);
               assigned = true;
             }
           });
         }
-
         if (!assigned) newGeneralPhotos.push(item);
       });
 
@@ -495,94 +499,57 @@ exports.updateProperty = async (req, res) => {
           newCoverVideo = item;
           return;
         }
-
         let assigned = false;
         if (Array.isArray(item.tags)) {
           item.tags.forEach((tag) => {
             const room = roomMap.get(tag.id);
             if (room) {
-              const updated = [...(room.videos || []), item];
-              room.set("videos", updated);
+              const updatedVideos = [...(room.videos || []), item];
+              room.set("videos", updatedVideos);
               roomsToUpdate.add(room);
               assigned = true;
             }
           });
         }
-
         if (!assigned) newGeneralVideos.push(item);
       });
 
       if (roomsToUpdate.size > 0) {
-        try {
-          await Promise.all(
-            Array.from(roomsToUpdate).map((room) => room.save())
-          );
-        } catch (error) {
-          console.error("❌ ERROR saving room media:", error);
-        }
+        await Promise.all(Array.from(roomsToUpdate).map((room) => room.save()));
       }
 
-      try {
-        const propertyInstance = property;
-
-        // --------- PHOTOS ---------
-        const incomingPhotos = [
-          ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...(Array.isArray(newGeneralPhotos) ? newGeneralPhotos : []),
-        ];
-
-        const existingPhotos = Array.isArray(propertyInstance.photos)
-          ? propertyInstance.photos
-          : [];
-
-        const mergedPhotos = [...existingPhotos, ...incomingPhotos];
-
-        const uniquePhotoMap = new Map();
-        for (const photo of mergedPhotos) {
-          if (!uniquePhotoMap.has(photo.imageURL)) {
-            uniquePhotoMap.set(photo.imageURL, photo);
-          }
+      // --------- MERGE & DEDUPLICATE PHOTOS ---------
+      const incomingPhotos = [
+        ...(newCoverPhoto ? [newCoverPhoto] : []),
+        ...newGeneralPhotos,
+      ];
+      const mergedPhotos = [...(property.photos || []), ...incomingPhotos];
+      const uniquePhotoMap = new Map();
+      for (const photo of mergedPhotos) {
+        if (photo?.imageURL && !uniquePhotoMap.has(photo.imageURL)) {
+          uniquePhotoMap.set(photo.imageURL, photo);
         }
-
-        const finalPhotos = Array.from(uniquePhotoMap.values());
-        propertyInstance.set("photos", finalPhotos);
-
-        console.log("📸 Final unique photos:", finalPhotos.length);
-
-        // --------- VIDEOS ---------
-        const incomingVideos = [
-          ...(newCoverVideo ? [newCoverVideo] : []),
-          ...(Array.isArray(newGeneralVideos) ? newGeneralVideos : []),
-        ];
-
-        const existingVideos = Array.isArray(propertyInstance.videos)
-          ? propertyInstance.videos
-          : [];
-
-        const mergedVideos = [...existingVideos, ...incomingVideos];
-
-        const uniqueVideoMap = new Map();
-        for (const video of mergedVideos) {
-          if (!uniqueVideoMap.has(video.imageURL)) {
-            uniqueVideoMap.set(video.imageURL, video);
-          }
-        }
-
-        const finalVideos = Array.from(uniqueVideoMap.values());
-        propertyInstance.set("videos", finalVideos);
-
-        console.log("🎥 Final unique videos:", finalVideos.length);
-
-        // Save the updated property
-        await propertyInstance.save();
-        console.log("✅ Property media saved successfully.");
-      } catch (error) {
-        console.error("❌ ERROR updating property media:", error);
       }
+      finalPhotos = Array.from(uniquePhotoMap.values());
+      console.log("📸 Final unique photos to be saved:", finalPhotos.length);
+
+      // --------- MERGE & DEDUPLICATE VIDEOS ---------
+      const incomingVideos = [
+        ...(newCoverVideo ? [newCoverVideo] : []),
+        ...newGeneralVideos,
+      ];
+      const mergedVideos = [...(property.videos || []), ...incomingVideos];
+      const uniqueVideoMap = new Map();
+      for (const video of mergedVideos) {
+        if (video?.imageURL && !uniqueVideoMap.has(video.imageURL)) {
+          uniqueVideoMap.set(video.imageURL, video);
+        }
+      }
+      finalVideos = Array.from(uniqueVideoMap.values());
+      console.log("🎥 Final unique videos to be saved:", finalVideos.length);
 
       mediaKeys.forEach((key) => delete updates[key]);
     }
-
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 ENDS HERE --- 🔄
 
     delete updates.current_step;
@@ -613,6 +580,8 @@ exports.updateProperty = async (req, res) => {
       status,
       in_progress,
       is_completed,
+      photos: finalPhotos, // ✅ Save the final, correct photos array
+      videos: finalVideos, // ✅ Save the final, correct videos array
       strdata: newStrdata,
     });
 
