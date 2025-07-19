@@ -165,3 +165,60 @@ export function normalizePropertyRules(policies = {}) {
 
   return rules;
 }
+
+export function normalizeAmenitiesdata(rawAmenities = []) {
+  // Return early if there are no amenities to process
+  if (!rawAmenities || rawAmenities.length === 0) {
+    return { amenities: [] };
+  }
+
+  const groupedAmenities = {};
+
+  // 1. Filter out unselected amenities and iterate through the selected ones
+  rawAmenities
+    .filter((amenity) => amenity.is_selected === "true")
+    .forEach((amenity) => {
+      const { amenity_name, category, value, selected_sub_attributes } =
+        amenity;
+
+      // 2. Format the display name with its value and sub-attributes
+      let details = "";
+      const mainValue = Array.isArray(value) ? value.join(", ") : value;
+      const subAttribute =
+        selected_sub_attributes?.sub_attribute_1 ||
+        selected_sub_attributes?.sub_attribute_2 ||
+        "";
+
+      if (mainValue && subAttribute) {
+        details = `${mainValue} (${subAttribute})`;
+      } else if (mainValue) {
+        details = mainValue;
+      } else if (subAttribute) {
+        details = `(${subAttribute})`;
+      }
+
+      const formattedName = details
+        ? `${amenity_name}: ${details}`
+        : amenity_name;
+
+      const newItem = {
+        name: formattedName,
+        selected: true, // All items processed here are selected by definition
+      };
+
+      // 3. Group the formatted item by its category
+      if (!groupedAmenities[category]) {
+        groupedAmenities[category] = [];
+      }
+      groupedAmenities[category].push(newItem);
+    });
+
+  // 4. Convert the grouped object into the final required array format
+  const result = Object.keys(groupedAmenities).map((category) => ({
+    category,
+    items: groupedAmenities[category],
+  }));
+
+  // Wrap the result in an 'amenities' object as per the desired output
+  return { amenities: result };
+}

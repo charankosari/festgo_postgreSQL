@@ -14,6 +14,7 @@ const {
   normalizePropertyData,
   normalizeRoomData,
   normalizePropertyRules,
+  normalizeAmenitiesdata,
 } = require("../utils/normalizePropertyData");
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
@@ -818,9 +819,9 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
 
     // Property rules (policies)
     const propertyRules = normalizePropertyRules(plainProperty.policies || []);
-    //  (plainProperty.policies || []).map((p) => ({
-    //   rulesData: `${p.title}: ${p.description}`,
-    // }));
+    const commonFacilities = normalizeAmenitiesdata(
+      plainProperty.amenities || []
+    ).amenities;
 
     // Fetch all rooms for this property, with room amenities
     const rooms = await Room.findAll({
@@ -863,7 +864,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
         currency: "INR",
         perNight: true,
       },
-      commonFacilities: plainProperty.amenities,
+      amenities: commonFacilities,
       totalReviewRate: parseFloat(totalReviewRate.toFixed(1)),
       review: reviews,
       propertyRules,
