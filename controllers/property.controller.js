@@ -528,35 +528,29 @@ exports.updateProperty = async (req, res) => {
         const existingPhotos = Array.isArray(propertyInstance.photos)
           ? propertyInstance.photos
           : [];
-
-        console.log("📸 Existing photos count:", existingPhotos.length);
-
-        const existingPhotoMap = new Map(
-          existingPhotos.map((p) => [p.imageURL, p])
-        );
+        const existingPhotoSet = new Set(existingPhotos.map((p) => p.imageURL));
 
         const incomingPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
           ...(Array.isArray(newGeneralPhotos) ? newGeneralPhotos : []),
         ];
 
+        console.log("📸 Existing photos count:", existingPhotos.length);
         console.log("📥 Incoming photos count:", incomingPhotos.length);
 
-        let hasNewPhotos = false;
+        const newUniquePhotos = incomingPhotos.filter(
+          (photo) => !existingPhotoSet.has(photo.imageURL)
+        );
+        newUniquePhotos.forEach((photo) =>
+          console.log("➕ New unique photo found:", photo.imageURL)
+        );
 
-        incomingPhotos.forEach((photo) => {
-          if (!existingPhotoMap.has(photo.imageURL)) {
-            console.log("➕ New unique photo found:", photo.imageURL);
-            existingPhotoMap.set(photo.imageURL, photo);
-            hasNewPhotos = true;
-          } else {
-            console.log("✅ Duplicate photo skipped:", photo.imageURL);
-          }
-        });
+        const hasNewPhotos = newUniquePhotos.length > 0;
 
         if (hasNewPhotos) {
+          const updatedPhotos = [...existingPhotos, ...newUniquePhotos];
+          propertyInstance.set("photos", updatedPhotos);
           console.log("✅ Updating property photos with new items...");
-          propertyInstance.set("photos", Array.from(existingPhotoMap.values()));
         } else {
           console.log("ℹ️ No new photos to update.");
         }
@@ -565,35 +559,29 @@ exports.updateProperty = async (req, res) => {
         const existingVideos = Array.isArray(propertyInstance.videos)
           ? propertyInstance.videos
           : [];
-
-        console.log("🎥 Existing videos count:", existingVideos.length);
-
-        const existingVideoMap = new Map(
-          existingVideos.map((v) => [v.imageURL, v])
-        );
+        const existingVideoSet = new Set(existingVideos.map((v) => v.imageURL));
 
         const incomingVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...(Array.isArray(newGeneralVideos) ? newGeneralVideos : []),
         ];
 
+        console.log("🎥 Existing videos count:", existingVideos.length);
         console.log("📥 Incoming videos count:", incomingVideos.length);
 
-        let hasNewVideos = false;
+        const newUniqueVideos = incomingVideos.filter(
+          (video) => !existingVideoSet.has(video.imageURL)
+        );
+        newUniqueVideos.forEach((video) =>
+          console.log("➕ New unique video found:", video.imageURL)
+        );
 
-        incomingVideos.forEach((video) => {
-          if (!existingVideoMap.has(video.imageURL)) {
-            console.log("➕ New unique video found:", video.imageURL);
-            existingVideoMap.set(video.imageURL, video);
-            hasNewVideos = true;
-          } else {
-            console.log("✅ Duplicate video skipped:", video.imageURL);
-          }
-        });
+        const hasNewVideos = newUniqueVideos.length > 0;
 
         if (hasNewVideos) {
+          const updatedVideos = [...existingVideos, ...newUniqueVideos];
+          propertyInstance.set("videos", updatedVideos);
           console.log("✅ Updating property videos with new items...");
-          propertyInstance.set("videos", Array.from(existingVideoMap.values()));
         } else {
           console.log("ℹ️ No new videos to update.");
         }
