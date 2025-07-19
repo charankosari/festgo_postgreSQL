@@ -874,7 +874,13 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
     const commonFacilities = normalizeAmenitiesdata(
       plainProperty.amenities || []
     ).amenities;
+    const propertyImages = Array.isArray(plainProperty.photos)
+      ? plainProperty.photos.map((p) => p.imageURL || "")
+      : [];
 
+    const propertyVideos = Array.isArray(plainProperty.videos)
+      ? plainProperty.videos.map((v) => v.videoURL || "")
+      : [];
     // Fetch rooms
     const rooms = await Room.findAll({
       where: { propertyId },
@@ -886,10 +892,13 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       const imageList = Array.isArray(room.photos)
         ? room.photos.map((p) => p.imageURL || "")
         : [];
-
+      const videoList = Array.isArray(room.videos)
+        ? room.videos.map((v) => v.videoURL || "")
+        : [];
       return {
         ...room,
         photos: imageList,
+        videos: videoList,
       };
     });
 
@@ -931,6 +940,8 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       review: reviews,
       propertyRules,
       rooms: formattedRooms,
+      photos: propertyImages,
+      videos: propertyVideos,
     };
 
     return res.json(response);
