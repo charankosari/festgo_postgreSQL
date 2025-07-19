@@ -537,13 +537,12 @@ exports.updateProperty = async (req, res) => {
 
         const incomingPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...newGeneralPhotos,
+          ...(Array.isArray(newGeneralPhotos) ? newGeneralPhotos : []),
         ];
 
         console.log("📥 Incoming photos count:", incomingPhotos.length);
 
-        let hasNewPhotos =
-          existingPhotos.length === 0 && incomingPhotos.length > 0;
+        let hasNewPhotos = false;
 
         incomingPhotos.forEach((photo) => {
           if (!existingPhotoMap.has(photo.imageURL)) {
@@ -575,13 +574,12 @@ exports.updateProperty = async (req, res) => {
 
         const incomingVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
-          ...newGeneralVideos,
+          ...(Array.isArray(newGeneralVideos) ? newGeneralVideos : []),
         ];
 
         console.log("📥 Incoming videos count:", incomingVideos.length);
 
-        let hasNewVideos =
-          existingVideos.length === 0 && incomingVideos.length > 0;
+        let hasNewVideos = false;
 
         incomingVideos.forEach((video) => {
           if (!existingVideoMap.has(video.imageURL)) {
