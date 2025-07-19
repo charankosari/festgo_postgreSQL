@@ -524,40 +524,55 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        const combined = [
-          ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...newGeneralPhotos,
-        ];
+        // -------------------- PHOTOS --------------------
+        let existingPhotos = Array.isArray(propertyInstance.photos)
+          ? propertyInstance.photos
+          : [];
 
-        const combinedImageURLs = new Set(combined.map((i) => i.imageURL));
+        if (newCoverPhoto) {
+          existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
+        }
 
-        // Keep existing photos not already in the new set
-        const filteredExisting = existingPhotos.filter(
-          (p) => !combinedImageURLs.has(p.imageURL)
+        const existingPhotoURLs = new Set(
+          existingPhotos.map((p) => p.imageURL)
+        );
+        const newUniquePhotos = newGeneralPhotos.filter(
+          (item) => !existingPhotoURLs.has(item.imageURL)
         );
 
-        // Final list merges without duplicating
-        const finalPhotos = [...filteredExisting, ...combined];
+        const finalPhotos = [
+          ...(newCoverPhoto ? [newCoverPhoto] : []),
+          ...existingPhotos,
+          ...newUniquePhotos,
+        ];
 
         propertyInstance.set("photos", finalPhotos);
 
-        const combinedVideos = [
+        // -------------------- VIDEOS --------------------
+        let existingVideos = Array.isArray(propertyInstance.videos)
+          ? propertyInstance.videos
+          : [];
+
+        if (newCoverVideo) {
+          existingVideos = existingVideos.filter((v) => !v.coverPhoto);
+        }
+
+        const existingVideoURLs = new Set(
+          existingVideos.map((v) => v.imageURL)
+        );
+        const newUniqueVideos = newGeneralVideos.filter(
+          (item) => !existingVideoURLs.has(item.imageURL)
+        );
+
+        const finalVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
-          ...newGeneralVideos,
+          ...existingVideos,
+          ...newUniqueVideos,
         ];
-
-        const combinedVideoURLs = new Set(
-          combinedVideos.map((i) => i.imageURL)
-        );
-
-        const filteredExistingVideos = existingVideos.filter(
-          (v) => !combinedVideoURLs.has(v.imageURL)
-        );
-
-        const finalVideos = [...filteredExistingVideos, ...combinedVideos];
 
         propertyInstance.set("videos", finalVideos);
 
+        // Save everything
         await propertyInstance.save();
       } catch (error) {
         console.error("❌ ERROR updating property media:", error);
