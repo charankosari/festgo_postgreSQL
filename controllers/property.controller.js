@@ -329,105 +329,131 @@ exports.updateProperty = async (req, res) => {
     }
 
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 STARTS HERE --- 🔄
-
     if (currentStep === 5) {
-      // First, save the raw step 5 data to strdata as-is
-      if (!newStrdata.step_5) {
-        newStrdata.step_5 = {};
-      }
-      newStrdata.step_5 = { ...updates }; // Store the entire request body
+      if (!newStrdata.step_5) newStrdata.step_5 = {};
+      newStrdata.step_5 = { ...updates }; // Store entire body
 
-      // Extract image items from the main 'updates' object
+      // Separate image and video objects from updates
       const imageItems = [];
-      const imageKeys = [];
+      const videoItems = [];
+      const mediaKeys = [];
+
       for (const key in updates) {
-        // An image item is an object with an imageURL, and its key is a number
-        if (
-          !isNaN(parseInt(key)) &&
-          typeof updates[key] === "object" &&
-          updates[key]?.imageURL
-        ) {
-          imageItems.push(updates[key]);
-          imageKeys.push(key);
+        const item = updates[key];
+        if (!isNaN(parseInt(key)) && typeof item === "object") {
+          if (item?.imageURL) {
+            imageItems.push(item);
+            mediaKeys.push(key);
+          } else if (item?.videoURL) {
+            videoItems.push(item);
+            mediaKeys.push(key);
+          }
         }
       }
 
-      if (imageItems.length === 0) {
-        console.log(
-          "  ⚠️  Warning: No image objects were found in the request body."
-        );
-      }
-
-      // Fetch all rooms for this property to match by ID
+      // Fetch all rooms to assign media
       const rooms = await Room.findAll({ where: { propertyId: id } });
       const roomMap = new Map(rooms.map((room) => [room.id, room]));
       const roomsToUpdate = new Set();
 
+      // ---------- PHOTOS ----------
       let newCoverPhoto = null;
       const newGeneralPhotos = [];
 
-      imageItems.forEach((item, index) => {
+      imageItems.forEach((item) => {
         if (item.coverPhoto) {
           newCoverPhoto = item;
           return;
         }
 
-        let assignedToRoom = false;
-        if (item.tags && Array.isArray(item.tags)) {
+        let assigned = false;
+        if (Array.isArray(item.tags)) {
           item.tags.forEach((tag) => {
-            if (roomMap.has(tag)) {
-              const matchedRoom = roomMap.get(tag);
-              const photos = matchedRoom.photos || [];
-              const updatedPhotos = [...photos, item];
-              matchedRoom.set("photos", updatedPhotos); // Ensure Sequelize tracks this
-              roomsToUpdate.add(matchedRoom);
-              assignedToRoom = true;
+            const room = roomMap.get(tag);
+            if (room) {
+              const updated = [...(room.photos || []), item];
+              room.set("photos", updated);
+              roomsToUpdate.add(room);
+              assigned = true;
             }
           });
         }
 
-        if (!assignedToRoom) {
-          newGeneralPhotos.push(item);
-        }
+        if (!assigned) newGeneralPhotos.push(item);
       });
 
-      // 2. Save all rooms that have been updated with new photos
+      // ---------- VIDEOS ----------
+      let newCoverVideo = null;
+      const newGeneralVideos = [];
 
+      videoItems.forEach((item) => {
+        if (item.coverVideo) {
+          newCoverVideo = item;
+          return;
+        }
+
+        let assigned = false;
+        if (Array.isArray(item.tags)) {
+          item.tags.forEach((tag) => {
+            const room = roomMap.get(tag);
+            if (room) {
+              const updated = [...(room.videos || []), item];
+              room.set("videos", updated);
+              roomsToUpdate.add(room);
+              assigned = true;
+            }
+          });
+        }
+
+        if (!assigned) newGeneralVideos.push(item);
+      });
+
+      // ---------- SAVE ROOM MEDIA ----------
       if (roomsToUpdate.size > 0) {
         try {
           await Promise.all(
-            Array.from(roomsToUpdate).map(async (room) => {
-              await room.save();
-            })
+            Array.from(roomsToUpdate).map((room) => room.save())
           );
         } catch (error) {
-          console.error("  ❌ ERROR while saving rooms:", error);
+          console.error("❌ ERROR saving room media:", error);
         }
       }
 
-      // 3. Update the property's main photos array
-
-      let existingPhotos = (property.photos || []).filter((photo) =>
-        newCoverPhoto ? !photo.coverPhoto : true
-      );
-
-      const finalPhotos = [];
-      if (newCoverPhoto) {
-        finalPhotos.push(newCoverPhoto);
-      }
-      finalPhotos.push(...existingPhotos, ...newGeneralPhotos);
-
+      // ---------- UPDATE PROPERTY MEDIA ----------
       try {
         const propertyInstance = await Property.findByPk(id);
+
+        // PHOTOS
+        let existingPhotos = (property.photos || []).filter((p) =>
+          newCoverPhoto ? !p.coverPhoto : true
+        );
+        const finalPhotos = [
+          ...(newCoverPhoto ? [newCoverPhoto] : []),
+          ...existingPhotos,
+          ...newGeneralPhotos,
+        ];
         propertyInstance.set("photos", finalPhotos);
+
+        // VIDEOS
+        let existingVideos = (property.videos || []).filter((v) =>
+          newCoverVideo ? !v.coverVideo : true
+        );
+        const finalVideos = [
+          ...(newCoverVideo ? [newCoverVideo] : []),
+          ...existingVideos,
+          ...newGeneralVideos,
+        ];
+        propertyInstance.set("videos", finalVideos);
+
         await propertyInstance.save();
       } catch (error) {
-        console.error("  ❌ ERROR while updating property photos:", error);
+        console.error("❌ ERROR updating property media:", error);
       }
 
-      // Clean up the processed image keys from the updates object
-      imageKeys.forEach((key) => delete updates[key]);
+      // 🔍 Clean up processed keys
+      mediaKeys.forEach((key) => delete updates[key]);
     }
+
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 ENDS HERE --- 🔄
 
     delete updates.current_step;
@@ -833,9 +859,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
     }
 
     // Fetch property
-    const property = await Property.findOne({
-      where: { id: propertyId },
-    });
+    const property = await Property.findOne({ where: { id: propertyId } });
 
     if (!property) {
       return res
@@ -845,23 +869,33 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
 
     const plainProperty = property.get({ plain: true });
 
-    // Property rules (policies)
+    // Normalize property rules and amenities
     const propertyRules = normalizePropertyRules(plainProperty.policies || []);
     const commonFacilities = normalizeAmenitiesdata(
       plainProperty.amenities || []
     ).amenities;
 
-    // Fetch all rooms for this property, with room amenities
+    // Fetch rooms
     const rooms = await Room.findAll({
-      where: { propertyId: propertyId },
+      where: { propertyId },
       include: [{ model: room_amenity, as: "roomAmenities" }],
     });
 
-    const formattedRooms = rooms.map((r) => r.get({ plain: true }));
+    const formattedRooms = rooms.map((r) => {
+      const room = r.get({ plain: true });
+      const imageList = Array.isArray(room.photos)
+        ? room.photos.map((p) => p.imageURL || "")
+        : [];
 
-    // Fetch reviews
+      return {
+        ...room,
+        photos: imageList,
+      };
+    });
+
+    // Reviews
     const reviewRecords = await review.findAll({
-      where: { propertyId: propertyId },
+      where: { propertyId },
     });
 
     const totalReviewRate = reviewRecords.length
@@ -875,7 +909,7 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       rating: parseFloat(r.rating),
     }));
 
-    // Final response
+    // Prepare final response
     const firstRoom = formattedRooms[0] || {};
 
     const response = {
