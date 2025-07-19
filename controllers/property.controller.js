@@ -158,7 +158,9 @@ const formatPropertyResponse = async (property, startDate) => {
   } = property;
 
   // Parse image URLs
-  const imageList = photos ? photos.map((p) => JSON.parse(p).url) : [];
+  const imageList = Array.isArray(photos)
+    ? photos.map((p) => p.imageURL || "")
+    : [];
 
   // Fetch room
   const room = await Room.findOne({
