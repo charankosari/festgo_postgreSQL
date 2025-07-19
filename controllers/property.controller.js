@@ -329,8 +329,6 @@ exports.updateProperty = async (req, res) => {
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 STARTS HERE --- 🔄
 
     if (currentStep === 5) {
-      console.log("\n--- 🟢 Starting Step 5 Photo Processing ---");
-
       // First, save the raw step 5 data to strdata as-is
       if (!newStrdata.step_5) {
         newStrdata.step_5 = {};
@@ -352,9 +350,6 @@ exports.updateProperty = async (req, res) => {
         }
       }
 
-      console.log(
-        `[1. EXTRACTION] Found ${imageItems.length} image items to process.`
-      );
       if (imageItems.length === 0) {
         console.log(
           "  ⚠️  Warning: No image objects were found in the request body."
@@ -366,26 +361,12 @@ exports.updateProperty = async (req, res) => {
       const roomMap = new Map(rooms.map((room) => [room.id, room]));
       const roomsToUpdate = new Set();
 
-      console.log(
-        `[2. FETCH ROOMS] Found ${rooms.length} rooms for this property.`
-      );
-      console.log("   -> Available Room IDs:", Array.from(roomMap.keys()));
-
       let newCoverPhoto = null;
       const newGeneralPhotos = [];
 
-      console.log(
-        "[3. CATEGORIZING] Looping through images to categorize them..."
-      );
       imageItems.forEach((item, index) => {
-        console.log(
-          `\n  Processing Image #${index + 1} with URL: ${item.imageURL}`
-        );
-        console.log(`  Tags for this image:`, item.tags);
-
         if (item.coverPhoto) {
           newCoverPhoto = item;
-          console.log(`  ✅ Identified as NEW COVER PHOTO.`);
           return;
         }
 
@@ -399,80 +380,51 @@ exports.updateProperty = async (req, res) => {
               matchedRoom.set("photos", updatedPhotos); // Ensure Sequelize tracks this
               roomsToUpdate.add(matchedRoom);
               assignedToRoom = true;
-              console.log(
-                `  ✅ Tag '${tag}' MATCHED a Room ID. Photo assigned to Room.`
-              );
             }
           });
         }
 
         if (!assignedToRoom) {
           newGeneralPhotos.push(item);
-          console.log(
-            `  -> No room match found. Classified as a GENERAL photo.`
-          );
         }
       });
 
       // 2. Save all rooms that have been updated with new photos
-      console.log(
-        `\n[4. SAVING ROOMS] Found ${roomsToUpdate.size} rooms to update with new photos.`
-      );
+
       if (roomsToUpdate.size > 0) {
         try {
           await Promise.all(
             Array.from(roomsToUpdate).map(async (room) => {
               await room.save();
-              console.log(
-                "✅ Room updated:",
-                room.id,
-                room.photos.length,
-                "photos saved."
-              );
             })
           );
-
-          console.log("  ✅ Successfully saved updated rooms to the database.");
         } catch (error) {
           console.error("  ❌ ERROR while saving rooms:", error);
         }
       }
 
       // 3. Update the property's main photos array
-      console.log(
-        "\n[5. SAVING PROPERTY] Assembling final photo list for the property."
-      );
+
       let existingPhotos = (property.photos || []).filter((photo) =>
         newCoverPhoto ? !photo.coverPhoto : true
       );
 
-      console.log(`  Found ${existingPhotos.length} existing property photos.`);
-      console.log(`  Found ${newGeneralPhotos.length} new general photos.`);
-
       const finalPhotos = [];
       if (newCoverPhoto) {
         finalPhotos.push(newCoverPhoto);
-        console.log("  Added new cover photo to the top of the list.");
       }
       finalPhotos.push(...existingPhotos, ...newGeneralPhotos);
-
-      console.log(`  Total photos to save to property: ${finalPhotos.length}.`);
 
       try {
         const propertyInstance = await Property.findByPk(id);
         propertyInstance.set("photos", finalPhotos);
         await propertyInstance.save();
-        console.log(
-          "✅ Saved property photos to fresh instance:",
-          propertyInstance.photos.length
-        );
       } catch (error) {
         console.error("  ❌ ERROR while updating property photos:", error);
       }
 
       // Clean up the processed image keys from the updates object
       imageKeys.forEach((key) => delete updates[key]);
-      console.log("\n--- 🟢 Finished Step 5 Photo Processing ---");
     }
     // 🔄 --- REVISED CODE BLOCK FOR STEP 5 ENDS HERE --- 🔄
 
@@ -645,10 +597,6 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       };
 
       const nearbyProperties = await Property.findAll({ where: whereNearby });
-      console.log(
-        "Nearby properties:",
-        nearbyProperties.map((p) => p.id)
-      );
 
       const finalProperties = await enrichProperties(nearbyProperties, null);
 
@@ -678,10 +626,6 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       };
 
       const nearbyProperties = await Property.findAll({ where: whereNearby });
-      console.log(
-        "Nearby properties:",
-        nearbyProperties.map((p) => p.id)
-      );
 
       for (const property of nearbyProperties) {
         const available = await checkAvailableRooms(
