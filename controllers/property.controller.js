@@ -523,6 +523,7 @@ exports.updateProperty = async (req, res) => {
 
       try {
         const propertyInstance = await Property.findByPk(id);
+
         // --------- PHOTOS ---------
         const incomingPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
@@ -533,24 +534,22 @@ exports.updateProperty = async (req, res) => {
           ? propertyInstance.photos
           : [];
 
-        const incomingPhotoURLs = new Set(
-          incomingPhotos.map((p) => p.imageURL)
+        const existingPhotoMap = new Map(
+          existingPhotos.map((p) => [p.imageURL, p])
         );
 
-        // 1. Retain exact matches from existing
+        const incomingPhotoMap = new Map(
+          incomingPhotos.map((p) => [p.imageURL, p])
+        );
+
         const retainedPhotos = existingPhotos.filter((p) =>
-          incomingPhotoURLs.has(p.imageURL)
+          incomingPhotoMap.has(p.imageURL)
         );
 
-        // 2. Add only truly new incoming ones (not in retained list)
-        const retainedPhotoURLs = new Set(
-          retainedPhotos.map((p) => p.imageURL)
-        );
         const newPhotosToAdd = incomingPhotos.filter(
-          (p) => !retainedPhotoURLs.has(p.imageURL)
+          (p) => !existingPhotoMap.has(p.imageURL)
         );
 
-        // 3. Final updated array
         const finalPhotos = [...retainedPhotos, ...newPhotosToAdd];
         propertyInstance.set("photos", finalPhotos);
 
@@ -567,31 +566,33 @@ exports.updateProperty = async (req, res) => {
           ? propertyInstance.videos
           : [];
 
-        const incomingVideoURLs = new Set(
-          incomingVideos.map((v) => v.imageURL)
+        const existingVideoMap = new Map(
+          existingVideos.map((v) => [v.imageURL, v])
         );
 
-        // 1. Retain exact matches from existing
+        const incomingVideoMap = new Map(
+          incomingVideos.map((v) => [v.imageURL, v])
+        );
+
         const retainedVideos = existingVideos.filter((v) =>
-          incomingVideoURLs.has(v.imageURL)
+          incomingVideoMap.has(v.imageURL)
         );
 
-        // 2. Add only truly new incoming ones
-        const retainedVideoURLs = new Set(
-          retainedVideos.map((v) => v.imageURL)
-        );
         const newVideosToAdd = incomingVideos.filter(
-          (v) => !retainedVideoURLs.has(v.imageURL)
+          (v) => !existingVideoMap.has(v.imageURL)
         );
 
-        // 3. Final updated array
         const finalVideos = [...retainedVideos, ...newVideosToAdd];
         propertyInstance.set("videos", finalVideos);
 
         console.log("🎥 Final video count:", finalVideos.length);
         console.log("🎥 Final videos:", finalVideos);
 
-        if (hasNewPhotos || hasNewVideos) {
+        // Save only if there's any change
+        if (
+          finalPhotos.length !== existingPhotos.length ||
+          finalVideos.length !== existingVideos.length
+        ) {
           console.log("💾 Saving updated property media...");
           await propertyInstance.save();
           console.log("✅ Property media saved successfully.");
