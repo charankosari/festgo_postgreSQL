@@ -394,8 +394,9 @@ exports.updateProperty = async (req, res) => {
           item.tags.forEach((tag) => {
             if (roomMap.has(tag)) {
               const matchedRoom = roomMap.get(tag);
-              matchedRoom.photos = matchedRoom.photos || [];
-              matchedRoom.photos.push(item);
+              const photos = matchedRoom.photos || [];
+              const updatedPhotos = [...photos, item];
+              matchedRoom.set("photos", updatedPhotos); // Ensure Sequelize tracks this
               roomsToUpdate.add(matchedRoom);
               assignedToRoom = true;
               console.log(
@@ -419,10 +420,18 @@ exports.updateProperty = async (req, res) => {
       );
       if (roomsToUpdate.size > 0) {
         try {
-          const roomUpdatePromises = Array.from(roomsToUpdate).map((room) =>
-            room.save()
+          await Promise.all(
+            Array.from(roomsToUpdate).map(async (room) => {
+              await room.save();
+              console.log(
+                "✅ Room updated:",
+                room.id,
+                room.photos.length,
+                "photos saved."
+              );
+            })
           );
-          await Promise.all(roomUpdatePromises);
+
           console.log("  ✅ Successfully saved updated rooms to the database.");
         } catch (error) {
           console.error("  ❌ ERROR while saving rooms:", error);
@@ -450,7 +459,9 @@ exports.updateProperty = async (req, res) => {
       console.log(`  Total photos to save to property: ${finalPhotos.length}.`);
 
       try {
-        await property.update({ photos: finalPhotos });
+        property.set("photos", finalPhotos);
+        await property.save();
+
         console.log(
           "  ✅ Successfully updated property photos in the database."
         );
