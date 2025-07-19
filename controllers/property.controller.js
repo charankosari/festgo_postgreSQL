@@ -523,68 +523,73 @@ exports.updateProperty = async (req, res) => {
 
       try {
         const propertyInstance = await Property.findByPk(id);
-
-        // ---- PHOTOS ----
-        const existingPhotos = Array.isArray(propertyInstance.photos)
-          ? propertyInstance.photos
-          : [];
-        const existingPhotoSet = new Set(existingPhotos.map((p) => p.imageURL));
-
+        // --------- PHOTOS ---------
         const incomingPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
           ...(Array.isArray(newGeneralPhotos) ? newGeneralPhotos : []),
         ];
 
-        console.log("📸 Existing photos count:", existingPhotos.length);
-        console.log("📥 Incoming photos count:", incomingPhotos.length);
-
-        const newUniquePhotos = incomingPhotos.filter(
-          (photo) => !existingPhotoSet.has(photo.imageURL)
-        );
-        newUniquePhotos.forEach((photo) =>
-          console.log("➕ New unique photo found:", photo.imageURL)
-        );
-
-        const hasNewPhotos = newUniquePhotos.length > 0;
-
-        if (hasNewPhotos) {
-          const updatedPhotos = [...existingPhotos, ...newUniquePhotos];
-          propertyInstance.set("photos", updatedPhotos);
-          console.log("✅ Updating property photos with new items...");
-        } else {
-          console.log("ℹ️ No new photos to update.");
-        }
-
-        // ---- VIDEOS ----
-        const existingVideos = Array.isArray(propertyInstance.videos)
-          ? propertyInstance.videos
+        const existingPhotos = Array.isArray(propertyInstance.photos)
+          ? propertyInstance.photos
           : [];
-        const existingVideoSet = new Set(existingVideos.map((v) => v.imageURL));
 
+        const incomingPhotoURLs = new Set(
+          incomingPhotos.map((p) => p.imageURL)
+        );
+
+        // 1. Retain exact matches from existing
+        const retainedPhotos = existingPhotos.filter((p) =>
+          incomingPhotoURLs.has(p.imageURL)
+        );
+
+        // 2. Add only truly new incoming ones (not in retained list)
+        const retainedPhotoURLs = new Set(
+          retainedPhotos.map((p) => p.imageURL)
+        );
+        const newPhotosToAdd = incomingPhotos.filter(
+          (p) => !retainedPhotoURLs.has(p.imageURL)
+        );
+
+        // 3. Final updated array
+        const finalPhotos = [...retainedPhotos, ...newPhotosToAdd];
+        propertyInstance.set("photos", finalPhotos);
+
+        console.log("📸 Final photo count:", finalPhotos.length);
+        console.log("📸 Final photos:", finalPhotos);
+
+        // --------- VIDEOS ---------
         const incomingVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...(Array.isArray(newGeneralVideos) ? newGeneralVideos : []),
         ];
 
-        console.log("🎥 Existing videos count:", existingVideos.length);
-        console.log("📥 Incoming videos count:", incomingVideos.length);
+        const existingVideos = Array.isArray(propertyInstance.videos)
+          ? propertyInstance.videos
+          : [];
 
-        const newUniqueVideos = incomingVideos.filter(
-          (video) => !existingVideoSet.has(video.imageURL)
-        );
-        newUniqueVideos.forEach((video) =>
-          console.log("➕ New unique video found:", video.imageURL)
+        const incomingVideoURLs = new Set(
+          incomingVideos.map((v) => v.imageURL)
         );
 
-        const hasNewVideos = newUniqueVideos.length > 0;
+        // 1. Retain exact matches from existing
+        const retainedVideos = existingVideos.filter((v) =>
+          incomingVideoURLs.has(v.imageURL)
+        );
 
-        if (hasNewVideos) {
-          const updatedVideos = [...existingVideos, ...newUniqueVideos];
-          propertyInstance.set("videos", updatedVideos);
-          console.log("✅ Updating property videos with new items...");
-        } else {
-          console.log("ℹ️ No new videos to update.");
-        }
+        // 2. Add only truly new incoming ones
+        const retainedVideoURLs = new Set(
+          retainedVideos.map((v) => v.imageURL)
+        );
+        const newVideosToAdd = incomingVideos.filter(
+          (v) => !retainedVideoURLs.has(v.imageURL)
+        );
+
+        // 3. Final updated array
+        const finalVideos = [...retainedVideos, ...newVideosToAdd];
+        propertyInstance.set("videos", finalVideos);
+
+        console.log("🎥 Final video count:", finalVideos.length);
+        console.log("🎥 Final videos:", finalVideos);
 
         if (hasNewPhotos || hasNewVideos) {
           console.log("💾 Saving updated property media...");
