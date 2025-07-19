@@ -524,51 +524,37 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        let existingPhotos = Array.isArray(propertyInstance.photos)
-          ? propertyInstance.photos
-          : [];
-
-        const newImageURLs = new Set(
-          [...newGeneralPhotos, newCoverPhoto]
-            .filter(Boolean)
-            .map((i) => i.imageURL)
-        );
-
-        // Remove old coverPhoto only if new one is provided
-        if (newCoverPhoto) {
-          existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
-        }
-
-        // Remove items that are being replaced
-        const filteredExisting = existingPhotos.filter(
-          (p) => !newImageURLs.has(p.imageURL)
-        );
-
-        const finalPhotos = [
+        const combined = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...filteredExisting,
           ...newGeneralPhotos,
         ];
 
-        propertyInstance.set("photos", finalPhotos);
+        const combinedImageURLs = new Set(combined.map((i) => i.imageURL));
 
-        let existingVideos = Array.isArray(propertyInstance.videos)
-          ? propertyInstance.videos.filter((v) =>
-              newCoverVideo ? !v.coverPhoto : true
-            )
-          : [];
-
-        const existingVideoURLs = new Set(
-          existingVideos.map((v) => v.imageURL)
+        // Keep existing photos not already in the new set
+        const filteredExisting = existingPhotos.filter(
+          (p) => !combinedImageURLs.has(p.imageURL)
         );
 
-        const finalVideos = [
+        // Final list merges without duplicating
+        const finalPhotos = [...filteredExisting, ...combined];
+
+        propertyInstance.set("photos", finalPhotos);
+
+        const combinedVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
-          ...existingVideos,
-          ...newGeneralVideos.filter(
-            (item) => !existingVideoURLs.has(item.imageURL)
-          ),
+          ...newGeneralVideos,
         ];
+
+        const combinedVideoURLs = new Set(
+          combinedVideos.map((i) => i.imageURL)
+        );
+
+        const filteredExistingVideos = existingVideos.filter(
+          (v) => !combinedVideoURLs.has(v.imageURL)
+        );
+
+        const finalVideos = [...filteredExistingVideos, ...combinedVideos];
 
         propertyInstance.set("videos", finalVideos);
 
