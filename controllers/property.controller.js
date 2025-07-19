@@ -524,55 +524,59 @@ exports.updateProperty = async (req, res) => {
       try {
         const propertyInstance = await Property.findByPk(id);
 
-        // -------------------- PHOTOS --------------------
+        // ---- PHOTOS ----
         let existingPhotos = Array.isArray(propertyInstance.photos)
           ? propertyInstance.photos
           : [];
 
+        // Remove old cover photo **only if** a new cover photo with a *different* URL is sent
         if (newCoverPhoto) {
-          existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
+          const isNewCoverDifferent = !existingPhotos.some(
+            (p) => p.coverPhoto && p.imageURL === newCoverPhoto.imageURL
+          );
+
+          if (isNewCoverDifferent) {
+            existingPhotos = existingPhotos.filter((p) => !p.coverPhoto);
+            existingPhotos.unshift(newCoverPhoto); // Add new one at beginning
+          }
         }
 
+        // Avoid adding duplicate general photos
         const existingPhotoURLs = new Set(
           existingPhotos.map((p) => p.imageURL)
         );
-        const newUniquePhotos = newGeneralPhotos.filter(
-          (item) => !existingPhotoURLs.has(item.imageURL)
+        const newPhotosToAdd = newGeneralPhotos.filter(
+          (p) => !existingPhotoURLs.has(p.imageURL)
         );
 
-        const finalPhotos = [
-          ...(newCoverPhoto ? [newCoverPhoto] : []),
-          ...existingPhotos,
-          ...newUniquePhotos,
-        ];
+        // Final photo list = existing ones + new ones
+        propertyInstance.set("photos", [...existingPhotos, ...newPhotosToAdd]);
 
-        propertyInstance.set("photos", finalPhotos);
-
-        // -------------------- VIDEOS --------------------
+        // ---- VIDEOS ----
         let existingVideos = Array.isArray(propertyInstance.videos)
           ? propertyInstance.videos
           : [];
 
         if (newCoverVideo) {
-          existingVideos = existingVideos.filter((v) => !v.coverPhoto);
+          const isNewCoverDifferent = !existingVideos.some(
+            (v) => v.coverPhoto && v.imageURL === newCoverVideo.imageURL
+          );
+
+          if (isNewCoverDifferent) {
+            existingVideos = existingVideos.filter((v) => !v.coverPhoto);
+            existingVideos.unshift(newCoverVideo);
+          }
         }
 
         const existingVideoURLs = new Set(
           existingVideos.map((v) => v.imageURL)
         );
-        const newUniqueVideos = newGeneralVideos.filter(
-          (item) => !existingVideoURLs.has(item.imageURL)
+        const newVideosToAdd = newGeneralVideos.filter(
+          (v) => !existingVideoURLs.has(v.imageURL)
         );
 
-        const finalVideos = [
-          ...(newCoverVideo ? [newCoverVideo] : []),
-          ...existingVideos,
-          ...newUniqueVideos,
-        ];
+        propertyInstance.set("videos", [...existingVideos, ...newVideosToAdd]);
 
-        propertyInstance.set("videos", finalVideos);
-
-        // Save everything
         await propertyInstance.save();
       } catch (error) {
         console.error("❌ ERROR updating property media:", error);
