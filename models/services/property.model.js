@@ -69,12 +69,12 @@ module.exports = (sequelize) =>
       defaultValue: false,
     },
     photos: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSONB, // Correct type for an array of objects
       defaultValue: [],
     },
 
     videos: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSONB, // Correct type for an array of objects
       defaultValue: [],
     },
 
