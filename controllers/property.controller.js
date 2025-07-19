@@ -529,11 +529,17 @@ exports.updateProperty = async (req, res) => {
               newCoverPhoto ? !p.coverPhoto : true
             )
           : [];
+        const existingImageURLs = new Set(
+          existingPhotos.map((p) => p.imageURL)
+        );
         const finalPhotos = [
           ...(newCoverPhoto ? [newCoverPhoto] : []),
           ...existingPhotos,
-          ...newGeneralPhotos,
+          ...newGeneralPhotos.filter(
+            (item) => !existingImageURLs.has(item.imageURL)
+          ),
         ];
+
         propertyInstance.set("photos", finalPhotos);
 
         let existingVideos = Array.isArray(propertyInstance.videos)
@@ -541,11 +547,17 @@ exports.updateProperty = async (req, res) => {
               newCoverVideo ? !v.coverPhoto : true
             )
           : [];
+        const existingVideoURLs = new Set(
+          existingVideos.map((v) => v.imageURL)
+        );
         const finalVideos = [
           ...(newCoverVideo ? [newCoverVideo] : []),
           ...existingVideos,
-          ...newGeneralVideos,
+          ...newGeneralVideos.filter(
+            (item) => !existingVideoURLs.has(item.imageURL)
+          ),
         ];
+
         propertyInstance.set("videos", finalVideos);
 
         await propertyInstance.save();
