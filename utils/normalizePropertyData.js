@@ -180,28 +180,10 @@ export function normalizeAmenitiesdata(rawAmenities = []) {
       const { amenity_name, category, value, selected_sub_attributes } =
         amenity;
 
-      // 2. Format the display name with its value and sub-attributes
-      let details = "";
-      const mainValue = Array.isArray(value) ? value.join(", ") : value;
-      const subAttribute =
-        selected_sub_attributes?.sub_attribute_1 ||
-        selected_sub_attributes?.sub_attribute_2 ||
-        "";
-
-      if (mainValue && subAttribute) {
-        details = `${mainValue} (${subAttribute})`;
-      } else if (mainValue) {
-        details = mainValue;
-      } else if (subAttribute) {
-        details = `(${subAttribute})`;
-      }
-
-      const formattedName = details
-        ? `${amenity_name}: ${details}`
-        : amenity_name;
+      const fname = amenity_name;
 
       const newItem = {
-        name: formattedName,
+        name: fname,
         selected: true, // All items processed here are selected by definition
       };
 
