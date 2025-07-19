@@ -58,15 +58,17 @@ module.exports = (sequelize) =>
       // [{ roomAmenityId, value }]
     },
 
+    // ... inside your Room.js model definition
+
     photos: {
-      type: DataTypes.ARRAY(DataTypes.JSONB),
+      type: DataTypes.JSONB, // CORRECT TYPE
       defaultValue: [],
-      // Example: [{ url: 'url1', tag: '' }]
     },
 
     videos: {
-      type: DataTypes.ARRAY(DataTypes.JSONB),
+      type: DataTypes.JSONB, // CORRECT TYPE
       defaultValue: [],
-      // Example: [{ url: 'url1', tag: '' }]
     },
+
+    // ...
   });
