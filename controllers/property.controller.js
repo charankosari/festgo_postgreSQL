@@ -459,11 +459,12 @@ exports.updateProperty = async (req, res) => {
       console.log(`  Total photos to save to property: ${finalPhotos.length}.`);
 
       try {
-        property.set("photos", finalPhotos);
-        await property.save();
-
+        const propertyInstance = await Property.findByPk(id);
+        propertyInstance.set("photos", finalPhotos);
+        await propertyInstance.save();
         console.log(
-          "  ✅ Successfully updated property photos in the database."
+          "✅ Saved property photos to fresh instance:",
+          propertyInstance.photos.length
         );
       } catch (error) {
         console.error("  ❌ ERROR while updating property photos:", error);
