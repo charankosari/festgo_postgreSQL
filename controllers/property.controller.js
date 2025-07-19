@@ -8,6 +8,7 @@ const {
   room_amenity_category,
   RoomBookedDate,
   RoomRateInventory,
+  sequelize,
 } = require("../models/services/index");
 const { review } = require("../models/users/index");
 const {
@@ -522,7 +523,7 @@ exports.updateProperty = async (req, res) => {
       }
 
       try {
-        const propertyInstance = await Property.findByPk(id);
+        const propertyInstance = property;
 
         // --------- PHOTOS ---------
         const incomingPhotos = [
