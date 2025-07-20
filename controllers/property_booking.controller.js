@@ -118,7 +118,35 @@ exports.bookProperty = async (req, res) => {
 
     const child_charge_per = Number(room.price?.child_charge) || 0;
     // Total price calculation
-    const total_base_price = base_price_per_room * num_rooms;
+    const nights = Math.ceil(
+      (new Date(check_out_date) - new Date(check_in_date)) /
+        (1000 * 60 * 60 * 24)
+    );
+
+    let total_base_price = 0;
+
+    for (let i = 0; i < nights; i++) {
+      const currentDate = new Date(check_in_date);
+      currentDate.setDate(currentDate.getDate() + i);
+      const dateString = currentDate.toISOString().split("T")[0];
+
+      const rate = await RoomRateInventory.findOne({
+        where: {
+          propertyId: property_id,
+          roomId: room_id,
+          date: dateString,
+        },
+        transaction: t,
+      });
+
+      const basePriceForThisNight = rate?.price?.offerBaseRate
+        ? Number(rate.price.offerBaseRate)
+        : Number(room.price?.base_price_for_2_adults) || 0;
+
+      total_base_price += basePriceForThisNight;
+    }
+
+    total_base_price *= num_rooms;
 
     // Calculate included adults per room based on sleeping arrangement
     const base_adults_per_room = room.sleeping_arrangement?.base_adults || 2; // fallback 2 if not defined
