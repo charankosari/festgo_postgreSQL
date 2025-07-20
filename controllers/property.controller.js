@@ -16,6 +16,7 @@ const {
   normalizeRoomData,
   normalizePropertyRules,
   normalizeAmenitiesdata,
+  normalizeRoomAmenities,
 } = require("../utils/normalizePropertyData");
 const { Op, Sequelize } = require("sequelize");
 // total steps in your property creation process
@@ -1415,5 +1416,112 @@ exports.updateRoomPrices = async (req, res) => {
   } catch (error) {
     console.error("Error updating room price and property strdata:", error);
     res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.getUpdatedRoomsForProperty = async (req, res) => {
+  try {
+    const { propertyId, adults, children, requestedRooms, date } = req.body;
+
+    if (!propertyId) {
+      return res.status(400).json({ message: "propertyId is required" });
+    }
+
+    const numRooms = parseInt(requestedRooms) || 1;
+    const numAdults = parseInt(adults) || 0;
+    const numChildren = parseInt(children) || 0;
+    const startDate = date;
+
+    const allRoomsInProperty = await Room.findAll({ where: { propertyId } });
+
+    if (!allRoomsInProperty || allRoomsInProperty.length === 0) {
+      return res.status(404).json({ message: "No rooms found for property" });
+    }
+
+    const totalGuests = numAdults + numChildren;
+    const avgGuestsPerRoom = Math.ceil(totalGuests / numRooms);
+    const avgAdultsPerRoom = Math.ceil(numAdults / numRooms);
+
+    const validRooms = [];
+
+    for (const room of allRoomsInProperty) {
+      const maxAdults = parseInt(room.sleeping_arrangement?.max_adults || 0);
+      const maxOccupancy = parseInt(
+        room.sleeping_arrangement?.max_occupancy || 0
+      );
+
+      if (maxOccupancy >= avgGuestsPerRoom && maxAdults >= avgAdultsPerRoom) {
+        let currentBasePrice = parseInt(
+          room.price?.base_price_for_2_adults || 0
+        );
+        let currentOriginalPrice = Math.round(currentBasePrice * 1.05);
+
+        // Override price with rate inventory if available
+        if (startDate) {
+          const rate = await RoomRateInventory.findOne({
+            where: { propertyId, roomId: room.id, date: startDate },
+          });
+
+          if (rate?.price) {
+            currentBasePrice = parseInt(rate.price.offerBaseRate);
+            currentOriginalPrice = parseInt(rate.price.base);
+          }
+        }
+
+        const baseAdultsPerRoom = parseInt(room.price?.base_adults || 2);
+        const extraAdultChargePerRoom = parseInt(
+          room.price?.extra_adult_charge || 0
+        );
+        const childChargePerChild = parseInt(room.price?.child_charge || 0);
+
+        const totalBaseForRooms = currentBasePrice * numRooms;
+        const totalIncludedAdults = baseAdultsPerRoom * numRooms;
+        const extraAdultsCount = Math.max(0, numAdults - totalIncludedAdults);
+
+        const totalExtraAdultCharge =
+          extraAdultsCount * extraAdultChargePerRoom;
+        const totalChildCharge = numChildren * childChargePerChild;
+
+        const bestFinalPrice =
+          totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
+        const bestOriginalPrice =
+          currentOriginalPrice * numRooms +
+          totalExtraAdultCharge +
+          totalChildCharge;
+
+        const normalizedAmenities = normalizeRoomAmenities(
+          room.room_amenities || []
+        );
+        const plainRoom = room.get({ plain: true });
+        const photoURLs = (plainRoom.photos || []).map(
+          (photo) => photo.imageURL
+        );
+        const videoURLs = (plainRoom.videos || []).map(
+          (video) => video.imageURL
+        );
+        delete plainRoom.room_amenities;
+        delete plainRoom.photos;
+        delete plainRoom.videos;
+
+        validRooms.push({
+          ...plainRoom,
+          pricing: {
+            pricePerNight: bestFinalPrice,
+            originalPrice: bestOriginalPrice,
+          },
+          amenities: normalizedAmenities.amenities,
+          photos: photoURLs,
+          videos: videoURLs,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      rooms: validRooms,
+      count: validRooms.length,
+    });
+  } catch (error) {
+    console.error("Error in getUpdatedRoomsForProperty:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };

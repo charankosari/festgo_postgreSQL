@@ -103,4 +103,10 @@ router.put(
   propertyController.updateRoomPrices
 );
 
+router.post(
+  "/getupdated-room/p",
+  // isAuthorized,
+  propertyController.getUpdatedRoomsForProperty
+);
+
 module.exports = router;

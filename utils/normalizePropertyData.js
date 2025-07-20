@@ -203,3 +203,29 @@ export function normalizeAmenitiesdata(rawAmenities = []) {
   // Wrap the result in an 'amenities' object as per the desired output
   return { amenities: result };
 }
+
+export function normalizeRoomAmenities(rawAmenities = []) {
+  const categoryMap = {};
+
+  for (const amenity of rawAmenities) {
+    const category = amenity.category?.trim() || "Uncategorized";
+    const name = amenity.otaName?.trim();
+    const selected = !!amenity.isSelected;
+
+    if (!categoryMap[category]) {
+      categoryMap[category] = [];
+    }
+
+    categoryMap[category].push({
+      name,
+      selected,
+    });
+  }
+
+  const normalized = Object.entries(categoryMap).map(([category, items]) => ({
+    category,
+    items,
+  }));
+
+  return { amenities: normalized };
+}
