@@ -1225,7 +1225,6 @@ exports.getPropertyRoomInventories = async (req, res) => {
         .json({ message: "startDate and endDate are required" });
     }
 
-    // Get properties owned by this vendor
     const properties = await Property.findAll({
       where: { vendorId: req.user.id },
     });
@@ -1246,17 +1245,14 @@ exports.getPropertyRoomInventories = async (req, res) => {
       const roomsData = [];
 
       for (const room of rooms) {
-        // Default inventory from room.number_of_rooms
         const defaultInventory = room.number_of_rooms;
 
-        // Default rates
         const defaultRates = {
           base: room.price.base_price_for_2_adults,
           extra: room.price.extra_adult_charge,
           child: room.price.child_charge,
         };
 
-        // Initialize inventory & rates for given date range
         const inventory = {};
         const rates = {};
 
@@ -1274,7 +1270,30 @@ exports.getPropertyRoomInventories = async (req, res) => {
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        // Fetch bookings of this room in date range
+        // Apply overrides from RoomRateInventory
+        const overrides = await RoomRateInventory.findAll({
+          where: {
+            roomId: room.id,
+            date: { [Op.between]: [startDate, endDate] },
+          },
+        });
+
+        for (const override of overrides) {
+          const dateStr = override.date.toISOString().split("T")[0];
+
+          if (inventory[dateStr] !== undefined) {
+            inventory[dateStr] = override.inventory;
+            rates[dateStr] = {
+              base: override.price.base,
+              extra: override.price.extra,
+              child: defaultRates.child, // use default if child not included
+              offerBaseRate: override.price.offerBaseRate,
+              offerPlusOne: override.price.offerPlusOne,
+            };
+          }
+        }
+
+        // Adjust inventory based on bookings
         const bookings = await RoomBookedDate.findAll({
           where: {
             roomId: room.id,
@@ -1294,7 +1313,6 @@ exports.getPropertyRoomInventories = async (req, res) => {
           },
         });
 
-        // Adjust inventory based on bookings
         for (const booking of bookings) {
           const checkIn = new Date(booking.checkIn);
           const checkOut = new Date(booking.checkOut);
@@ -1309,7 +1327,6 @@ exports.getPropertyRoomInventories = async (req, res) => {
           }
         }
 
-        // Assemble room data
         roomsData.push({
           id: room.id,
           name: room.room_name,
@@ -1317,11 +1334,9 @@ exports.getPropertyRoomInventories = async (req, res) => {
           rates,
           defaultInventory,
           defaultRates,
-          beds: room.beds,
         });
       }
 
-      // Assemble property data
       result.push({
         id: property.id,
         name: property.name,
