@@ -924,25 +924,25 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       ? plainProperty.videos.map((v) => v.videoURL || "")
       : [];
     // Fetch rooms
-    const rooms = await Room.findAll({
-      where: { propertyId },
-      include: [{ model: room_amenity, as: "roomAmenities" }],
-    });
+    // const rooms = await Room.findAll({
+    //   where: { propertyId },
+    //   include: [{ model: room_amenity, as: "roomAmenities" }],
+    // });
 
-    const formattedRooms = rooms.map((r) => {
-      const room = r.get({ plain: true });
-      const imageList = Array.isArray(room.photos)
-        ? room.photos.map((p) => p.imageURL || "")
-        : [];
-      const videoList = Array.isArray(room.videos)
-        ? room.videos.map((v) => v.videoURL || "")
-        : [];
-      return {
-        ...room,
-        photos: imageList,
-        videos: videoList,
-      };
-    });
+    // const formattedRooms = rooms.map((r) => {
+    //   const room = r.get({ plain: true });
+    //   const imageList = Array.isArray(room.photos)
+    //     ? room.photos.map((p) => p.imageURL || "")
+    //     : [];
+    //   const videoList = Array.isArray(room.videos)
+    //     ? room.videos.map((v) => v.videoURL || "")
+    //     : [];
+    //   return {
+    //     ...room,
+    //     photos: imageList,
+    //     videos: videoList,
+    //   };
+    // });
 
     // Reviews
     const reviewRecords = await review.findAll({
