@@ -1279,7 +1279,7 @@ exports.getPropertyRoomInventories = async (req, res) => {
         });
 
         for (const override of overrides) {
-          const dateStr = override.date.toISOString().split("T")[0];
+          const dateStr = new Date(override.date).toISOString().split("T")[0];
 
           if (inventory[dateStr] !== undefined) {
             inventory[dateStr] = override.inventory;
