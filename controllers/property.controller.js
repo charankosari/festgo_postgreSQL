@@ -1421,27 +1421,69 @@ exports.updateRoomPrices = async (req, res) => {
 
 exports.getUpdatedRoomsForProperty = async (req, res) => {
   try {
-    const { propertyId, adults, children, requestedRooms, date } = req.body;
+    const { propertyId, adults, children, requestedRooms, startDate, endDate } =
+      req.body;
 
-    if (!propertyId) {
-      return res.status(400).json({ message: "propertyId is required" });
+    if (!propertyId || !startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "propertyId, startDate, and endDate are required" });
     }
 
     const numRooms = parseInt(requestedRooms) || 1;
     const numAdults = parseInt(adults) || 0;
     const numChildren = parseInt(children) || 0;
-    const startDate = date;
+
+    const start = moment(startDate, "YYYY-MM-DD");
+    const end = moment(endDate, "YYYY-MM-DD");
+    const no_of_days_stay = end.diff(start, "days");
+
+    if (no_of_days_stay <= 0) {
+      return res
+        .status(400)
+        .json({ message: "endDate must be after startDate" });
+    }
 
     const allRoomsInProperty = await Room.findAll({ where: { propertyId } });
-
-    if (!allRoomsInProperty || allRoomsInProperty.length === 0) {
+    if (!allRoomsInProperty.length)
       return res.status(404).json({ message: "No rooms found for property" });
-    }
+
+    const roomIds = allRoomsInProperty.map((room) => room.id);
+    const finalDate = end.clone().format("YYYY-MM-DD");
+
+    // Get existing bookings overlapping requested dates
+    const bookedRooms = await RoomBookedDate.findAll({
+      where: {
+        roomId: { [Op.in]: roomIds },
+        checkIn: { [Op.lt]: finalDate },
+        checkOut: { [Op.gt]: startDate },
+        status: { [Op.in]: ["pending", "confirmed"] },
+      },
+    });
+
+    // Count booked rooms per roomId
+    const bookedCountMap = {};
+    bookedRooms.forEach((b) => {
+      bookedCountMap[b.roomId] = (bookedCountMap[b.roomId] || 0) + 1;
+    });
+
+    // Get inventory from rate table
+    const roomRates = await RoomRateInventory.findAll({
+      where: {
+        propertyId,
+        roomId: { [Op.in]: roomIds },
+        date: startDate, // Using only the first day; adjust for all days if needed
+      },
+    });
+
+    const roomRateMap = {};
+    roomRates.forEach((rate) => {
+      roomRateMap[rate.roomId] = rate.inventory;
+    });
 
     const totalGuests = numAdults + numChildren;
     const avgGuestsPerRoom = Math.ceil(totalGuests / numRooms);
     const avgAdultsPerRoom = Math.ceil(numAdults / numRooms);
-
     const validRooms = [];
 
     for (const room of allRoomsInProperty) {
@@ -1450,76 +1492,81 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
         room.sleeping_arrangement?.max_occupancy || 0
       );
 
-      if (maxOccupancy >= avgGuestsPerRoom && maxAdults >= avgAdultsPerRoom) {
-        let currentBasePrice = parseInt(
-          room.price?.base_price_for_2_adults || 0
-        );
-        let currentOriginalPrice = Math.round(currentBasePrice * 1.05);
+      if (maxOccupancy < avgGuestsPerRoom || maxAdults < avgAdultsPerRoom)
+        continue;
 
-        // Override price with rate inventory if available
-        if (startDate) {
-          const rate = await RoomRateInventory.findOne({
-            where: { propertyId, roomId: room.id, date: startDate },
-          });
+      const roomInventory = roomRateMap[room.id] || room.number_of_rooms || 0;
+      const bookedCount = bookedCountMap[room.id] || 0;
+      const availableRooms = Math.max(0, roomInventory - bookedCount);
 
-          if (rate?.price) {
-            currentBasePrice = parseInt(rate.price.offerBaseRate);
-            currentOriginalPrice = parseInt(rate.price.base);
-          }
-        }
+      if (availableRooms < numRooms) continue;
 
-        const baseAdultsPerRoom = parseInt(room.price?.base_adults || 2);
-        const extraAdultChargePerRoom = parseInt(
-          room.price?.extra_adult_charge || 0
-        );
-        const childChargePerChild = parseInt(room.price?.child_charge || 0);
+      // Price logic
+      let basePrice = parseInt(room.price?.base_price_for_2_adults || 0);
+      let originalPrice = Math.round(basePrice * 1.05);
+      let totalBase = 0,
+        totalOriginal = 0;
 
-        const totalBaseForRooms = currentBasePrice * numRooms;
-        const totalIncludedAdults = baseAdultsPerRoom * numRooms;
-        const extraAdultsCount = Math.max(0, numAdults - totalIncludedAdults);
-
-        const totalExtraAdultCharge =
-          extraAdultsCount * extraAdultChargePerRoom;
-        const totalChildCharge = numChildren * childChargePerChild;
-
-        const bestFinalPrice =
-          totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
-        const bestOriginalPrice =
-          currentOriginalPrice * numRooms +
-          totalExtraAdultCharge +
-          totalChildCharge;
-
-        const normalizedAmenities = normalizeRoomAmenities(
-          room.room_amenities || []
-        );
-        const plainRoom = room.get({ plain: true });
-        const photoURLs = (plainRoom.photos || []).map(
-          (photo) => photo.imageURL
-        );
-        const videoURLs = (plainRoom.videos || []).map(
-          (video) => video.imageURL
-        );
-        delete plainRoom.room_amenities;
-        delete plainRoom.photos;
-        delete plainRoom.videos;
-
-        validRooms.push({
-          ...plainRoom,
-          pricing: {
-            pricePerNight: bestFinalPrice,
-            originalPrice: bestOriginalPrice,
-          },
-          amenities: normalizedAmenities.amenities,
-          photos: photoURLs,
-          videos: videoURLs,
+      for (let d = 0; d < no_of_days_stay; d++) {
+        const currDate = start.clone().add(d, "days").format("YYYY-MM-DD");
+        const rate = await RoomRateInventory.findOne({
+          where: { propertyId, roomId: room.id, date: currDate },
         });
+
+        if (rate?.price) {
+          totalBase += parseInt(rate.price.offerBaseRate);
+          totalOriginal += parseInt(rate.price.base);
+        } else {
+          totalBase += basePrice;
+          totalOriginal += originalPrice;
+        }
       }
+
+      const baseAdultsPerRoom = parseInt(room.price?.base_adults || 2);
+      const extraAdultCharge = parseInt(room.price?.extra_adult_charge || 0);
+      const childCharge = parseInt(room.price?.child_charge || 0);
+
+      const totalBaseForRooms = totalBase * numRooms;
+      const totalIncludedAdults = baseAdultsPerRoom * numRooms;
+      const extraAdults = Math.max(0, numAdults - totalIncludedAdults);
+
+      const totalExtraAdultCharge =
+        extraAdults * extraAdultCharge * no_of_days_stay;
+      const totalChildCharge = numChildren * childCharge * no_of_days_stay;
+
+      const finalPrice =
+        totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
+      const finalOriginalPrice =
+        totalOriginal * numRooms + totalExtraAdultCharge + totalChildCharge;
+
+      const plainRoom = room.get({ plain: true });
+      const normalizedAmenities = normalizeRoomAmenities(
+        room.room_amenities || []
+      );
+      const photos = (plainRoom.photos || []).map((photo) => photo.imageURL);
+      const videos = (plainRoom.videos || []).map((video) => video.imageURL);
+
+      delete plainRoom.room_amenities;
+      delete plainRoom.photos;
+      delete plainRoom.videos;
+
+      validRooms.push({
+        ...plainRoom,
+        pricing: {
+          pricePerNight: finalPrice,
+          originalPrice: finalOriginalPrice,
+          numberOfDays: no_of_days_stay,
+        },
+        availableRooms,
+        amenities: normalizedAmenities.amenities,
+        photos,
+        videos,
+      });
     }
 
-    return res.status(200).json({
-      rooms: validRooms,
-      count: validRooms.length,
-    });
+    return res
+      .status(200)
+      .json({ rooms: validRooms, count: validRooms.length });
   } catch (error) {
     console.error("Error in getUpdatedRoomsForProperty:", error);
     return res.status(500).json({ message: "Internal server error" });
