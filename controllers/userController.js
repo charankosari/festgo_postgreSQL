@@ -571,7 +571,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       user = await User.create({
         email,
         role: "user",
-        status: "pending",
+        status: "active",
         image_url,
         firstname,
         lastname,
