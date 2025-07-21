@@ -1444,6 +1444,8 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
         .status(400)
         .json({ message: "propertyId, startDate, and endDate are required" });
     }
+    const property = await Property.findByPk(propertyId);
+    const cancellationPolicy = property?.policies?.cancellationPolicy || null;
 
     const numRooms = parseInt(requestedRooms) || 1;
     const numAdults = parseInt(adults) || 0;
@@ -1572,6 +1574,7 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
           originalPrice: finalOriginalPrice,
           numberOfDays: no_of_days_stay,
         },
+        cancellationPolicy,
         availableRooms,
         amenities: normalizedAmenities.amenities,
         photos,
