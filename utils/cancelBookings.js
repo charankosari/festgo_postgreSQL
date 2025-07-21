@@ -155,11 +155,14 @@ const cancelBeachFestBooking = async (req, res) => {
     const { id } = req.params;
 
     const booking = await beachfests_booking.findByPk(id, { transaction: t });
-    if (!booking) {
+    if (!booking || booking.payment_status !== "paid") {
       await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Booking not found." });
+      return res.status(404).json({
+        success: false,
+        message: !booking
+          ? "Booking not found."
+          : "Booking is not eligible for cancellation (payment not completed).",
+      });
     }
 
     const fest = await beach_fests.findByPk(booking.beachfest_id, {
