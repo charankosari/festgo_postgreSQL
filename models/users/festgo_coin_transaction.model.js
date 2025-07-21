@@ -22,7 +22,8 @@ module.exports = (sequelize) => {
           "property_recommend",
           "cityfest_referal",
           "trip_referal",
-          "user_referal"
+          "user_referal",
+          "login_bonus"
         ),
         allowNull: false,
       },
