@@ -1,5 +1,6 @@
 const {
   property_booking,
+  Property,
   RoomBookedDate,
   beachfests_booking,
   beach_fests,
@@ -21,13 +22,45 @@ const cancelPropertyBooking = async (req, res) => {
         .json({ success: false, message: "Booking not found." });
     }
 
+    const property = await Property.findByPk(booking.propertyId);
+    const policy = property?.policies?.cancellationProperty || "Flexible";
+
     const today = moment();
     const checkInDate = moment(booking.check_in_date);
     const daysBeforeCheckin = checkInDate.diff(today, "days");
 
     let refundPercentage = 0;
-    if (daysBeforeCheckin >= 4) refundPercentage = 100;
-    else if (daysBeforeCheckin >= 2) refundPercentage = 50;
+
+    switch (policy) {
+      case "Flexible":
+        if (daysBeforeCheckin >= 1) refundPercentage = 100;
+        break;
+
+      case "Moderate":
+        if (daysBeforeCheckin >= 5) refundPercentage = 100;
+        break;
+
+      case "Firm":
+        if (daysBeforeCheckin >= 30) refundPercentage = 50;
+        break;
+
+      case "Strict":
+        if (daysBeforeCheckin >= 7) refundPercentage = 50;
+        break;
+
+      case "Super Strict 30":
+        if (daysBeforeCheckin >= 30) refundPercentage = 50;
+        break;
+
+      case "Super Strict 60":
+        if (daysBeforeCheckin >= 60) refundPercentage = 50;
+        break;
+
+      case "Non-Refundable":
+      default:
+        refundPercentage = 0;
+        break;
+    }
 
     let refundAmount = 0;
 
@@ -65,12 +98,11 @@ const cancelPropertyBooking = async (req, res) => {
       success: true,
       message:
         refundPercentage > 0
-          ? `Booking cancelled successfully. ₹${
-              refundAmount > 0 ? refundAmount : 0
-            } refunded (excluding service charges).`
-          : "Booking cancelled successfully. No refund applicable.",
-      refundAmount: refundAmount,
+          ? `Booking cancelled. ₹${refundAmount} refunded (${refundPercentage}% of amount excluding service charges).`
+          : "Booking cancelled. No refund applicable as per cancellation policy.",
+      refundAmount,
       refundPercentage,
+      cancellationPolicy: policy,
     });
   } catch (error) {
     console.error("Error cancelling property booking:", error);
