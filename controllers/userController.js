@@ -17,6 +17,8 @@ const {
   changePasswordTemplate,
   SignupEmail,
 } = require("../libs/mailgun/mailTemplates");
+const { createInitialFestgoTransaction } = require("../utils/issueCoins"); // Adjust the path if needed
+
 const path = require("path");
 const dotenv = require("dotenv");
 
@@ -575,7 +577,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         lastname,
         logintype: loginType,
       });
-
+      await createInitialFestgoTransaction(user.id);
       // Log login history
       await LoginHistory.create({
         userId: user.id,
@@ -634,7 +636,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           logintype: loginType,
         });
       }
-
+      await createInitialFestgoTransaction(user.id);
       const verificationLink = `${process.env.APP_DEEP_LINK}?token=${token}`;
       await sendEmail(
         email,
@@ -681,7 +683,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           mobile_otp_expire: otpExpire,
         });
       }
-
+      await createInitialFestgoTransaction(user.id);
       const message = loginOtpTemplate(otp);
       const smsResponse = await sendSMS(user.number, message);
 
@@ -713,18 +715,17 @@ exports.verifyEmailToken = async (req, res) => {
   try {
     // Find user by token
     const user = await User.findOne({ where: { token } });
+
+    if (!user)
+      return res
+        .status(400)
+        .json({ message: "Invalid link or user not found", status: 400 });
     if (user.role !== "user") {
       return res.status(400).json({
         message: "Email already registered with a different role",
         status: 400,
       });
     }
-
-    if (!user)
-      return res
-        .status(400)
-        .json({ message: "Invalid link or user not found", status: 400 });
-
     if (user.tokenExpire < new Date())
       return res.status(400).json({ message: "Link has expired", status: 400 });
 
