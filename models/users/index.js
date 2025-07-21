@@ -18,6 +18,7 @@ const db = {
   Wishlist,
   LoginHistory,
   FestgoCoinTransaction,
+  FestGoCoinHistory,
 };
 review.belongsTo(User, {
   foreignKey: "userId",
