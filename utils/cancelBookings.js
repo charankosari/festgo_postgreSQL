@@ -14,7 +14,9 @@ const cancelPropertyBooking = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const booking = await property_booking.findOne({ where: { id } });
+    const booking = await property_booking.findOne({
+      where: { id, payment_status: "paid" },
+    });
 
     if (!booking) {
       return res
