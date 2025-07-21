@@ -84,23 +84,6 @@ module.exports = (sequelize) => {
       user.festgo_coins = 2000;
     }
   });
-  User.afterCreate(async (user, options) => {
-    const FestgoCoinTransaction = sequelize.models.FestgoCoinTransaction;
-
-    const now = new Date();
-    const oneMonthLater = new Date();
-    oneMonthLater.setMonth(now.getMonth() + 1);
-
-    await FestgoCoinTransaction.create({
-      userId: user.id,
-      type: "login_bonus", // or another appropriate type
-      amount: 2000,
-      remaining: 2000,
-      expiresAt: oneMonthLater,
-      CurrentMonthCount: 0,
-      monthlyRefillDate: oneMonthLater,
-    });
-  });
 
   User.prototype.comparePassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
