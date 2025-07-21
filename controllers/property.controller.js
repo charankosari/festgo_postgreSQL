@@ -1560,6 +1560,18 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
       const normalizedAmenities = normalizeRoomAmenities(
         room.room_amenities || []
       );
+      let gst_rate = 0;
+      if (finalPrice >= 8000) gst_rate = 18;
+      else if (finalPrice >= 1000) gst_rate = 12;
+
+      const gst_amount = (finalPrice * gst_rate) / 100;
+
+      let service_fee = 50;
+      if (finalPrice >= 1000 && finalPrice <= 1999) service_fee = 50;
+      else if (finalPrice >= 2000 && finalPrice <= 4999) service_fee = 100;
+      else if (finalPrice >= 5000 && finalPrice <= 7499) service_fee = 150;
+      else if (finalPrice >= 7500 && finalPrice <= 9999) service_fee = 200;
+      else if (finalPrice >= 10000) service_fee = 250;
       const photos = (plainRoom.photos || []).map((photo) => photo.imageURL);
       const videos = (plainRoom.videos || []).map((video) => video.imageURL);
 
@@ -1573,6 +1585,9 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
           pricePerNight: finalPrice,
           originalPrice: finalOriginalPrice,
           numberOfDays: no_of_days_stay,
+          tax: gst_amount,
+          service_fee: service_fee,
+          totalPrice: finalPrice + gst_amount + service_fee,
         },
         cancellationPolicy,
         availableRooms,
