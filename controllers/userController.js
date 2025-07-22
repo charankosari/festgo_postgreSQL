@@ -1,4 +1,8 @@
-const { User, LoginHistory } = require("../models/users");
+const {
+  User,
+  LoginHistory,
+  FestgoCoinTransaction,
+} = require("../models/users");
 const {
   property_booking,
   beachfests_booking,
