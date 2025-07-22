@@ -11,6 +11,9 @@ const ReferralHistory = require("./referral_history.model")(usersSequelize);
 const FestgoCoinTransaction = require("./festgo_coin_transaction.model")(
   usersSequelize
 );
+const FestgoCoinToIssue = require("./festgo_coin_to_issue.model")(
+  usersSequelize
+);
 const db = {
   Sequelize: usersSequelize,
   User,
@@ -20,6 +23,7 @@ const db = {
   FestgoCoinTransaction,
   FestGoCoinHistory,
   ReferralHistory,
+  FestgoCoinToIssue,
 };
 review.belongsTo(User, {
   foreignKey: "userId",
