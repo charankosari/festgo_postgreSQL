@@ -1,10 +1,9 @@
+const { CronThing } = require("../models/services");
 const {
-  user_coin,
+  FestGoCoinHistory,
   FestgoCoinTransaction,
-  CronThing,
   sequelize,
-} = require("../models/services");
-const { FestGoCoinHistory } = require("../models/users");
+} = require("../models/users");
 const issuePendingCoins = async () => {
   const t = await sequelize.transaction();
 
@@ -33,13 +32,6 @@ const issuePendingCoins = async () => {
 
     for (const row of rows) {
       const { user_id, coins, source_type, source_id, metaData } = row;
-
-      // ⬆️ Increment user_coin
-      await user_coin.increment("coins", {
-        by: parseFloat(coins),
-        where: { user_id },
-        transaction: t,
-      });
 
       // 🧾 Create FestgoCoinTransaction
       await FestgoCoinTransaction.create(

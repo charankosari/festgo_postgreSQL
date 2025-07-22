@@ -15,6 +15,7 @@ const FestgoCoinToIssue = require("./festgo_coin_to_issue.model")(
   usersSequelize
 );
 const db = {
+  sequelize: usersSequelize,
   Sequelize: usersSequelize,
   User,
   review,
