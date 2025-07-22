@@ -1,0 +1,87 @@
+const {
+  festgo_coin_histories,
+  user_coin,
+  FestgoCoinTransaction,
+  CronThing,
+  sequelize,
+} = require("../models/services");
+
+const issuePendingCoins = async () => {
+  const t = await sequelize.transaction();
+
+  try {
+    // 🔍 Fetch active cron job
+    const cronThing = await CronThing.findOne({
+      where: { entity: "property_coins_issue", active: true },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!cronThing) {
+      await t.commit();
+      return;
+    }
+
+    // 🔍 Fetch all pending histories with issue: true
+    const rows = await festgo_coin_histories.findAll({
+      where: {
+        issue: true,
+        status: "pending",
+      },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    for (const row of rows) {
+      const { user_id, coins, source_type, source_id, metaData } = row;
+
+      // ⬆️ Increment user_coin
+      await user_coin.increment("coins", {
+        by: parseFloat(coins),
+        where: { user_id },
+        transaction: t,
+      });
+
+      // 🧾 Create FestgoCoinTransaction
+      await FestgoCoinTransaction.create(
+        {
+          user_id,
+          coins,
+          type: "credit",
+          source: source_type,
+          reference_id: source_id,
+          metaData: metaData || {},
+        },
+        { transaction: t }
+      );
+
+      // ✅ Update festgo_coin_history to status: "issued"
+      await row.update(
+        {
+          status: "issued",
+          issue: false,
+          issuedAt: new Date(),
+        },
+        { transaction: t }
+      );
+    }
+
+    // 🔄 Check if any more pending issues
+    const remaining = await festgo_coin_histories.count({
+      where: { status: "pending", issue: true },
+      transaction: t,
+    });
+
+    if (remaining === 0) {
+      await cronThing.update({ active: false }, { transaction: t });
+      console.log("✅ No more pending coin issues. Deactivated cron.");
+    }
+
+    await t.commit();
+  } catch (err) {
+    await t.rollback();
+    console.error("❌ Error issuing coins:", err);
+  }
+};
+
+module.exports = issuePendingCoins;
