@@ -17,7 +17,10 @@ const {
   changePasswordTemplate,
   SignupEmail,
 } = require("../libs/mailgun/mailTemplates");
-const { createInitialFestgoTransaction } = require("../utils/issueCoins"); // Adjust the path if needed
+const {
+  createInitialFestgoTransaction,
+  issueUserReferralCoins,
+} = require("../utils/issueCoins"); // Adjust the path if needed
 
 const path = require("path");
 const dotenv = require("dotenv");
@@ -58,6 +61,81 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
 
   return data;
 }
+
+const handleUserReferral = async (referral_id, referredId) => {
+  try {
+    const referrer = await User.findOne({
+      where: { referralCode: referral_id },
+    });
+    if (!referrer || referrer.id === referredId) return;
+
+    const setting = await FestgoCoinSetting.findOne({
+      where: { type: "user_referral" },
+    });
+    if (!setting || setting.monthly_referral_limit <= 0) return;
+
+    // Month calculation based on referrer’s account creation
+    const createdAt = new Date(referrer.createdAt);
+    const current = new Date();
+
+    const monthsSinceCreated =
+      (current.getFullYear() - createdAt.getFullYear()) * 12 +
+      (current.getMonth() - createdAt.getMonth());
+
+    const monthStart = new Date(
+      createdAt.getFullYear(),
+      createdAt.getMonth() + monthsSinceCreated,
+      1
+    );
+    const monthEnd = new Date(
+      createdAt.getFullYear(),
+      createdAt.getMonth() + monthsSinceCreated + 1,
+      0,
+      23,
+      59,
+      59
+    );
+
+    const referralsThisMonth = await ReferralHistory.count({
+      where: {
+        referrerId: referrer.id,
+        createdAt: { [Op.between]: [monthStart, monthEnd] },
+      },
+    });
+
+    if (referralsThisMonth >= setting.monthly_referral_limit) return;
+
+    const coinsToGive = Number(setting.single_transaction_limit_value) || 0;
+    if (coinsToGive <= 0) return;
+
+    await issueUserReferralCoins({
+      referrerId: referrer.id,
+      referredId,
+      coins: coinsToGive,
+    });
+  } catch (err) {
+    console.error("Error in handleUserReferral:", err);
+  }
+};
+const checkAndIssueLoginBonus = async (userId) => {
+  try {
+    const existingBonus = await FestgoCoinTransaction.findOne({
+      where: {
+        userId,
+        source: "login_bonus", // or `type: 'login_bonus'` depending on your schema
+      },
+    });
+
+    if (!existingBonus) {
+      await createInitialFestgoTransaction(userId);
+      console.log(`Login bonus issued to user: ${userId}`);
+    } else {
+      console.log(`Login bonus already exists for user: ${userId}`);
+    }
+  } catch (error) {
+    console.error("Error checking/issuing login bonus:", error);
+  }
+};
 
 exports.registerUser = async (req, res, roleType) => {
   try {
@@ -577,7 +655,11 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         lastname,
         logintype: loginType,
       });
-      await createInitialFestgoTransaction(user.id);
+      await checkAndIssueLoginBonus(user.id);
+
+      if (req.body.referral_id) {
+        await handleUserReferral(req.body.referral_id, user.id);
+      }
       // Log login history
       await LoginHistory.create({
         userId: user.id,
@@ -636,7 +718,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           logintype: loginType,
         });
       }
-      await createInitialFestgoTransaction(user.id);
+      await checkAndIssueLoginBonus(user.id);
       const verificationLink = `${process.env.APP_DEEP_LINK}?token=${token}`;
       await sendEmail(
         email,
@@ -683,7 +765,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           mobile_otp_expire: otpExpire,
         });
       }
-      await createInitialFestgoTransaction(user.id);
+      await checkAndIssueLoginBonus(user.id);
       const message = loginOtpTemplate(otp);
       const smsResponse = await sendSMS(user.number, message);
 

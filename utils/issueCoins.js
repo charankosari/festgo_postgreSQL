@@ -56,6 +56,39 @@ const logCoinIssuance = async ({
   }
 };
 
+const issueUserReferralCoins = async ({
+  referrerId,
+  referredId,
+  coins,
+  type = "user_referral",
+  note = "Referral bonus for inviting a friend",
+}) => {
+  try {
+    // Step 1: Create referral history
+    await ReferralHistory.create({
+      referrerId,
+      referredId,
+      coinsAwarded: coins,
+      referralNote: note,
+    });
+
+    // Step 2: Create coin transaction log
+    await FestGoCoinHistory.create({
+      userId: referrerId,
+      type: "earned",
+      reason: note,
+      coins,
+      referenceId: referredId,
+      metaData: {
+        type,
+        referredUser: referredId,
+      },
+    });
+  } catch (err) {
+    console.error("Error issuing FestGo coins:", err);
+  }
+};
 module.exports = {
   createInitialFestgoTransaction,
+  issueUserReferralCoins,
 };
