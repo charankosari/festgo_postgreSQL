@@ -33,7 +33,7 @@ module.exports = (sequelize) => {
       resetPasswordToken: { type: DataTypes.STRING, defaultValue: null },
       resetPasswordExpire: { type: DataTypes.DATE, defaultValue: null },
       logintype: { type: DataTypes.STRING, defaultValue: null },
-      festgo_coins: { type: DataTypes.INTEGER, defaultValue: 0 },
+      // festgo_coins: { type: DataTypes.INTEGER, defaultValue: 0 },
       pincode: { type: DataTypes.STRING, defaultValue: null },
       state: { type: DataTypes.STRING, defaultValue: null },
       referralCode: {
@@ -81,7 +81,7 @@ module.exports = (sequelize) => {
         if (!existingUser) exists = false;
       }
       user.referralCode = code;
-      user.festgo_coins = 2000;
+      // user.festgo_coins = 2000;
     }
   });
 

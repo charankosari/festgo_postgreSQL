@@ -19,6 +19,7 @@ const db = {
   LoginHistory,
   FestgoCoinTransaction,
   FestGoCoinHistory,
+  ReferralHistory,
 };
 review.belongsTo(User, {
   foreignKey: "userId",

@@ -2,11 +2,13 @@ const {
   User,
   LoginHistory,
   FestgoCoinTransaction,
+  ReferralHistory,
 } = require("../models/users");
 const {
   property_booking,
   beachfests_booking,
   Event,
+  FestgoCoinSetting,
 } = require("../models/services");
 const { Sequelize } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
@@ -24,6 +26,7 @@ const {
 const {
   createInitialFestgoTransaction,
   issueUserReferralCoins,
+  calculateFestgoCoins,
 } = require("../utils/issueCoins"); // Adjust the path if needed
 
 const path = require("path");
@@ -50,7 +53,7 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
     "billing_address",
     "pincode",
     "state",
-    "festgo_coins",
+
     "referralCode",
   ];
 
@@ -501,7 +504,7 @@ exports.getUserDetails = async (req, res) => {
       cleanUser = safeUser(
         user,
         ["username"],
-        ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
+        ["billing_address", "pincode", "state", "referralCode"]
       );
 
       // 📌 Fetch property bookings count (confirmed only)
@@ -523,6 +526,8 @@ exports.getUserDetails = async (req, res) => {
         where: { userId: userId },
         order: [["loginTime", "DESC"]],
       });
+      const festgoCoins = await calculateFestgoCoins(userId);
+      cleanUser.festgo_coins = festgoCoins;
       cleanUser.loginHistories = loginHistory;
       cleanUser.bookingsCount = bookingsCount;
     } else {
@@ -631,18 +636,13 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           where: { userId: user.id },
           order: [["loginTime", "DESC"]],
         });
-
         const cleanUser = safeUser(
           user,
           ["username"],
-          [
-            "billing_address",
-            "pincode",
-            "state",
-            "festgo_coins",
-            "referralCode",
-          ]
+          ["billing_address", "pincode", "state", "referralCode"]
         );
+        const festgoCoins = await calculateFestgoCoins(user.id);
+        cleanUser.festgo_coins = festgoCoins;
         cleanUser.loginHistories = loginHistories;
         cleanUser.offers = 0;
         const message = "Login successful";
@@ -684,8 +684,10 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       const cleanUser = safeUser(
         user,
         ["username"],
-        ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
+        ["billing_address", "pincode", "state", "referralCode"]
       );
+      const festgoCoins = await calculateFestgoCoins(user.id);
+      cleanUser.festgo_coins = festgoCoins;
       cleanUser.loginHistories = loginHistories;
       cleanUser.offers = 0;
       const message = "Login successful";
@@ -848,8 +850,10 @@ exports.verifyEmailToken = async (req, res) => {
     const cleanUser = safeUser(
       user,
       ["username"],
-      ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
+      ["billing_address", "pincode", "state", "referralCode"]
     );
+    const festgoCoins = await calculateFestgoCoins(user.id);
+    cleanUser.festgo_coins = festgoCoins;
     cleanUser.loginHistories = loginHistories;
     cleanUser.offers = 0;
     sendToken(cleanUser, 200, message, res);
@@ -926,11 +930,12 @@ exports.verifyOtp = async (req, res) => {
   const cleanUser = safeUser(
     user,
     ["username"],
-    ["billing_address", "pincode", "state", "festgo_coins", "referralCode"]
+    ["billing_address", "pincode", "state", "referralCode"]
   );
   cleanUser.loginHistories = loginHistories;
   cleanUser.offers = 0;
-
+  const festgoCoins = await calculateFestgoCoins(user.id);
+  cleanUser.festgo_coins = festgoCoins;
   const message = "Login successful";
   sendToken(cleanUser, 200, message, res);
 };
