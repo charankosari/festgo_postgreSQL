@@ -16,13 +16,13 @@ module.exports = (sequelize) => {
       },
       type: {
         type: DataTypes.ENUM(
-          "event_referal",
-          "festbite_referal",
-          "beachfest_referal",
+          "event_referral",
+          "festbite_referral",
+          "beachfest_referral",
           "property_recommend",
-          "cityfest_referal",
-          "trip_referal",
-          "user_referal",
+          "cityfest_referral",
+          "trip_referral",
+          "user_referral",
           "login_bonus"
         ),
         allowNull: false,
