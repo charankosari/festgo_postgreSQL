@@ -71,7 +71,10 @@ module.exports = (sequelize) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
-
+      issue: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       metaData: {
         type: DataTypes.JSONB,
         allowNull: true,

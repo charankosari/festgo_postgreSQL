@@ -14,6 +14,10 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
+      status: {
+        type: DataTypes.ENUM("pending", "issued", "expired"),
+        defaultValue: "pending",
+      },
       type: {
         type: DataTypes.ENUM("earned", "used"),
         allowNull: false,
