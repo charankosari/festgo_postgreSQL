@@ -112,7 +112,8 @@ const handleUserReferral = async (referral_id, referredId) => {
 
     if (referralsThisMonth >= setting.monthly_referral_limit) return;
 
-    const coinsToGive = Number(setting.single_transaction_limit_value) || 0;
+    const coinsToGive = Number(setting.coins_per_referral) || 0;
+
     if (coinsToGive <= 0) return;
 
     await issueUserReferralCoins({
