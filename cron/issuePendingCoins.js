@@ -1,11 +1,10 @@
 const {
-  festgo_coin_histories,
   user_coin,
   FestgoCoinTransaction,
   CronThing,
   sequelize,
 } = require("../models/services");
-
+const { FestGoCoinHistory } = require("../models/users");
 const issuePendingCoins = async () => {
   const t = await sequelize.transaction();
 
@@ -23,7 +22,7 @@ const issuePendingCoins = async () => {
     }
 
     // 🔍 Fetch all pending histories with issue: true
-    const rows = await festgo_coin_histories.findAll({
+    const rows = await FestGoCoinHistory.findAll({
       where: {
         issue: true,
         status: "pending",
@@ -67,7 +66,7 @@ const issuePendingCoins = async () => {
     }
 
     // 🔄 Check if any more pending issues
-    const remaining = await festgo_coin_histories.count({
+    const remaining = await FestGoCoinHistory.count({
       where: { status: "pending", issue: true },
       transaction: t,
     });
