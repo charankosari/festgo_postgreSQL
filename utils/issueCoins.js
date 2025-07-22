@@ -2,7 +2,9 @@ const {
   FestgoCoinTransaction,
   FestGoCoinHistory,
   ReferralHistory,
+  usersequel,
 } = require("../models/users"); // ✅ Correct
+const { FestgoCoinSetting, sequelize } = require("../models/services");
 const { Op } = require("sequelize");
 const createInitialFestgoTransaction = async (userId) => {
   try {
@@ -133,8 +135,110 @@ const calculateFestgoCoins = async (userId) => {
     return 0;
   }
 };
+const createPropertyReferralTempCoin = async (
+  userId,
+  referral_id,
+  bookingId,
+  metaData = {}
+) => {
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+
+  try {
+    // 1️⃣ Get user who referred this user
+    const referringUser = await User.findByPk(referral_id, {
+      transaction: user_tx,
+    });
+    if (!referringUser) throw new Error("Referrer not found");
+
+    // 2️⃣ Get Coin Setting for "property"
+    const setting = await FestgoCoinSetting.findOne({
+      where: { type: "property" },
+      transaction: service_tx,
+    });
+    if (!setting || !setting.coins_per_referral) {
+      throw new Error("Property coin setting not found");
+    }
+
+    const coins = parseInt(setting.coins_per_referral);
+
+    // 3️⃣ Get referral history for this referrer in current month
+    const firstCreated = referringUser.createdAt;
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthEnd = endOfMonth(new Date());
+
+    const currentMonthReferrals = await FestGoCoinHistory.count({
+      where: {
+        userId: referringUser.id,
+        reason: "property_referral",
+        createdAt: {
+          [Op.between]: [currentMonthStart, currentMonthEnd],
+        },
+      },
+      transaction: user_tx,
+    });
+
+    if (currentMonthReferrals >= setting.monthly_referral_limit) {
+      console.log("❌ Monthly referral limit reached.");
+      await user_tx.rollback();
+      await service_tx.rollback();
+      return;
+    }
+
+    // 4️⃣ Create FestgoCoinToIssue (temp coin)
+    await FestgoCoinToIssue.create(
+      {
+        userId: referringUser.id,
+        referral_id,
+        booking_id: bookingId,
+        sourceType: "property",
+        sourceId: bookingId,
+        coinsToIssue: coins,
+        issueAt: new Date(Date.now() + 2 * 60 * 1000), // after 2 min
+        type: "property_recommend",
+        issue: true,
+        metaData,
+      },
+      { transaction: user_tx }
+    );
+
+    // 5️⃣ Create FestGoCoinHistory (status: pending)
+    await FestGoCoinHistory.create(
+      {
+        userId: referringUser.id,
+        status: "pending",
+        type: "earned",
+        reason: "property_referral",
+        referenceId: bookingId,
+        coins,
+        metaData,
+      },
+      { transaction: user_tx }
+    );
+
+    // 6️⃣ Set CronThing active for 'property_coins_issue'
+    await CronThing.upsert(
+      {
+        entity: "property_coins_issue",
+        active: true,
+      },
+      { transaction: service_tx }
+    );
+
+    await user_tx.commit();
+    await service_tx.commit();
+
+    console.log("✅ Temp coins and history created for referral");
+  } catch (err) {
+    await user_tx.rollback();
+    await service_tx.rollback();
+    console.error("❌ Failed to create temp coins:", err.message);
+  }
+};
+
 module.exports = {
   createInitialFestgoTransaction,
   issueUserReferralCoins,
   calculateFestgoCoins,
+  createPropertyReferralTempCoin,
 };
