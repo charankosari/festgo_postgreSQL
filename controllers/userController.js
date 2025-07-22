@@ -657,9 +657,10 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       });
       await checkAndIssueLoginBonus(user.id);
 
-      if (req.body.referral_id) {
+      if (req.body.referral_id && req.body.referral_id.trim() !== "") {
         await handleUserReferral(req.body.referral_id, user.id);
       }
+
       // Log login history
       await LoginHistory.create({
         userId: user.id,
@@ -810,6 +811,14 @@ exports.verifyEmailToken = async (req, res) => {
     }
     if (user.tokenExpire < new Date())
       return res.status(400).json({ message: "Link has expired", status: 400 });
+    if (
+      req.body.referral_id &&
+      req.body.referral_id.trim() !== "" &&
+      user.status === "pending" &&
+      ["email", "mobile"].includes(user.logintype)
+    ) {
+      await handleUserReferral(req.body.referral_id, user.id);
+    }
 
     // Mark email as verified, clear token fields
     user.token = null;
@@ -876,6 +885,14 @@ exports.verifyOtp = async (req, res) => {
     return res
       .status(400)
       .json({ message: "Invalid or expired OTP", status: 400 });
+  if (
+    req.body.referral_id &&
+    req.body.referral_id.trim() !== "" &&
+    user.status === "pending" &&
+    ["email", "mobile"].includes(user.logintype)
+  ) {
+    await handleUserReferral(req.body.referral_id, user.id);
+  }
 
   // Update user mobile verification status
   user.mobile_otp = null;
