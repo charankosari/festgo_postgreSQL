@@ -40,7 +40,7 @@ module.exports = (sequelize) => {
 
       sourceId: {
         type: DataTypes.UUID,
-        allowNull: true, // Optional: booking ID, fest ID, etc.
+        allowNull: true,
       },
 
       coinsToIssue: {
