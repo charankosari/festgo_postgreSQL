@@ -1,12 +1,12 @@
-const { CronThing } = require("../models/services");
+const { CronThing, sequelize } = require("../models/services");
 const {
   FestGoCoinHistory,
   FestgoCoinTransaction,
-  sequelize,
+  usersequel,
 } = require("../models/users");
 const issuePendingCoins = async () => {
-  const t = await sequelize.transaction();
-
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
   try {
     // 🔍 Fetch active cron job
     const cronThing = await CronThing.findOne({
