@@ -129,7 +129,7 @@ const checkAndIssueLoginBonus = async (userId) => {
     const existingBonus = await FestgoCoinTransaction.findOne({
       where: {
         userId,
-        source: "login_bonus", // or `type: 'login_bonus'` depending on your schema
+        type: "login_bonus", // or `type: 'login_bonus'` depending on your schema
       },
     });
 
