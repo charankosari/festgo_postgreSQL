@@ -38,6 +38,7 @@ const property_booking = require("./property_booking.model")(servicesSequelize);
 const city_fest_booking = require("./city_fest_booking.model")(
   servicesSequelize
 );
+
 // room rate inventory
 const RoomRateInventory = require("./room_rate_inventory.model")(
   servicesSequelize
@@ -103,6 +104,7 @@ room_amenity.belongsTo(Room, {
   as: "room",
   onDelete: "CASCADE",
 });
+
 // for available rooms
 Property.hasMany(RoomBookedDate, {
   foreignKey: "propertyId",
