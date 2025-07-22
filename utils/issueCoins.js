@@ -1,4 +1,8 @@
-const { FestgoCoinTransaction, FestGoCoinHistory } = require("../models/users"); // ✅ Correct
+const {
+  FestgoCoinTransaction,
+  FestGoCoinHistory,
+  ReferralHistory,
+} = require("../models/users"); // ✅ Correct
 const { Op } = require("sequelize");
 const createInitialFestgoTransaction = async (userId) => {
   try {
