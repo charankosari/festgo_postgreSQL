@@ -44,6 +44,16 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: 0,
       },
+      coins_per_referral: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0.0,
+      },
+      coins_earned_per_booking: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0.0,
+      },
     },
     {
       sequelize,

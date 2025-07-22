@@ -8,8 +8,8 @@ cron.schedule("*/2 * * * *", () => {
   expireStaleBookings();
 });
 
-// 🪙 Run every 2 minutes: Issue pending FestGo coins
-cron.schedule("*/2 * * * *", () => {
+// 🪙 Run every 10 minutes: Issue pending FestGo coins
+cron.schedule("*/10 * * * *", () => {
   console.log("🪙 Running cron to issue pending FestGo coins...");
   issuePendingCoins();
 });
