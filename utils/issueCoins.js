@@ -274,7 +274,7 @@ const handleReferralForEvent = async ({ referralId, event }) => {
   const referralCount = await FestGoCoinHistory.count({
     where: {
       userId: referrer.id,
-      type: "event_referral",
+      reason: "event referral",
       createdAt: { [Op.gte]: startOfMonth },
     },
     transaction: user_tx,

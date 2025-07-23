@@ -1,5 +1,16 @@
-const { Property, FestgoCoinSetting } = require("../models/services");
-const { User } = require("../models/users");
+const {
+  Property,
+  FestgoCoinSetting,
+  Event,
+  sequelize,
+} = require("../models/services");
+const {
+  User,
+  usersequel,
+  FestgoCoinToIssue,
+  FestgoCoinTransaction,
+  FestGoCoinHistory,
+} = require("../models/users");
 
 // ✅ Get all vendors
 exports.getAllVendors = async (req, res) => {
@@ -145,5 +156,98 @@ exports.getAllCoinSettings = async (req, res) => {
   } catch (error) {
     console.error("Error in getAllCoinSettings:", error);
     res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+exports.updateEventStatus = async (req, res) => {
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+  try {
+    const { eventId } = req.params;
+    const { status } = req.body;
+
+    // ✅ Validate status
+    const validStatuses = ["pending", "hold", "accepted", "cancelled"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    // 🔍 Find event
+    const event = await Event.findByPk(eventId, { transaction: service_tx });
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // ✅ Update status
+    event.status = status;
+    await event.save({ transaction: service_tx });
+
+    // 💰 Issue coins if accepted
+    if (status === "accepted") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: { event_id: event.id, issue: false },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        const now = new Date();
+
+        // 🔄 Create FestgoCoinTransaction
+        await FestgoCoinTransaction.create(
+          {
+            userId: coinToIssue.userId,
+            type: "event_referral",
+            amount: coinToIssue.amount,
+            remaining: coinToIssue.amount,
+            sourceType: "event",
+            sourceId: event.id,
+            expiresAt: new Date(now.setMonth(now.getMonth() + 12)),
+          },
+          { transaction: user_tx }
+        );
+
+        // 🔄 Update FestgoCoinToIssue
+        coinToIssue.issue = true;
+        coinToIssue.issueAt = new Date();
+        await coinToIssue.save({ transaction: t });
+
+        // 🔄 Upsert FestgoCoinHistory
+        await FestGoCoinHistory.update(
+          {
+            status: "issued",
+            issuedAt: new Date(),
+          },
+
+          {
+            where: {
+              reason: "event referral", // or whatever your reason is
+              referenceId: event.id, // or booking.id etc.
+              status: "pending",
+            },
+          }
+        );
+      }
+    }
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Event status updated to '${status}'`,
+      event,
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("Error updating event status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
