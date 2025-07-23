@@ -2,6 +2,7 @@ const {
   FestgoCoinTransaction,
   FestGoCoinHistory,
   ReferralHistory,
+  FestgoCoinToIssue,
   usersequel,
 } = require("../models/users"); // ✅ Correct
 const { FestgoCoinSetting, sequelize } = require("../models/services");
@@ -237,6 +238,97 @@ const createPropertyReferralTempCoin = async (
   }
 };
 
+const handleReferralForEvent = async ({ referralId, event }) => {
+  if (!referralId || !event || !event.eventBudget) return;
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+
+  // 🔍 Step 1: Find referring user by referralCode
+  const referrer = await User.findOne({
+    where: { referralCode: referralId },
+  });
+
+  if (!referrer) {
+    console.warn("⚠️ Invalid referral code");
+    return;
+  }
+
+  // ⚙️ Step 2: Get event referral settings
+  const setting = await FestgoCoinSetting.findOne({
+    where: { type: "event" },
+    transaction: service_tx,
+  });
+
+  if (!setting) {
+    console.warn("⚠️ FestgoCoinSetting not found for type 'event'");
+    return;
+  }
+
+  const maxReferrals = setting.monthly_referral_limit;
+  const coinsPerReferral = parseFloat(setting.coins_per_referral || 0);
+
+  // 📆 Step 3: Get current month’s referral count for referrer
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const referralCount = await FestGoCoinHistory.count({
+    where: {
+      userId: referrer.id,
+      type: "event_referral",
+      createdAt: { [Op.gte]: startOfMonth },
+    },
+    transaction: user_tx,
+  });
+
+  if (referralCount >= maxReferrals) {
+    console.warn("⚠️ Monthly referral limit reached");
+    return;
+  }
+
+  // 💰 Step 4: Compute coin issuance cap (2% of event budget)
+  const budget = parseFloat(event.eventBudget);
+  const coinCap = budget * 0.02;
+  const coinsToIssue = Math.min(coinsPerReferral, coinCap);
+
+  if (coinsToIssue <= 0) {
+    console.warn("⚠️ Computed coins to issue is 0");
+    return;
+  }
+
+  // 🪙 Step 5: Create pending FestGoCoinHistory
+  await FestGoCoinHistory.create(
+    {
+      userId: referrer.id,
+      status: "pending",
+      type: "earned",
+      reason: "event referral",
+      referenceId: event.id,
+      coins: coinsToIssue,
+      metaData: {
+        eventId: event.id,
+        type: "event_referral",
+      },
+    },
+    { transaction: user_tx }
+  );
+  await FestgoCoinToIssue.create(
+    {
+      userId: referrer.id,
+      referral_id: referralId,
+      sourceType: "event",
+      sourceId: event.id,
+      coinsToIssue,
+      status: "pending",
+      type: "event_referral",
+      issue: false,
+      issueAt: null,
+    },
+    { transaction: t }
+  );
+  console.log(
+    `✅ Pending coins (${coinsToIssue}) created for referrer: ${referrer.id}`
+  );
+};
 module.exports = {
   createInitialFestgoTransaction,
   issueUserReferralCoins,
