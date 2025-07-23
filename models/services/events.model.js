@@ -63,10 +63,12 @@ module.exports = (sequelize) =>
         type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: [],
       },
-      accept: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
+      status: {
+        type: DataTypes.ENUM("pending", "hold", "cancelled", "accepted"),
+        allowNull: false,
+        defaultValue: "pending",
       },
+
       eventTypeId: {
         type: DataTypes.UUID,
         allowNull: false,

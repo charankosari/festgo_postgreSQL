@@ -9,13 +9,14 @@ exports.createEvent = async (req, res) => {
     }
 
     // 🧹 Remove 'active' from req.body if present
-    if ("active" in req.body) {
-      delete req.body.active;
+    if ("status" in req.body) {
+      delete req.body.status;
     }
 
     const eventData = {
       ...req.body,
       userId,
+      status: "pending",
     };
 
     const event = await Event.create(eventData);
@@ -45,8 +46,8 @@ exports.updateEvent = async (req, res) => {
     if (!event) return res.status(404).json({ message: "Event not found" });
 
     // 🧹 Remove 'active' from req.body if present
-    if ("active" in req.body) {
-      delete req.body.active;
+    if ("status" in req.body) {
+      delete req.body.status;
     }
 
     await event.update(req.body);
