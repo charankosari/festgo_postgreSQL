@@ -569,11 +569,11 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
       );
 
       await FestGoCoinHistory.update(
-        { is_valid: false },
+        { status: "not valid" },
         {
           where: {
             referenceId: bookingId,
-            is_valid: true,
+            status: "pending",
           },
           transaction: t,
         }
