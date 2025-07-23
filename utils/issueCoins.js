@@ -333,5 +333,6 @@ module.exports = {
   createInitialFestgoTransaction,
   issueUserReferralCoins,
   calculateFestgoCoins,
-  createPropertyReferralTempCoin,
+  // createPropertyReferralTempCoin,
+  handleReferralForEvent,
 };

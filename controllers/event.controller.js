@@ -1,5 +1,5 @@
 const { Event, EventType } = require("../models/services"); // adjust path as per your project
-
+const { handleReferralForEvent } = require("../utils/issueCoins"); // adjust path as per your project}
 // Create Event
 exports.createEvent = async (req, res) => {
   try {
@@ -20,7 +20,10 @@ exports.createEvent = async (req, res) => {
     };
 
     const event = await Event.create(eventData);
-
+    const referralId = req.body.referral_id?.trim();
+    if (referralId && referralId.length > 0) {
+      await handleReferralForEvent(referralId, event);
+    }
     res.status(201).json({
       success: true,
       message: "Event created successfully",
