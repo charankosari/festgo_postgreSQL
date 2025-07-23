@@ -56,38 +56,43 @@ const issuePendingCoins = async () => {
           userId,
           amount: coinsToIssue,
           remaining: coinsToIssue,
+          CurrentMonthCount: 0,
           type,
-          source: sourceType,
-          reference_id: sourceId,
           expiresAt: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000), // 1 year
-          metaData,
         },
         { transaction: user_tx }
       );
 
       // 📘 Step 4: Create coin history
-      await FestGoCoinHistory.create(
+      await FestGoCoinHistory.upsert(
         {
           userId,
-          status: "issued",
-          type: "earned",
-          reason: sourceType + "_referral",
-          referenceId: booking_id || sourceId,
-          coins: coinsToIssue,
-          metaData,
+          status: "pending",
+          referenceId: booking_id,
         },
         { transaction: user_tx }
       );
 
       // ✅ Step 5: Update coin to issue entry
-      await row.update(
-        {
-          status: "issued",
-          issuedAt: now,
-          issue: false,
+      const history = await FestGoCoinHistory.findOne({
+        where: {
+          userId,
+          referenceId: booking_id,
+          status: "pending",
         },
-        { transaction: user_tx }
-      );
+        transaction: user_tx,
+        lock: user_tx.LOCK.UPDATE, // optional: prevent race conditions
+      });
+
+      if (history) {
+        await history.update(
+          {
+            status: "issued",
+            issuedAt: new Date(),
+          },
+          { transaction: user_tx }
+        );
+      }
     }
 
     // 🔄 Step 6: Check if anything is left to issue
