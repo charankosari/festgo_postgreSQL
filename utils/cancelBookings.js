@@ -7,7 +7,7 @@ const {
   Event,
   sequelize, // your services sequelize instance
 } = require("../models/services");
-
+const { FestgoCoinToIssue, FestGoCoinHistory } = require("../models/users");
 const { refundPayment } = require("../libs/payments/razorpay");
 const moment = require("moment");
 const cancelPropertyBooking = async (req, res) => {
@@ -95,7 +95,27 @@ const cancelPropertyBooking = async (req, res) => {
             : "norefund"
           : "norefund",
     });
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          booking_id: booking.id,
+          status: "pending",
+        },
+        transaction: t,
+      }
+    );
 
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: booking.id,
+          status: "pending",
+        },
+        transaction: t,
+      }
+    );
     res.status(200).json({
       success: true,
       message:
