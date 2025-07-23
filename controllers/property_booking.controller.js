@@ -635,6 +635,27 @@ exports.handlePaymentFailure = async (bookingId) => {
     await RoomBookedDate.destroy({
       where: { bookingId, status: "pending" },
     });
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          booking_id: bookingId,
+          status: "pending",
+        },
+        transaction: t,
+      }
+    );
+
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: bookingId,
+          status: "pending",
+        },
+        transaction: t,
+      }
+    );
 
     console.log(`❌ Booking ${bookingId} cancelled, rooms released.`);
     return true;
