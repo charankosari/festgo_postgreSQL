@@ -125,6 +125,7 @@ const cancelPropertyBooking = async (req, res) => {
       refundAmount,
       refundPercentage,
       cancellationPolicy: policy,
+      booking: booking,
     });
   } catch (error) {
     console.error("Error cancelling property booking:", error);
