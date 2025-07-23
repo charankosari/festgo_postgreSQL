@@ -63,7 +63,10 @@ module.exports = (sequelize) =>
         type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: [],
       },
-
+      accept: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       eventTypeId: {
         type: DataTypes.UUID,
         allowNull: false,

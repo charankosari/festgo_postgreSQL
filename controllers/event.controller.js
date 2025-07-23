@@ -7,11 +7,19 @@ exports.createEvent = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized: User not found" });
     }
+
+    // 🧹 Remove 'active' from req.body if present
+    if ("active" in req.body) {
+      delete req.body.active;
+    }
+
     const eventData = {
       ...req.body,
       userId,
     };
+
     const event = await Event.create(eventData);
+
     res.status(201).json({
       success: true,
       message: "Event created successfully",
@@ -35,6 +43,11 @@ exports.updateEvent = async (req, res) => {
     const event = await Event.findByPk(id);
 
     if (!event) return res.status(404).json({ message: "Event not found" });
+
+    // 🧹 Remove 'active' from req.body if present
+    if ("active" in req.body) {
+      delete req.body.active;
+    }
 
     await event.update(req.body);
     res.json(event);
