@@ -96,6 +96,7 @@ const issueUserReferralCoins = async ({
       userId: referrerId,
       type: "earned",
       reason: note,
+      status: "issued",
       coins,
       referenceId: referredId,
       metaData: {
@@ -170,7 +171,7 @@ const createPropertyReferralTempCoin = async (
     const currentMonthReferrals = await FestGoCoinHistory.count({
       where: {
         userId: referringUser.id,
-        reason: "property_referral",
+        reason: "property_recommend",
         createdAt: {
           [Op.between]: [currentMonthStart, currentMonthEnd],
         },
@@ -208,7 +209,7 @@ const createPropertyReferralTempCoin = async (
         userId: referringUser.id,
         status: "pending",
         type: "earned",
-        reason: "property_referral",
+        reason: "property_recommend",
         referenceId: bookingId,
         coins,
         metaData,

@@ -9,10 +9,16 @@ const {
   Event,
   EventType,
   CronThing,
+  FestgoCoinSetting,
   sequelize, // your services sequelize instance
 } = require("../models/services");
 
-const { User } = require("../models/users");
+const {
+  User,
+  FestGoCoinHistory,
+  FestgoCoinToIssue,
+  usersequel,
+} = require("../models/users");
 const { createOrder } = require("../libs/payments/razorpay");
 const { FESTGO_COIN_VALUE } = require("../config/festgo_coin");
 const { Op, Transaction } = require("sequelize");
@@ -21,6 +27,174 @@ const {
   cancelPropertyBooking,
   cancelEventBooking,
 } = require("../utils/cancelBookings");
+const handleUserReferralForPropertyBooking = async (
+  referral_id,
+  referredUserId,
+  bookingId,
+  property_id,
+  service_tx // services DB transaction
+) => {
+  if (!referral_id || referral_id.trim() === "") {
+    console.log(
+      "🚫 Referral ID is empty or not provided. Skipping referral handling."
+    );
+    return;
+  }
+
+  const user_tx = await usersequel.transaction();
+  console.log("🔄 Started user transaction");
+
+  try {
+    // Fetch referred user
+    const referredUser = await User.findByPk(referredUserId, {
+      transaction: user_tx,
+    });
+    if (!referredUser) {
+      console.log(`🚫 Referred user with ID ${referredUserId} not found.`);
+      await user_tx.rollback();
+      return;
+    }
+    console.log("✅ Referred user found:", referredUser.id);
+
+    // Fetch referrer by referral code
+    const referrer = await User.findOne({
+      where: { referralCode: referral_id },
+      transaction: user_tx,
+    });
+    if (!referrer || referrer.id === referredUserId) {
+      console.log("🚫 Referrer not found or trying to refer self.");
+      await user_tx.rollback();
+      return;
+    }
+    console.log("✅ Referrer found:", referrer.id);
+
+    // Get booking
+    const booking = await property_booking.findOne({
+      where: {
+        user_id: referrer.id,
+        property_id: property_id,
+        booking_status: "confirmed",
+        payment_status: "paid",
+      },
+      transaction: service_tx,
+    });
+    if (!booking) {
+      console.log("🚫 Booking not found");
+      await user_tx.rollback();
+      return;
+    }
+    console.log("✅ Booking found:", booking.id);
+
+    const today = new Date();
+    const checkOutDate = new Date(booking.check_out_date);
+    if (checkOutDate >= today) {
+      console.log("🚫 Checkout date hasn't passed yet. Cannot issue coins.");
+      await user_tx.rollback();
+      return;
+    }
+    console.log("✅ Checkout date passed. Proceeding.");
+
+    // Get coin settings
+    const setting = await FestgoCoinSetting.findOne({
+      where: { type: "property" },
+      transaction: service_tx,
+    });
+    if (!setting || Number(setting.coins_per_referral) <= 0) {
+      console.log("🚫 Invalid coin setting or 0 coins per referral.");
+      await user_tx.rollback();
+      return;
+    }
+    console.log(
+      "✅ Coin setting found. Coins per referral:",
+      setting.coins_per_referral
+    );
+
+    // Monthly limit check
+    const thisMonthStart = new Date();
+    thisMonthStart.setDate(1);
+    thisMonthStart.setHours(0, 0, 0, 0);
+
+    const referralCount = await FestGoCoinHistory.count({
+      where: {
+        userId: referrer.id,
+        createdAt: {
+          [Op.gte]: thisMonthStart,
+        },
+        status: ["pending", "issued"],
+      },
+      transaction: user_tx,
+    });
+
+    if (referralCount >= (setting.monthly_referral_limit || 0)) {
+      console.log("🚫 Monthly referral limit reached:", referralCount);
+      await user_tx.rollback();
+      return;
+    }
+    console.log("✅ Monthly referral count is within limit:", referralCount);
+
+    // Create coin history
+    await FestGoCoinHistory.create(
+      {
+        userId: referrer.id,
+        type: "earned",
+        reason: "property_recommend",
+        referenceId: bookingId,
+        coins: Number(setting.coins_per_referral),
+        status: "pending",
+        metaData: {
+          referral: referral_id,
+          referredUser: referredUser.id,
+          propertyId: booking.property_id,
+        },
+      },
+      { transaction: user_tx }
+    );
+    console.log("🪙 Coin history created.");
+
+    // Create pending coin issue entry
+    await FestgoCoinToIssue.create(
+      {
+        booking_id: booking.id,
+        userId: referrer.id,
+        referral_id,
+        sourceType: "property",
+        sourceId: booking.property_id,
+        coinsToIssue: Number(setting.coins_per_referral),
+        status: "pending",
+        type: "property_recommend",
+        issueAt: new Date(checkOutDate.getTime() + 86400000), // next day
+        issue: false,
+        metaData: {
+          referredUserId,
+          bookingId: booking.id,
+        },
+      },
+      { transaction: user_tx }
+    );
+    console.log("📦 Coin issue record created for next day.");
+
+    // Upsert cron job entry
+    await CronThing.upsert(
+      {
+        entity: "property_coins_issue",
+        active: true,
+        last_run: new Date(),
+      },
+      { transaction: service_tx }
+    );
+    console.log("🕓 CronThing upserted for property_coins_issue");
+
+    // Commit user transaction
+    await user_tx.commit();
+    console.log(
+      `✅ Referral coins scheduled for user ${referrer.id} on booking ${booking.id}`
+    );
+  } catch (err) {
+    await user_tx.rollback();
+    console.error("❌ Referral handling error:", err);
+    throw err;
+  }
+};
 
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
@@ -261,6 +435,16 @@ exports.bookProperty = async (req, res) => {
       { entity: "property_booking", active: true, last_run: new Date() },
       { transaction: t }
     );
+    if (req.body.referral_id && req.body.referral_id.trim() !== "") {
+      console.log("entering referral handling");
+      await handleUserReferralForPropertyBooking(
+        req.body.referral_id.trim(),
+        user.id,
+        newBooking.id,
+        property_id,
+        t // this is the `sequelize.transaction` object
+      );
+    }
 
     await t.commit();
 
@@ -373,7 +557,27 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         payment_id: transactionId,
         amount: booking.amount_paid,
       });
+      await FestgoCoinToIssue.update(
+        { status: "cancelled" },
+        {
+          where: {
+            booking_id: bookingId,
+            status: "pending",
+          },
+          transaction: t,
+        }
+      );
 
+      await FestGoCoinHistory.update(
+        { is_valid: false },
+        {
+          where: {
+            referenceId: bookingId,
+            is_valid: true,
+          },
+          transaction: t,
+        }
+      );
       await t.commit();
       console.log(
         `❌ Booking ${bookingId} cancelled due to overbooking, refund initiated.`
@@ -395,7 +599,16 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
       { status: "confirmed" },
       { where: { bookingId, status: "pending" }, transaction: t }
     );
-
+    await FestgoCoinToIssue.update(
+      { issue: true },
+      {
+        where: {
+          booking_id: bookingId,
+          issue: false,
+        },
+        transaction: t,
+      }
+    );
     await t.commit();
     console.log(`✅ Booking ${bookingId} confirmed, rooms blocked.`);
     return true;
