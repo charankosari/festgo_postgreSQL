@@ -16,9 +16,10 @@ async function applyUsableFestgoCoins({
   total_room_price,
   gst_amount,
   transaction,
+  user_tx,
 }) {
   const now = new Date();
-  const user_tx = await usersequel.transaction();
+  //   const user_tx = await usersequel.transaction();
   // ✅ Step 1: Check total allowed monthly usage (FestgoCoinUsageLimit)
   const coinLimit = await FestgoCoinUsageLimit.findOne({ transaction });
   if (!coinLimit || !coinLimit?.allother) {
@@ -133,7 +134,6 @@ async function applyUsableFestgoCoins({
 
   const coins_discount_value = usable_coins * 1;
   const amount_paid = gross_payable - coins_discount_value;
-
   return {
     usable_coins,
     coins_discount_value,
