@@ -1,6 +1,9 @@
 const cron = require("node-cron");
 const expireStaleBookings = require("./expireStaleBookings");
-const issuePendingCoins = require("./issuePendingCoins");
+const {
+  issuePendingCoins,
+  issueBeachFestPendingCoins,
+} = require("./issuePendingCoins");
 
 // 🕒 Run every 2 minutes: Expire stale room bookings
 cron.schedule("*/2 * * * *", () => {
@@ -12,4 +15,9 @@ cron.schedule("*/2 * * * *", () => {
 cron.schedule("*/10 * * * *", () => {
   console.log("🪙 Running cron to issue pending FestGo coins...");
   issuePendingCoins();
+});
+// 🪙 Run every 10 minutes: Issue pending FestGo coins
+cron.schedule("*/10 * * * *", () => {
+  console.log("🪙 Running cron to issue pending FestGo coins...");
+  issueBeachFestPendingCoins();
 });
