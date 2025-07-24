@@ -7,10 +7,15 @@ const {
   Event,
   sequelize, // your services sequelize instance
 } = require("../models/services");
-const { FestgoCoinToIssue, FestGoCoinHistory } = require("../models/users");
+const {
+  FestgoCoinToIssue,
+  FestGoCoinHistory,
+  usersequel,
+} = require("../models/users");
 const { refundPayment } = require("../libs/payments/razorpay");
 const moment = require("moment");
 const cancelPropertyBooking = async (req, res) => {
+  const user_tx = await usersequel.transaction();
   try {
     const { id } = req.params;
 
@@ -19,6 +24,7 @@ const cancelPropertyBooking = async (req, res) => {
     });
 
     if (!booking) {
+      await user_tx.rollback();
       return res
         .status(404)
         .json({ success: false, message: "Booking not found." });
@@ -102,7 +108,7 @@ const cancelPropertyBooking = async (req, res) => {
           booking_id: booking.id,
           status: "pending",
         },
-        transaction: t,
+        transaction: user_tx,
       }
     );
 
@@ -113,9 +119,10 @@ const cancelPropertyBooking = async (req, res) => {
           referenceId: booking.id,
           status: "pending",
         },
-        transaction: t,
+        transaction: user_tx,
       }
     );
+    await user_tx.commit();
     res.status(200).json({
       success: true,
       message:
@@ -128,6 +135,7 @@ const cancelPropertyBooking = async (req, res) => {
       booking: booking,
     });
   } catch (error) {
+    await user_tx.rollback();
     console.error("Error cancelling property booking:", error);
     res.status(500).json({ success: false, message: "Something went wrong." });
   }
@@ -135,6 +143,7 @@ const cancelPropertyBooking = async (req, res) => {
 
 // Event booking cancel placeholder
 const cancelEventBooking = async (req, res) => {
+  const user_tx = await usersequel.transaction();
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -154,8 +163,32 @@ const cancelEventBooking = async (req, res) => {
       });
     }
 
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          sourceId: event.id,
+          type: "event_referral",
+          sourceType: "event",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: event.id,
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
     await event.destroy();
 
+    await user_tx.commit();
     res.status(200).json({
       success: true,
       message: "Event booking cancelled successfully.",
@@ -172,6 +205,7 @@ const cancelEventBooking = async (req, res) => {
 // Beach fest booking cancel placeholder
 const cancelBeachFestBooking = async (req, res) => {
   const t = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
   try {
     const { id } = req.params;
 
@@ -239,7 +273,30 @@ const cancelBeachFestBooking = async (req, res) => {
       { transaction: t }
     );
 
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          booking_id: booking.id,
+          type: "beachfest_referral",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: booking.id,
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
     await t.commit();
+    await user_tx.commit();
 
     res.status(200).json({
       success: true,
