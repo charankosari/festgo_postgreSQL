@@ -27,10 +27,7 @@ module.exports = (sequelize) => {
       },
       allother: {
         type: DataTypes.JSON,
-        defaultValue: {
-          transaction_limit: 0,
-          monthly_limit: 0,
-        },
+        monthly_limit: DataTypes.INTEGER,
       },
     },
     {
