@@ -54,4 +54,17 @@ router.get(
   authorizedRoles("admin"),
   adminController.getAllCoinSettings
 );
+
+router.post(
+  "/usage-limits",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.upsertCoinUsageLimit
+);
+router.get(
+  "/usage-limits",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getCoinUsageLimit
+);
 module.exports = router;

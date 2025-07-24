@@ -1,6 +1,7 @@
 const {
   Property,
   FestgoCoinSetting,
+  FestgoCoinUsageLimit,
   Event,
   sequelize,
 } = require("../models/services");
@@ -247,6 +248,66 @@ exports.updateEventStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+exports.upsertCoinUsageLimit = async (req, res) => {
+  try {
+    const payload = req.body;
+
+    // Get existing data if exists
+    let existing = await FestgoCoinUsageLimit.findByPk(1);
+
+    const finalData = {
+      id: 1,
+      festbite: payload.festbite ||
+        existing?.festbite || { transaction_limit: 0, monthly_limit: 0 },
+      event: payload.event ||
+        existing?.event || { transaction_limit: 0, monthly_limit: 0 },
+      allother: payload.allother ||
+        existing?.allother || { transaction_limit: 0, monthly_limit: 0 },
+    };
+
+    const [record, created] = await FestgoCoinUsageLimit.upsert(finalData, {
+      returning: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: created ? "Created new usage limits" : "Updated usage limits",
+      data: record,
+    });
+  } catch (error) {
+    console.error("🔴 Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+exports.getCoinUsageLimit = async (req, res) => {
+  try {
+    const usageLimit = await FestgoCoinUsageLimit.findByPk(1);
+
+    if (!usageLimit) {
+      return res.status(404).json({
+        success: false,
+        message: "Coin usage limit not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: usageLimit,
+    });
+  } catch (error) {
+    console.error("🔴 Error fetching coin usage limit:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
       error: error.message,
     });
   }
