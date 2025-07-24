@@ -3,7 +3,11 @@ const {
   beachfests_booking,
   sequelize,
 } = require("../models/services");
-
+const {
+  FestgoCoinToIssue,
+  FestGoCoinHistory,
+  usersequel,
+} = require("../models/users");
 const { createOrder, refundPayment } = require("../libs/payments/razorpay"); // your Razorpay order util
 const {
   handleUserReferralForBeachFestBooking,
@@ -109,6 +113,7 @@ exports.createBeachFestBooking = async (req, res) => {
         userId,
         newBooking.id,
         id,
+        fest.event_end,
         t
       ).catch((err) => {
         console.error("❌ Error handling referral (non-blocking):", err);
@@ -139,6 +144,7 @@ exports.createBeachFestBooking = async (req, res) => {
 
 exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
   const t = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
   try {
     const booking = await beachfests_booking.findByPk(bookingId, {
       transaction: t,
@@ -166,7 +172,36 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
         payment_id: transactionId,
         amount: booking.amount_paid,
       });
+      await FestGoCoinHistory.update(
+        {
+          status: "not_valid",
+        },
+        {
+          where: {
+            referenceId: bookingId,
+            reason: "beachfest referral",
+            status: "pending", // Only if it's still pending
+          },
+          transaction: user_tx,
+        }
+      );
 
+      // 🪙 Cancel coin to issue if exists
+      await FestgoCoinToIssue.update(
+        {
+          status: "cancelled",
+          issue: false,
+        },
+        {
+          where: {
+            booking_id: bookingId,
+            sourceType: "beachfest",
+            type: "beachfest_referral",
+            status: "pending",
+          },
+          transaction: user_tx,
+        }
+      );
       await t.commit();
 
       console.log(
@@ -187,7 +222,27 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
       },
       { where: { id: bookingId }, transaction: t }
     );
-
+    const coinToIssue = await FestgoCoinToIssue.findOne({
+      where: {
+        booking_id: bookingId,
+        sourceType: "beachfest",
+        type: "beachfest_referral",
+        status: "pending",
+        issue: false,
+      },
+      transaction: user_tx,
+    });
+    coinToIssue.issue = true;
+    await coinToIssue.save({ transaction: user_tx });
+    await CronThing.upsert(
+      {
+        entity: "beachfest_coins_issue",
+        active: true,
+        last_run: new Date(),
+      },
+      { transaction: t }
+    );
+    await user_tx.commit();
     await t.commit();
     console.log(`✅ Booking ${bookingId} confirmed, passes deducted.`);
     return { success: true, message: "Booking confirmed." };
@@ -198,6 +253,7 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
   }
 };
 exports.handleBeachfestPaymentFailure = async (bookingId) => {
+  const user_tx = await usersequel.transaction();
   try {
     await beachfests_booking.update(
       {
@@ -206,6 +262,38 @@ exports.handleBeachfestPaymentFailure = async (bookingId) => {
       },
       { where: { id: bookingId } }
     );
+    await FestGoCoinHistory.update(
+      {
+        status: "not_valid",
+      },
+      {
+        where: {
+          referenceId: bookingId,
+          reason: "beachfest referral",
+          status: "pending", // Only if it's still pending
+        },
+        transaction: user_tx,
+      }
+    );
+
+    // 🪙 Cancel coin to issue if exists
+    await FestgoCoinToIssue.update(
+      {
+        status: "cancelled",
+        issue: false,
+      },
+      {
+        where: {
+          booking_id: bookingId,
+          sourceType: "beachfest",
+          type: "beachfest_referral",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+    await user_tx.commit();
+
     console.log(`❌ Beachfest Booking ${bookingId} cancelled.`);
     return true;
   } catch (error) {

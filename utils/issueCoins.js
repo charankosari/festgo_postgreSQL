@@ -328,17 +328,20 @@ const handleReferralForEvent = async ({ referralId, event }) => {
       issue: false,
       issueAt: null,
     },
-    { transaction: t }
+    { transaction: user_tx }
   );
   console.log(
     `✅ Pending coins (${coinsToIssue}) created for referrer: ${referrer.id}`
   );
+  await user_tx.commit();
+  await service_tx.commit();
 };
 const handleUserReferralForBeachFestBooking = async (
   referral_id,
   referredUserId,
   bookingId,
   beachfest_id,
+  issueAt,
   service_tx
 ) => {
   if (!referral_id || referral_id.trim() === "") {
@@ -425,7 +428,7 @@ const handleUserReferralForBeachFestBooking = async (
         coinsToIssue: Number(setting.coins_per_referral),
         status: "pending",
         type: "beachfest_referral",
-        issueAt: new Date(checkOutDate.getTime() + 86400000),
+        issueAt: new Date(issueAt.getTime() + 86400000),
         issue: false,
         metaData: {
           referredUserId,
