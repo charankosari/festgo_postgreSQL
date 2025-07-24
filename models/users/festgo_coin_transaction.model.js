@@ -39,7 +39,6 @@ module.exports = (sequelize) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
-
       CurrentMonthCount: {
         type: DataTypes.INTEGER,
         allowNull: true,
