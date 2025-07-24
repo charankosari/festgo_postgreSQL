@@ -48,6 +48,9 @@ const FestgoCoinSetting = require("./festgo_coins_settings.model")(
 );
 // cron
 const CronThing = require("./cron_things")(servicesSequelize);
+const CoinLimits = require("./festgo_coins_usage_limits.model")(
+  servicesSequelize
+);
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
   as: "category",
@@ -249,6 +252,7 @@ const db = {
   ContactMessage,
   RoomRateInventory,
   FestgoCoinSetting,
+  CoinLimits,
 };
 
 // Sync all models
