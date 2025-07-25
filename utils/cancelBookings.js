@@ -10,6 +10,7 @@ const {
 const {
   FestgoCoinToIssue,
   FestGoCoinHistory,
+  FestgoCoinTransaction,
   usersequel,
 } = require("../models/users");
 const { refundPayment } = require("../libs/payments/razorpay");
@@ -122,11 +123,72 @@ const cancelPropertyBooking = async (req, res) => {
       {
         where: {
           referenceId: booking.id,
+          type: "earned",
           status: "pending",
         },
         transaction: user_tx,
       }
     );
+    const usedCoinHistory = await FestGoCoinHistory.findOne({
+      where: {
+        referenceId: booking.id,
+        type: "used",
+      },
+      transaction: user_tx,
+    });
+    let refundedCoins = 0;
+    if (usedCoinHistory) {
+      const totalUsedCoins = usedCoinHistory.coins;
+      refundedCoins = Math.floor(totalUsedCoins * (refundPercentage / 100));
+
+      if (refundedCoins > 0) {
+        const txnsToRestore = await FestgoCoinTransaction.findAll({
+          where: { user_id: booking.user_id },
+          order: [["expiredAt", "ASC"]],
+          transaction: user_tx,
+        });
+
+        let remainingToRefund = refundedCoins;
+
+        for (const txn of txnsToRestore) {
+          const originallyUsed = txn.amount - txn.remaining;
+          const refundable = Math.min(originallyUsed, remainingToRefund);
+
+          if (refundable <= 0) continue;
+
+          txn.remaining += refundable;
+          remainingToRefund -= refundable;
+
+          await txn.save({ transaction: user_tx });
+
+          if (remainingToRefund <= 0) break;
+        }
+
+        // Mark original usage history as not valid
+        await usedCoinHistory.update(
+          { status: "not valid" },
+          { transaction: user_tx }
+        );
+
+        // Create new refund coin history
+        await FestGoCoinHistory.create(
+          {
+            userId: booking.user_id,
+            type: "refund",
+            reason: "booking_cancelled",
+            referenceId: booking.id,
+            coins: refundedCoins,
+            status: "issued",
+            metaData: {
+              booking_amount: booking.amount_paid,
+              refund_percentage: refundPercentage,
+              cancellation_policy: policy,
+            },
+          },
+          { transaction: user_tx }
+        );
+      }
+    }
     await user_tx.commit();
     res.status(200).json({
       success: true,

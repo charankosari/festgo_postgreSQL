@@ -19,7 +19,7 @@ module.exports = (sequelize) => {
         defaultValue: "pending",
       },
       type: {
-        type: DataTypes.ENUM("earned", "used"),
+        type: DataTypes.ENUM("earned", "used", "refund"),
         allowNull: false,
       },
       reason: {
