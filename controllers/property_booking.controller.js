@@ -491,6 +491,7 @@ exports.bookProperty = async (req, res) => {
           gst_company_name,
           gst_company_address,
           property_id,
+          booking_id: newBooking.id,
           userId: userId,
         },
         { transaction: user_tx }
