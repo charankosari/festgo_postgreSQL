@@ -13,11 +13,11 @@ cron.schedule("*/2 * * * *", () => {
 
 // 🪙 Run every 10 minutes: Issue pending FestGo coins
 cron.schedule("*/10 * * * *", () => {
-  console.log("🪙 Running cron to issue pending FestGo coins...");
+  console.log("🪙 Running cron to issue pending  property FestGo coins...");
   issuePendingCoins();
 });
 // 🪙 Run every 10 minutes: Issue pending FestGo coins
 cron.schedule("*/10 * * * *", () => {
-  console.log("🪙 Running cron to issue pending FestGo coins...");
+  console.log("🪙 Running cron to issue pending beach fest FestGo coins...");
   issueBeachFestPendingCoins();
 });
