@@ -133,6 +133,7 @@ const cancelPropertyBooking = async (req, res) => {
       refundPercentage,
       cancellationPolicy: policy,
       booking: booking,
+      property: property,
     });
   } catch (error) {
     await user_tx.rollback();
