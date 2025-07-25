@@ -112,6 +112,22 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      gst_number: {
+        type: DataTypes.STRING(15),
+        validate: {
+          len: [15, 15],
+        },
+        allowNull: true,
+      },
+      gst_company_name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      gst_company_address: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+
       notes: {
         type: DataTypes.TEXT,
         allowNull: true,

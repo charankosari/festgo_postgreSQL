@@ -3,6 +3,7 @@ const {
   LoginHistory,
   FestgoCoinTransaction,
   ReferralHistory,
+  UserGstDetails,
 } = require("../models/users");
 const {
   property_booking,
@@ -10,7 +11,7 @@ const {
   Event,
   FestgoCoinSetting,
 } = require("../models/services");
-const { Sequelize } = require("sequelize");
+const { Sequelize, where } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
 const sendEmail = require("../libs/mailgun/mailGun");
 const { sendSMS } = require("../libs/sms/sms");
@@ -527,10 +528,14 @@ exports.getUserDetails = async (req, res) => {
         where: { userId: userId },
         order: [["loginTime", "DESC"]],
       });
+      const gst_details = await UserGstDetails.findOne({
+        where: { userId: userId },
+      });
       const festgoCoins = await calculateFestgoCoins(userId);
       cleanUser.festgo_coins = festgoCoins;
       cleanUser.loginHistories = loginHistory;
       cleanUser.bookingsCount = bookingsCount;
+      cleanUser.gst_details = gst_details;
     } else {
       cleanUser = safeUser(user, [
         "firstname",
@@ -637,6 +642,9 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           where: { userId: user.id },
           order: [["loginTime", "DESC"]],
         });
+        const gst_details = await UserGstDetails.findOne({
+          where: { userId: user.id },
+        });
         const cleanUser = safeUser(
           user,
           ["username"],
@@ -645,6 +653,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         const festgoCoins = await calculateFestgoCoins(user.id);
         cleanUser.festgo_coins = festgoCoins;
         cleanUser.loginHistories = loginHistories;
+        cleanUser.gst_details = gst_details;
         cleanUser.offers = 0;
         const message = "Login successful";
         return sendToken(cleanUser, 201, message, res);
@@ -681,7 +690,9 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         where: { userId: user.id },
         order: [["loginTime", "DESC"]],
       });
-
+      const gst_details = await UserGstDetails.findOne({
+        where: { userId: user.id },
+      });
       const cleanUser = safeUser(
         user,
         ["username"],
@@ -690,6 +701,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       const festgoCoins = await calculateFestgoCoins(user.id);
       cleanUser.festgo_coins = festgoCoins;
       cleanUser.loginHistories = loginHistories;
+      cleanUser.gst_details = gst_details;
       cleanUser.offers = 0;
       const message = "Login successful";
       return sendToken(cleanUser, 201, message, res);
@@ -846,6 +858,9 @@ exports.verifyEmailToken = async (req, res) => {
       where: { userId: user.id },
       order: [["loginTime", "DESC"]],
     });
+    const gst_details = await UserGstDetails.findOne({
+      where: { userId: user.id },
+    });
 
     const message = "Registration successful";
     const cleanUser = safeUser(
@@ -856,6 +871,7 @@ exports.verifyEmailToken = async (req, res) => {
     const festgoCoins = await calculateFestgoCoins(user.id);
     cleanUser.festgo_coins = festgoCoins;
     cleanUser.loginHistories = loginHistories;
+    cleanUser.gst_details = gst_details;
     cleanUser.offers = 0;
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
@@ -926,7 +942,9 @@ exports.verifyOtp = async (req, res) => {
     where: { userId: user.id },
     order: [["loginTime", "DESC"]],
   });
-
+  const gst_details = await UserGstDetails.findOne({
+    where: { userId: user.id },
+  });
   // Clean user for response
   const cleanUser = safeUser(
     user,
@@ -934,6 +952,7 @@ exports.verifyOtp = async (req, res) => {
     ["billing_address", "pincode", "state", "referralCode"]
   );
   cleanUser.loginHistories = loginHistories;
+  cleanUser.gst_details = gst_details;
   cleanUser.offers = 0;
   const festgoCoins = await calculateFestgoCoins(user.id);
   cleanUser.festgo_coins = festgoCoins;

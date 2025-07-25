@@ -19,6 +19,7 @@ const {
   FestgoCoinToIssue,
   FestgoCoinTransaction,
   usersequel,
+  UserGstDetails,
 } = require("../models/users");
 const { createOrder } = require("../libs/payments/razorpay");
 const { Op, Transaction } = require("sequelize");
@@ -214,6 +215,9 @@ exports.bookProperty = async (req, res) => {
       num_children,
       num_rooms,
       notes,
+      gst_number,
+      gst_company_name,
+      gst_company_address,
     } = req.body;
 
     // Fetch property
@@ -408,6 +412,9 @@ exports.bookProperty = async (req, res) => {
         payment_status: "pending",
         booking_status: "pending",
         transaction_id: null,
+        gst_number,
+        gst_company_name,
+        gst_company_address,
         notes,
       },
       { transaction: t }
@@ -477,7 +484,18 @@ exports.bookProperty = async (req, res) => {
         ],
       },
     });
-
+    if (gst_number || gst_company_name || gst_company_address) {
+      await UserGstDetails.create(
+        {
+          gst_number,
+          gst_company_name,
+          gst_company_address,
+          property_id,
+          userId: userId,
+        },
+        { transaction: user_tx }
+      );
+    }
     return res.status(201).json({
       message: "Booking created successfully",
       booking: newBooking,
