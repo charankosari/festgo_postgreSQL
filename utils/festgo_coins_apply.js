@@ -120,7 +120,7 @@ async function applyUsableFestgoCoins({
     if (remainingToUse <= 0) break;
     const deduct = Math.min(txn.remaining, remainingToUse);
     txn.remaining -= deduct;
-    await txn.save({ transaction });
+    await txn.save({ transaction: user_tx });
 
     await FestGoCoinHistory.create(
       {
