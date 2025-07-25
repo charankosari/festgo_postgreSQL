@@ -41,6 +41,9 @@ async function applyUsableFestgoCoins({
       where: {
         userId,
         type: "used",
+        status: {
+          [Op.in]: ["issued", "pending"],
+        },
         reason: {
           [Op.in]: [
             "property_booking",
