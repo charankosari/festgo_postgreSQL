@@ -20,7 +20,6 @@ const {
   usersequel,
 } = require("../models/users");
 const { createOrder } = require("../libs/payments/razorpay");
-const { FESTGO_COIN_VALUE } = require("../config/festgo_coin");
 const { Op, Transaction } = require("sequelize");
 const {
   cancelBeachFestBooking,
@@ -213,7 +212,6 @@ exports.bookProperty = async (req, res) => {
       num_adults,
       num_children,
       num_rooms,
-      festgo_coins = 0,
       notes,
     } = req.body;
 
@@ -348,40 +346,43 @@ exports.bookProperty = async (req, res) => {
       total_base_price + total_extra_adult_charge + total_child_charge;
 
     // ✅ GST slab on total cumulative price
-    let gst_rate = 0;
-    if (total_room_price >= 8000) gst_rate = 18;
-    else if (total_room_price >= 1000) gst_rate = 12;
 
-    const gst_amount = (total_room_price * gst_rate) / 100;
-
-    // ✅ Service Fee slab on total cumulative price
-    let service_fee = 50;
-    if (total_room_price >= 1000 && total_room_price <= 1999) service_fee = 50;
-    else if (total_room_price >= 2000 && total_room_price <= 4999)
-      service_fee = 100;
-    else if (total_room_price >= 5000 && total_room_price <= 7499)
-      service_fee = 150;
-    else if (total_room_price >= 7500 && total_room_price <= 9999)
-      service_fee = 200;
-    else if (total_room_price >= 10000) service_fee = 250;
-
-    // ✅ Gross amount to be paid before discounts or coins
-    const gross_payable = total_room_price + gst_amount + service_fee;
     const coinSetting = await FestgoCoinSetting.findOne({
       where: { type: "property" },
     });
     const requestedCoins = coinSetting.single_transaction_limit_value;
-    const { usable_coins, coins_discount_value, amount_paid } =
-      await applyUsableFestgoCoins({
-        userId: user.id,
-        requestedCoins,
-        gross_payable,
-        total_room_price,
-        gst_amount,
-        transaction: t,
-        user_tx,
-      });
+    const {
+      usable_coins,
+      coins_discount_value,
+      amount_to_be_paid,
+      coin_history_inputs,
+    } = await applyUsableFestgoCoins({
+      userId: user.id,
+      requestedCoins,
+      total_room_price,
+      transaction: t,
+      user_tx,
+    });
+    let gst_rate = 0;
+    if (amount_to_be_paid >= 8000) gst_rate = 18;
+    else if (amount_to_be_paid >= 1000) gst_rate = 12;
 
+    const gst_amount = (amount_to_be_paid * gst_rate) / 100;
+
+    // ✅ Service Fee slab on total cumulative price
+    let service_fee = 50;
+    if (amount_to_be_paid >= 1000 && amount_to_be_paid <= 1999)
+      service_fee = 50;
+    else if (amount_to_be_paid >= 2000 && amount_to_be_paid <= 4999)
+      service_fee = 100;
+    else if (amount_to_be_paid >= 5000 && amount_to_be_paid <= 7499)
+      service_fee = 150;
+    else if (amount_to_be_paid >= 7500 && amount_to_be_paid <= 9999)
+      service_fee = 200;
+    else if (total_room_price >= 10000) service_fee = 250;
+
+    // ✅ Gross amount to be paid before discounts or coins
+    const gross_payable = amount_to_be_paid + gst_amount + service_fee;
     // Create booking
     const newBooking = await property_booking.create(
       {
@@ -401,7 +402,7 @@ exports.bookProperty = async (req, res) => {
         gst_amount,
         gst_rate,
         service_fee,
-        amount_paid,
+        amount_paid: gross_payable,
         payment_method: "online",
         payment_status: "pending",
         booking_status: "pending",
@@ -430,7 +431,7 @@ exports.bookProperty = async (req, res) => {
     // Create Razorpay order
     const razorpayOrder = await createOrder({
       order_id: newBooking.id,
-      amount: amount_paid,
+      amount: gross_payable,
       notes: {
         payment_for: "property_booking",
         booking_id: newBooking.id,
@@ -451,9 +452,14 @@ exports.bookProperty = async (req, res) => {
         t // this is the `sequelize.transaction` object
       );
     }
-
+    for (let i = 0; i < coin_history_inputs.length; i++) {
+      coin_history_inputs[i].referenceId = newBooking.id;
+    }
+    await FestGoCoinHistory.bulkCreate(coin_history_inputs, {
+      transaction: user_tx,
+    });
     await t.commit();
-
+    await user_tx.commit();
     const u = await User.findByPk(userId, {
       attributes: {
         exclude: [

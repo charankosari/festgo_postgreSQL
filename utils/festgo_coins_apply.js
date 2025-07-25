@@ -13,22 +13,14 @@ const {
 async function applyUsableFestgoCoins({
   userId,
   requestedCoins,
-  gross_payable,
   total_room_price,
-  gst_amount,
   transaction,
   user_tx,
 }) {
   const now = new Date();
   //   const user_tx = await usersequel.transaction();
   // ✅ Step 1: Check total allowed monthly usage (FestgoCoinUsageLimit)
-  console.log(
-    userId,
-    requestedCoins,
-    gross_payable,
-    total_room_price,
-    gst_amount
-  );
+
   const coinLimit = await FestgoCoinUsageLimit.findOne({ transaction });
   if (!coinLimit || !coinLimit?.allother) {
     throw new Error("Coin usage limit not configured");
@@ -59,7 +51,7 @@ async function applyUsableFestgoCoins({
     return {
       usable_coins: 0,
       coins_discount_value: 0,
-      amount_paid: gross_payable,
+      amount_paid: total_room_price,
     };
   }
 
@@ -116,36 +108,35 @@ async function applyUsableFestgoCoins({
   );
 
   let remainingToUse = usable_coins;
+  let totalCoinsUsed = 0;
+  const coin_history_inputs = [];
   for (const txn of txns) {
     if (remainingToUse <= 0) break;
     const deduct = Math.min(txn.remaining, remainingToUse);
     txn.remaining -= deduct;
     await txn.save({ transaction: user_tx });
-
-    await FestGoCoinHistory.create(
-      {
-        userId,
-        type: "used",
-        reason: "property_booking",
-        referenceId: null, // updated later
-        coins: deduct,
-        status: "issued",
-        metaData: {
-          booking_amount: total_room_price,
-          applied_gst: gst_amount,
-        },
-      },
-      { transaction: user_tx }
-    );
+    totalCoinsUsed += deduct;
     remainingToUse -= deduct;
   }
+  coin_history_inputs.push({
+    userId,
+    type: "used",
+    reason: "property_booking",
+    referenceId: null, // will set after booking
+    coins: totalCoinsUsed,
+    status: "pending",
+    metaData: {
+      booking_amount: total_room_price,
+    },
+  });
 
   const coins_discount_value = usable_coins * 1;
-  const amount_paid = gross_payable - coins_discount_value;
+  const amount_to_be_paid = total_room_price - coins_discount_value;
   return {
     usable_coins,
     coins_discount_value,
-    amount_paid,
+    amount_to_be_paid,
+    coin_history_inputs,
   };
 }
 
