@@ -30,7 +30,7 @@ const cancelPropertyBooking = async (req, res) => {
         .json({ success: false, message: "Booking not found." });
     }
 
-    const property = await Property.findByPk(booking.propertyId);
+    const property = await Property.findByPk(booking.property_id);
     const policy = property?.policies?.cancellationProperty || "Flexible";
 
     const today = moment();
