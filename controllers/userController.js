@@ -528,8 +528,8 @@ exports.getUserDetails = async (req, res) => {
         where: { userId: userId },
         order: [["loginTime", "DESC"]],
       });
-      const gst_details = await UserGstDetails.findOne({
-        where: { userId: userId },
+      const gst_details = await UserGstDetails.findAll({
+        where: { userId: user.id },
       });
       const festgoCoins = await calculateFestgoCoins(userId);
       cleanUser.festgo_coins = festgoCoins;
@@ -642,7 +642,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
           where: { userId: user.id },
           order: [["loginTime", "DESC"]],
         });
-        const gst_details = await UserGstDetails.findOne({
+        const gst_details = await UserGstDetails.findAll({
           where: { userId: user.id },
         });
         const cleanUser = safeUser(
@@ -690,7 +690,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         where: { userId: user.id },
         order: [["loginTime", "DESC"]],
       });
-      const gst_details = await UserGstDetails.findOne({
+      const gst_details = await UserGstDetails.findAll({
         where: { userId: user.id },
       });
       const cleanUser = safeUser(
@@ -858,7 +858,7 @@ exports.verifyEmailToken = async (req, res) => {
       where: { userId: user.id },
       order: [["loginTime", "DESC"]],
     });
-    const gst_details = await UserGstDetails.findOne({
+    const gst_details = await UserGstDetails.findAll({
       where: { userId: user.id },
     });
 
@@ -942,7 +942,7 @@ exports.verifyOtp = async (req, res) => {
     where: { userId: user.id },
     order: [["loginTime", "DESC"]],
   });
-  const gst_details = await UserGstDetails.findOne({
+  const gst_details = await UserGstDetails.findAll({
     where: { userId: user.id },
   });
   // Clean user for response
