@@ -705,23 +705,23 @@ exports.getMyBookings = async (req, res) => {
           attributes: ["room_name"],
         });
 
-        let photoUrls = [];
-        if (prop && prop.photos && Array.isArray(prop.photos)) {
-          try {
-            photoUrls = prop.photos.map((photoStr) => {
-              const photoObj = JSON.parse(photoStr);
-              return photoObj.url;
-            });
-          } catch (err) {
-            console.error("Error parsing property photos JSON string:", err);
-          }
-        }
-
+        // let photoUrls = [];
+        // if (prop && prop.photos && Array.isArray(prop.photos)) {
+        //   try {
+        //     photoUrls = prop.photos.map((photoStr) => {
+        //       const photoObj = JSON.parse(photoStr);
+        //       return photoObj.url;
+        //     });
+        //   } catch (err) {
+        //     console.error("Error parsing property photos JSON string:", err);
+        //   }
+        // }
+        const photos = (prop.photos || []).map((photo) => photo.imageURL);
         return {
           ...booking.toJSON(),
           property_location: prop ? prop.location : null,
           property_name: prop ? prop.name : null,
-          property_photos: photoUrls,
+          property_photos: photos,
           room_name: room ? room.room_name : null,
         };
       })
