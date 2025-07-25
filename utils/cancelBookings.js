@@ -14,6 +14,8 @@ const {
 } = require("../models/users");
 const { refundPayment } = require("../libs/payments/razorpay");
 const moment = require("moment");
+const axios = require("axios");
+
 const cancelPropertyBooking = async (req, res) => {
   const user_tx = await usersequel.transaction();
   try {
@@ -30,7 +32,12 @@ const cancelPropertyBooking = async (req, res) => {
         .json({ success: false, message: "Booking not found." });
     }
 
-    const property = await Property.findByPk(booking.property_id);
+    const { data } = await axios.post(
+      "https://server.festgo.in/api/properties/p/property-details",
+      { propertyId: booking.property_id }
+    );
+    const { success, status, ...cleanData } = data;
+    const property = cleanData;
     const policy = property?.policies?.cancellationProperty || "Flexible";
 
     const today = moment();
@@ -85,8 +92,6 @@ const cancelPropertyBooking = async (req, res) => {
           payment_id: booking.transaction_id,
           amount: refundAmount,
         });
-
-        console.log("Refund processed:", refund);
       }
     }
 
