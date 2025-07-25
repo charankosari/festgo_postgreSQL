@@ -114,9 +114,6 @@ module.exports = (sequelize) => {
       },
       gst_number: {
         type: DataTypes.STRING(15),
-        validate: {
-          len: [15, 15],
-        },
         allowNull: true,
       },
       gst_company_name: {
