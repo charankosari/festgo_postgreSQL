@@ -487,7 +487,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
   });
-
+  const user_tx = await usersequel.transaction();
   try {
     // Fetch booking details
     const booking = await property_booking.findOne({
@@ -575,10 +575,11 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
             referenceId: bookingId,
             status: "pending",
           },
-          transaction: t,
+          transaction: user_tx,
         }
       );
       await t.commit();
+      await user_tx.commit();
       console.log(
         `❌ Booking ${bookingId} cancelled due to overbooking, refund initiated.`
       );
@@ -606,21 +607,24 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
           booking_id: bookingId,
           issue: false,
         },
-        transaction: t,
+        transaction: user_tx,
       }
     );
     await t.commit();
+    await user_tx.commit();
     console.log(`✅ Booking ${bookingId} confirmed, rooms blocked.`);
     return true;
   } catch (error) {
     console.error("Error in handlePaymentSuccess:", error);
     await t.rollback();
+    await user_tx.rollback();
     return false;
   }
 };
 
 // On Payment Failure
 exports.handlePaymentFailure = async (bookingId) => {
+  const user_tx = await usersequel.transaction();
   try {
     // Update booking status
     await property_booking.update(
@@ -642,7 +646,7 @@ exports.handlePaymentFailure = async (bookingId) => {
           booking_id: bookingId,
           status: "pending",
         },
-        transaction: t,
+        transaction: user_tx,
       }
     );
 
@@ -653,13 +657,14 @@ exports.handlePaymentFailure = async (bookingId) => {
           referenceId: bookingId,
           status: "pending",
         },
-        transaction: t,
+        transaction: user_tx,
       }
     );
-
+    await user_tx.commit();
     console.log(`❌ Booking ${bookingId} cancelled, rooms released.`);
     return true;
   } catch (error) {
+    await user_tx.rollback();
     console.error("Error in handlePaymentFailure:", error);
     return false;
   }
