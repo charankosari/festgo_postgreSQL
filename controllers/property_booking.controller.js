@@ -371,17 +371,16 @@ exports.bookProperty = async (req, res) => {
       where: { type: "property" },
     });
     const requestedCoins = coinSetting.single_transaction_limit_value;
-    applyUsableFestgoCoins(
-      userId,
-      requestedCoins,
-      gross_payable,
-      total_room_price,
-      gst_amount,
-      t,
-      user_tx
-    );
-    const coins_discount_value = usable_coins * FESTGO_COIN_VALUE;
-    const amount_paid = gross_payable - coins_discount_value;
+    const { usable_coins, coins_discount_value, amount_paid } =
+      await applyUsableFestgoCoins(
+        userId,
+        requestedCoins,
+        gross_payable,
+        total_room_price,
+        gst_amount,
+        t,
+        user_tx
+      );
 
     // Create booking
     const newBooking = await property_booking.create(
