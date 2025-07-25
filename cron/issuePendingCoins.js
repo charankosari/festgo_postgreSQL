@@ -67,6 +67,7 @@ const issuePendingCoins = async () => {
       await FestGoCoinHistory.upsert(
         {
           userId,
+          type: "earned",
           status: "pending",
           referenceId: booking_id,
         },
@@ -77,6 +78,7 @@ const issuePendingCoins = async () => {
       const history = await FestGoCoinHistory.findOne({
         where: {
           userId,
+          type: "earned",
           referenceId: booking_id,
           status: "pending",
         },
@@ -144,6 +146,7 @@ const issueBeachFestPendingCoins = async () => {
         issue: true,
         status: "pending",
         type: "beachfest",
+
         issueAt: { [Op.lte]: now },
       },
       transaction: user_tx,
@@ -181,6 +184,7 @@ const issueBeachFestPendingCoins = async () => {
           userId,
           status: "pending",
           referenceId: booking_id,
+          type: "earned",
         },
         { transaction: user_tx }
       );
@@ -190,6 +194,7 @@ const issueBeachFestPendingCoins = async () => {
         where: {
           userId,
           referenceId: booking_id,
+          type: "earned",
           status: "pending",
         },
         transaction: user_tx,

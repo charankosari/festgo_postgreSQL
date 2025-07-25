@@ -17,6 +17,7 @@ const {
   User,
   FestGoCoinHistory,
   FestgoCoinToIssue,
+  FestgoCoinTransaction,
   usersequel,
 } = require("../models/users");
 const { createOrder } = require("../libs/payments/razorpay");
@@ -586,11 +587,49 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         {
           where: {
             referenceId: bookingId,
+            type: "earned",
             status: "pending",
           },
           transaction: user_tx,
         }
       );
+      const history = await FestGoCoinHistory.findOne({
+        where: {
+          referenceId: bookingId,
+          type: "used",
+          status: "pending",
+        },
+        transaction: user_tx,
+      });
+
+      if (history) {
+        let remainingToRefund = history.coins;
+
+        const txnsToRestore = await FestgoCoinTransaction.findAll({
+          where: {
+            user_id: booking.user_id,
+          },
+          order: [["expiredAt", "ASC"]],
+          transaction: user_tx,
+        });
+
+        for (const txn of txnsToRestore) {
+          const originallyUsed = txn.amount - txn.remaining;
+
+          const refundable = Math.min(originallyUsed, remainingToRefund);
+          if (refundable <= 0) continue;
+
+          txn.remaining += refundable;
+          remainingToRefund -= refundable;
+
+          await txn.save({ transaction: user_tx });
+
+          if (remainingToRefund <= 0) break;
+        }
+
+        await history.update({ status: "not valid" }, { transaction: user_tx });
+      }
+
       await t.commit();
       await user_tx.commit();
       console.log(
@@ -623,6 +662,19 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         transaction: user_tx,
       }
     );
+
+    await FestGoCoinHistory.update(
+      { status: "issued" },
+      {
+        where: {
+          referenceId: bookingId,
+          type: "used",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
     await t.commit();
     await user_tx.commit();
     console.log(`✅ Booking ${bookingId} confirmed, rooms blocked.`);
@@ -647,7 +699,7 @@ exports.handlePaymentFailure = async (bookingId) => {
       },
       { where: { id: bookingId } }
     );
-
+    const booking = await property_booking.findByPk(bookingId);
     // Release room holds
     await RoomBookedDate.destroy({
       where: { bookingId, status: "pending" },
@@ -673,6 +725,43 @@ exports.handlePaymentFailure = async (bookingId) => {
         transaction: user_tx,
       }
     );
+    const history = await FestGoCoinHistory.findOne({
+      where: {
+        referenceId: bookingId,
+        type: "used",
+        status: "pending",
+      },
+      transaction: user_tx,
+    });
+
+    if (history) {
+      let remainingToRefund = history.coins;
+
+      const txnsToRestore = await FestgoCoinTransaction.findAll({
+        where: {
+          user_id: booking.user_id,
+        },
+        order: [["expiredAt", "ASC"]],
+        transaction: user_tx,
+      });
+
+      for (const txn of txnsToRestore) {
+        const originallyUsed = txn.amount - txn.remaining;
+
+        const refundable = Math.min(originallyUsed, remainingToRefund);
+        if (refundable <= 0) continue;
+
+        txn.remaining += refundable;
+        remainingToRefund -= refundable;
+
+        await txn.save({ transaction: user_tx });
+
+        if (remainingToRefund <= 0) break;
+      }
+
+      await history.update({ status: "not valid" }, { transaction: user_tx });
+    }
+
     await user_tx.commit();
     console.log(`❌ Booking ${bookingId} cancelled, rooms released.`);
     return true;
