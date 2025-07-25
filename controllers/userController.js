@@ -315,7 +315,11 @@ exports.updateProfile = async (req, res) => {
     // Build update data based on allowed fields
     const updateData = {};
     fields.forEach((field) => {
-      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+      const value = req.body[field];
+
+      if (value !== undefined && value !== "") {
+        updateData[field] = value;
+      }
     });
 
     // Debug: log what is being updated
