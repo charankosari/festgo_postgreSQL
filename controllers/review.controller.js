@@ -26,9 +26,11 @@ exports.createReview = async (req, res) => {
 
     // Determine reviewer name
     const reviewer_name =
-      user.firstname && user.lastname
-        ? `${user.firstname} ${user.lastname}`
-        : user.username;
+      (user.firstname &&
+        user.lastname &&
+        `${user.firstname} ${user.lastname}`) ??
+      user.username ??
+      "Anonymous";
 
     // Create review
     const newReview = await review.create({
