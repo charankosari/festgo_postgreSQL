@@ -1,4 +1,3 @@
-const { User } = require("../models/users");
 const {
   Property,
   Room,
@@ -8,9 +7,16 @@ const {
   room_amenity_category,
   RoomBookedDate,
   RoomRateInventory,
+  FestgoCoinSetting,
+  FestgoCoinUsageLimit,
   sequelize,
 } = require("../models/services/index");
-const { review } = require("../models/users/index");
+const {
+  review,
+  User,
+  FestGoCoinHistory,
+  FestgoCoinTransaction,
+} = require("../models/users/index");
 const {
   normalizePropertyData,
   normalizeRoomData,
@@ -19,6 +25,7 @@ const {
   normalizeRoomAmenities,
 } = require("../utils/normalizePropertyData");
 const { Op, Sequelize } = require("sequelize");
+const { calculateFestgoCoins } = require("../utils/issueCoins");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
 const moment = require("moment");
@@ -546,6 +553,66 @@ const formatPropertyResponseForFilter = async (
     additionalInfo: matchingRoom.additional_info || "",
     freeBreakfast: matchingRoom.free_breakfast,
     freeCancellation: matchingRoom.free_cancellation,
+  };
+};
+const simulateUsableFestgoCoins = async ({ userId, total_room_price }) => {
+  const now = new Date();
+  const firstDayOfMonth = moment().startOf("month").toDate();
+  const lastDayOfMonth = moment().endOf("month").toDate();
+
+  const [coinLimit, setting, totalUsedAcrossAll, transactions] =
+    await Promise.all([
+      FestgoCoinUsageLimit.findOne(),
+      FestgoCoinSetting.findOne({ where: { type: "property" } }),
+      FestGoCoinHistory.sum("coins", {
+        where: {
+          userId,
+          type: "used",
+          status: { [Op.in]: ["issued", "pending"] },
+          reason: {
+            [Op.in]: [
+              "property_booking",
+              "beachfest_booking",
+              "cityfest_booking",
+            ],
+          },
+          createdAt: { [Op.between]: [firstDayOfMonth, lastDayOfMonth] },
+        },
+      }),
+      FestgoCoinTransaction.findAll({
+        where: {
+          userId,
+          [Op.or]: [{ remaining: { [Op.gt]: 0 } }, { amount: { [Op.gt]: 0 } }],
+          expiresAt: { [Op.or]: { [Op.gt]: now }, [Op.is]: null },
+        },
+        order: [["expiresAt", "ASC"]],
+      }),
+    ]);
+
+  if (!coinLimit || !setting) {
+    return { usable_coins: 0, coin_discount: 0 };
+  }
+
+  const allOtherMonthlyLimit = Number(coinLimit.allother);
+  const singleTransactionLimit = Number(setting.single_transaction_limit_value);
+  const propertyMonthlyLimit = Number(setting.monthly_limit_value);
+  const totalAvailable = transactions.reduce(
+    (sum, txn) => sum + txn.remaining,
+    0
+  );
+  const remainingGlobal = allOtherMonthlyLimit - (totalUsedAcrossAll || 0);
+
+  const usable_coins = Math.min(
+    totalAvailable,
+    singleTransactionLimit,
+    propertyMonthlyLimit,
+    remainingGlobal,
+    total_room_price
+  );
+
+  return {
+    usable_coins,
+    coin_discount: usable_coins,
   };
 };
 
@@ -1957,12 +2024,14 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
   try {
     const { propertyId, adults, children, requestedRooms, startDate, endDate } =
       req.body;
+    const userId = req.user?.id;
 
     if (!propertyId || !startDate || !endDate) {
       return res
         .status(400)
         .json({ message: "propertyId, startDate, and endDate are required" });
     }
+
     const property = await Property.findByPk(propertyId);
     const cancellationPolicy = property?.policies?.cancellationPolicy || null;
 
@@ -1981,13 +2050,13 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
     }
 
     const allRoomsInProperty = await Room.findAll({ where: { propertyId } });
-    if (!allRoomsInProperty.length)
+    if (!allRoomsInProperty.length) {
       return res.status(404).json({ message: "No rooms found for property" });
+    }
 
     const roomIds = allRoomsInProperty.map((room) => room.id);
     const finalDate = end.clone().format("YYYY-MM-DD");
 
-    // Get existing bookings overlapping requested dates
     const bookedRooms = await RoomBookedDate.findAll({
       where: {
         roomId: { [Op.in]: roomIds },
@@ -1997,18 +2066,16 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
       },
     });
 
-    // Count booked rooms per roomId
     const bookedCountMap = {};
     bookedRooms.forEach((b) => {
       bookedCountMap[b.roomId] = (bookedCountMap[b.roomId] || 0) + 1;
     });
 
-    // Get inventory from rate table
     const roomRates = await RoomRateInventory.findAll({
       where: {
         propertyId,
         roomId: { [Op.in]: roomIds },
-        date: startDate, // Using only the first day; adjust for all days if needed
+        date: startDate,
       },
     });
 
@@ -2037,7 +2104,6 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
 
       if (availableRooms < numRooms) continue;
 
-      // Price logic
       let basePrice = parseInt(room.price?.base_price_for_2_adults || 0);
       let originalPrice = Math.round(basePrice * 1.05);
       let totalBase = 0,
@@ -2065,7 +2131,6 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
       const totalBaseForRooms = totalBase * numRooms;
       const totalIncludedAdults = baseAdultsPerRoom * numRooms;
       const extraAdults = Math.max(0, numAdults - totalIncludedAdults);
-
       const totalExtraAdultCharge =
         extraAdults * extraAdultCharge * no_of_days_stay;
       const totalChildCharge = numChildren * childCharge * no_of_days_stay;
@@ -2074,6 +2139,24 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
         totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
       const finalOriginalPrice =
         totalOriginal * numRooms + totalExtraAdultCharge + totalChildCharge;
+
+      // --- Apply Coins using simulateUsableFestgoCoins ---
+      let usableCoins = 0;
+      let coinDiscount = 0;
+
+      if (userId && finalPrice > 0) {
+        try {
+          const { usable_coins, coin_discount } =
+            await simulateUsableFestgoCoins({
+              userId,
+              total_room_price: finalPrice,
+            });
+          usableCoins = usable_coins;
+          coinDiscount = coin_discount;
+        } catch (err) {
+          console.warn(`Coin simulation failed: ${err.message}`);
+        }
+      }
 
       const plainRoom = room.get({ plain: true });
       const normalizedAmenities = normalizeRoomAmenities(
@@ -2091,6 +2174,10 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
       else if (finalPrice >= 5000 && finalPrice <= 7499) service_fee = 150;
       else if (finalPrice >= 7500 && finalPrice <= 9999) service_fee = 200;
       else if (finalPrice >= 10000) service_fee = 250;
+
+      const totalPricePayable =
+        finalPrice + gst_amount + service_fee - coinDiscount;
+
       const photos = (plainRoom.photos || []).map((photo) => photo.imageURL);
       const videos = (plainRoom.videos || []).map((video) => video.imageURL);
 
@@ -2104,9 +2191,11 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
           pricePerNight: finalPrice,
           originalPrice: finalOriginalPrice,
           numberOfDays: no_of_days_stay,
+          usableCoins,
           tax: gst_amount,
-          service_fee: service_fee,
-          totalPrice: finalPrice + gst_amount + service_fee,
+          service_fee,
+          coinDiscount,
+          totalPrice: totalPricePayable,
         },
         cancellationPolicy,
         availableRooms,

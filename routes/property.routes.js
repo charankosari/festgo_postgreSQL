@@ -106,7 +106,7 @@ router.put(
 
 router.post(
   "/getupdated-room/p",
-  // isAuthorized,
+  isAuthorized,
   propertyController.getUpdatedRoomsForProperty
 );
 

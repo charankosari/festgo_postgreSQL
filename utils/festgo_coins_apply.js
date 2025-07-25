@@ -76,21 +76,19 @@ async function applyUsableFestgoCoins({
   const monthlyLimitProperty = Number(setting.monthly_limit_value);
   const singleTransactionLimit = Number(setting.single_transaction_limit_value);
 
-  const propertyRecommendUsed =
-    (await FestGoCoinHistory.sum("coins", {
-      where: {
-        userId,
-        type: "used",
-        reason: "property_recommend",
-        createdAt: { [Op.between]: [firstDayOfMonth, lastDayOfMonth] },
-      },
-      transaction: user_tx,
-    })) || 0;
+  // const propertyRecommendUsed =
+  //   (await FestGoCoinHistory.sum("coins", {
+  //     where: {
+  //       userId,
+  //       type: "used",
+  //       reason: "property_recommend",
+  //       createdAt: { [Op.between]: [firstDayOfMonth, lastDayOfMonth] },
+  //     },
+  //     transaction: user_tx,
+  //   })) || 0;
 
-  const remainingThisMonthForProperty =
-    monthlyLimitProperty - propertyRecommendUsed;
+  const remainingThisMonthForProperty = monthlyLimitProperty;
 
-  console.log("📉 Property Coins Used This Month:", propertyRecommendUsed);
   console.log(
     "📈 Remaining Property Coin Limit This Month:",
     remainingThisMonthForProperty
