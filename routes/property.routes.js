@@ -33,7 +33,7 @@ router.get(
 );
 router.get("/active", propertyController.getAllActiveProperties);
 router.post("/p/active-r", propertyController.getAllActivePropertiesByRange);
-router.post("/p/filter", propertyController.getAllActivePropertiesByRange);
+router.post("/p/filter", propertyController.filterActiveProperties);
 // router.post("/p/details", propertyController.getAmenitiesForProperty);
 
 // ✅ Get property by ID

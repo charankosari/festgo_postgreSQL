@@ -42,17 +42,19 @@ const checkAvailableRoomsForFilter = async (
   const numRooms = parseInt(requestedRooms) || 1;
   const totalPeople = totalAdults + totalChildren;
 
-  // If no guests, we can't determine suitability. This can be adjusted if needed.
-  if (totalPeople === 0) return null;
+  // If no guests or dates, we can't determine availability.
+  if (totalPeople === 0 || !startDate || !finalDate) {
+    return property.get({ plain: true }); // Return property to be handled by pricing logic
+  }
 
-  // ✅ Calculate average guests per room to find suitable room types
   const avgGuestsPerRoom = Math.ceil(totalPeople / numRooms);
   const avgAdultsPerRoom = Math.ceil(totalAdults / numRooms);
 
+  // 1. Find rooms that match capacity and other criteria
   const where = {
     propertyId: property.id,
     [Op.and]: [
-      // Guests capacity
+      // Capacity checks
       Sequelize.literal(
         `(sleeping_arrangement->>'max_occupancy')::int >= ${avgGuestsPerRoom}`
       ),
@@ -60,38 +62,38 @@ const checkAvailableRoomsForFilter = async (
         `(sleeping_arrangement->>'max_adults')::int >= ${avgAdultsPerRoom}`
       ),
 
-      // ✅ Match room view if passed
-      roomView?.length
-        ? { view: { [Op.in]: roomView.map((v) => v.toLowerCase()) } }
-        : null,
+      // Room View check (finds rooms with ANY of the selected views)
+      ...(roomView?.length
+        ? [{ view: { [Op.in]: roomView.map((v) => v.toLowerCase()) } }]
+        : []),
 
-      // ✅ Match selected room amenities (jsonb)
+      // Room Amenities checks (finds rooms with ALL of the selected amenities)
       ...(roomAmenities?.length
-        ? roomAmenities
-            .filter((a) => a.isSelected)
-            .map((a) =>
-              Sequelize.literal(`
+        ? roomAmenities.map((amenityName) =>
+            Sequelize.literal(`
               EXISTS (
-                SELECT 1 FROM jsonb_array_elements("Room"."amenities") AS elem
-                WHERE LOWER(elem->>'otaName') = LOWER('${a.otaName}')
+                SELECT 1 FROM jsonb_array_elements("Room"."room_amenities") AS elem
+                WHERE lower(elem->>'otaName') = lower('${amenityName}')
               )
             `)
-            )
+          )
         : []),
-    ].filter(Boolean),
+    ].filter(Boolean), // This safely removes any null/empty filters
   };
-
   const candidateRooms = await Room.findAll({ where });
-  if (!candidateRooms.length) return null;
+
+  if (!candidateRooms.length) {
+    return null;
+  }
 
   const roomIds = candidateRooms.map((room) => room.id);
 
-  // Fetch all bookings that overlap with the requested dates
+  // 2. Find all confirmed/pending bookings that overlap with the requested dates
   const bookedRooms = await RoomBookedDate.findAll({
     where: {
       roomId: { [Op.in]: roomIds },
-      checkIn: { [Op.lt]: finalDate },
-      checkOut: { [Op.gt]: startDate },
+      checkIn: { [Op.lt]: finalDate }, // Booking starts before the user's checkout
+      checkOut: { [Op.gt]: startDate }, // Booking ends after the user's check-in
       status: { [Op.in]: ["pending", "confirmed"] },
     },
   });
@@ -102,7 +104,7 @@ const checkAvailableRoomsForFilter = async (
       (bookedRoomCounts[booking.roomId] || 0) + 1;
   });
 
-  // Fetch room rates/inventory for the specific check-in date
+  // 3. Get specific inventory counts for the check-in date
   const roomRates = await RoomRateInventory.findAll({
     where: {
       propertyId: property.id,
@@ -112,32 +114,33 @@ const checkAvailableRoomsForFilter = async (
   });
 
   const roomRateMap = {};
-  roomRates.forEach((rate) => {
-    roomRateMap[rate.roomId] = rate.inventory;
-  });
+  roomRates.forEach((rate) => (roomRateMap[rate.roomId] = rate.inventory));
 
-  // ✅ Check if ANY suitable room type has enough inventory for the request
   let hasSufficientInventory = false;
   for (const room of candidateRooms) {
     const alreadyBooked = bookedRoomCounts[room.id] || 0;
+
+    // Use specific daily inventory if available, otherwise fall back to the room's total inventory
     const totalInventory =
       roomRateMap[room.id] !== undefined
         ? roomRateMap[room.id]
-        : room.number_of_rooms; // Fallback to base inventory
+        : room.number_of_rooms;
 
     const remainingAvailable = totalInventory - alreadyBooked;
 
     if (remainingAvailable >= numRooms) {
       hasSufficientInventory = true;
-      break; // Found a valid option, no need to check further
+      break; // Found a valid option, no need to check further rooms in this property
     }
   }
 
-  if (!hasSufficientInventory) return null;
+  if (!hasSufficientInventory) {
+    return null;
+  }
 
-  // If checks pass, return the property to be enriched later
+  // Return a plain object to prevent issues with Sequelize instances
   const plainProperty = property.get({ plain: true });
-  delete plainProperty.ownership_details;
+  delete plainProperty.ownership_details; // Clean up sensitive data
   return plainProperty;
 };
 const checkAvailableRooms = async (
@@ -378,6 +381,174 @@ const formatPropertyResponse = async (
     imageList,
   };
 };
+const enrichPropertiesFilter = async (
+  properties,
+  startDate,
+  requestedRooms,
+  adults,
+  children,
+  minPrice,
+  maxPrice
+) => {
+  const enriched = [];
+  for (const p of properties) {
+    const plain = p.get ? p.get({ plain: true }) : p;
+    delete plain.ownership_details;
+    delete plain.bank_details;
+    delete plain.tax_details;
+    delete plain.strdata;
+    const formattedProperty = await formatPropertyResponseForFilter(
+      plain,
+      startDate,
+      requestedRooms,
+      adults,
+      children,
+      minPrice,
+      maxPrice
+    );
+    if (formattedProperty) {
+      enriched.push(formattedProperty);
+    } else {
+      console.log(
+        `[DEBUG] Property ID ${plain.id} was discarded during formatting (no suitable rooms or price match).`
+      );
+    }
+  }
+
+  return enriched;
+};
+const formatPropertyResponseForFilter = async (
+  property,
+  startDate,
+  requestedRooms,
+  adults,
+  children,
+  minPrice,
+  maxPrice
+) => {
+  const numRooms = parseInt(requestedRooms) || 1;
+  const numAdults = parseInt(adults) || 0;
+  const numChildren = parseInt(children) || 0;
+  const { id } = property; // Destructuring other properties as needed
+
+  const allRoomsInProperty = await Room.findAll({ where: { propertyId: id } });
+  if (!allRoomsInProperty || allRoomsInProperty.length === 0) {
+    return null;
+  }
+
+  const totalGuests = numAdults + numChildren;
+  const avgGuestsPerRoom = Math.ceil(totalGuests / numRooms);
+  const avgAdultsPerRoom = Math.ceil(numAdults / numRooms);
+  const validRooms = allRoomsInProperty.filter((room) => {
+    const maxAdults = parseInt(room.sleeping_arrangement?.max_adults || 0);
+    const maxOccupancy = parseInt(
+      room.sleeping_arrangement?.max_occupancy || 0
+    );
+    return maxOccupancy >= avgGuestsPerRoom && maxAdults >= avgAdultsPerRoom;
+  });
+
+  if (validRooms.length === 0) {
+    return null;
+  }
+  let bestPriceInRange = Infinity;
+  let matchingRoom = null;
+  let matchingOriginalPrice = 0;
+
+  for (const room of validRooms) {
+    let currentBasePrice = parseInt(room.price?.base_price_for_2_adults || 0);
+    let currentOriginalPrice = Math.round(currentBasePrice * 1.05);
+
+    if (startDate) {
+      const rate = await RoomRateInventory.findOne({
+        where: { propertyId: id, roomId: room.id, date: startDate },
+      });
+      if (rate?.price) {
+        currentBasePrice = parseInt(rate.price.offerBaseRate);
+        currentOriginalPrice = parseInt(rate.price.base);
+      }
+    }
+
+    // ✅ FIXED: The full price calculation logic is now here, BEFORE it is used.
+    const baseAdultsPerRoom = parseInt(room.price?.base_adults || 2);
+    const extraAdultChargePerRoom = parseInt(
+      room.price?.extra_adult_charge || 0
+    );
+    const childChargePerChild = parseInt(room.price?.child_charge || 0);
+
+    const totalBaseForRooms = currentBasePrice * numRooms;
+    const totalIncludedAdults = baseAdultsPerRoom * numRooms;
+    const extraAdultsCount = Math.max(0, numAdults - totalIncludedAdults);
+    const totalExtraAdultCharge = extraAdultsCount * extraAdultChargePerRoom;
+    const totalChildCharge = numChildren * childChargePerChild;
+
+    const finalPriceForThisRoom =
+      totalBaseForRooms + totalExtraAdultCharge + totalChildCharge;
+
+    if (minPrice && maxPrice) {
+      if (
+        finalPriceForThisRoom >= minPrice &&
+        finalPriceForThisRoom <= maxPrice
+      ) {
+        if (finalPriceForThisRoom < bestPriceInRange) {
+          bestPriceInRange = finalPriceForThisRoom;
+          matchingRoom = room;
+          matchingOriginalPrice =
+            currentOriginalPrice * numRooms +
+            totalExtraAdultCharge +
+            totalChildCharge;
+        }
+      }
+    } else {
+      if (finalPriceForThisRoom < bestPriceInRange) {
+        bestPriceInRange = finalPriceForThisRoom;
+        matchingRoom = room;
+        matchingOriginalPrice =
+          currentOriginalPrice * numRooms +
+          totalExtraAdultCharge +
+          totalChildCharge;
+      }
+    }
+  }
+
+  if (!matchingRoom) {
+    return null;
+  }
+
+  // Destructure all needed properties from the original property object for the return
+  const {
+    vendorId,
+    name,
+    property_type,
+    email,
+    description,
+    star_rating,
+    location,
+    photos,
+    review_count,
+  } = property;
+  const imageList = Array.isArray(photos)
+    ? photos.map((p) => p.imageURL || "")
+    : [];
+
+  return {
+    id,
+    vendorId,
+    name,
+    property_type,
+    email,
+    description,
+    star_rating,
+    location,
+    review_count,
+    imageList,
+    pricePerNight: bestPriceInRange,
+    originalPrice: matchingOriginalPrice,
+    additionalInfo: matchingRoom.additional_info || "",
+    freeBreakfast: matchingRoom.free_breakfast,
+    freeCancellation: matchingRoom.free_cancellation,
+  };
+};
+
 function updateStrdata(existingStrdata, step, newStepData) {
   const updatedStrdata = { ...existingStrdata };
   updatedStrdata[`step_${step}`] = {
@@ -905,13 +1076,17 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
   }
 };
 const parseArray = (val) => {
-  if (!val || typeof val !== "string") return [];
-  try {
-    const parsed = JSON.parse(val);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
   }
+  return [];
 };
 
 exports.filterActiveProperties = async (req, res) => {
@@ -927,18 +1102,16 @@ exports.filterActiveProperties = async (req, res) => {
       location,
       property_type,
     } = req.body;
-    const userRatings = parseArray(req.body.userRatings); // e.g. ["excellent", "very_good"]
-    const starRatings = parseArray(req.body.starRatings); // e.g. [5, 4]
-    const popularTags = parseArray(req.body.popular); // e.g. ["couple_friendly"]
-    const amenities = parseArray(req.body.amenities); // e.g. ["bar", "beach"]
-    const roomView = parseArray(req.body.roomView); // e.g. ["sea_view"]
-    const roomAmenities = parseArray(req.body.roomAmenities); // e.g. ["bathtub"]
+    const userRatings = parseArray(req.body.userRatings);
+    const starRatings = parseArray(req.body.starRatings);
+    const popularTags = parseArray(req.body.popular);
+    const amenities = parseArray(req.body.amenities);
+    const roomView = parseArray(req.body.roomView);
+    const roomAmenities = parseArray(req.body.roomAmenities);
     const minPrice = parseFloat(req.body.minPrice);
     const maxPrice = parseFloat(req.body.maxPrice);
 
-    // 🧹 Clean and normalize incoming params
     const clean = (val) => (val === "" ? null : val);
-
     const lat = clean(latitude);
     const long = clean(longitude);
     const startDate = clean(todate)
@@ -962,75 +1135,90 @@ exports.filterActiveProperties = async (req, res) => {
     const extraPropertyFilters = [];
 
     if (userRatings.length) {
-      extraPropertyFilters.push(
-        Sequelize.where(Sequelize.fn("lower", Sequelize.col("user_rating")), {
-          [Op.in]: userRatings.map((r) => r.toLowerCase()),
-        })
-      );
-    }
+      const ratingConditions = [];
 
+      userRatings.forEach((rating) => {
+        switch (rating.toLowerCase()) {
+          case "excellent":
+            // Corresponds to ratings 4.5 and above
+            ratingConditions.push({ star_rating: { [Op.gte]: 4.5 } });
+            break;
+          case "very_good":
+            // Corresponds to ratings from 4.0 up to 4.5
+            ratingConditions.push({
+              star_rating: { [Op.between]: [4.0, 4.4] },
+            });
+            break;
+          case "good":
+            // Corresponds to ratings from 3.0 up to 4.0
+            ratingConditions.push({
+              star_rating: { [Op.between]: [3.0, 3.9] },
+            });
+            break;
+          // You can add more cases here if needed (e.g., 'average')
+        }
+      });
+
+      // If any valid rating strings were found, combine them with an OR condition
+      if (ratingConditions.length > 0) {
+        extraPropertyFilters.push({ [Op.or]: ratingConditions });
+      }
+    }
     if (starRatings.length) {
       extraPropertyFilters.push({
         star_rating: { [Op.in]: starRatings.map(Number) },
       });
     }
+    const tagsForDbFilter = popularTags.filter((tag) => tag !== "free_cancel");
 
-    if (popularTags.length) {
-      extraPropertyFilters.push(
-        Sequelize.literal(
-          popularTags
-            .map((tag) => `'${tag}' = ANY (string_to_array(popular_tags, ','))`)
-            .join(" AND ")
-        )
-      );
-    }
-
-    if (amenities.length) {
-      const amenityConditions = amenities.map((a) => {
-        return `
-      EXISTS (
-        SELECT 1 FROM jsonb_array_elements("Property"."amenity") AS elem
-        WHERE elem->>'amenity_name' = '${a}' AND elem->>'is_selected' = 'true'
-      )
-    `;
+    if (tagsForDbFilter.length) {
+      const tagConditions = tagsForDbFilter.map((tag) => {
+        const tagName = tag.replace(/_/g, " ");
+        switch (tag) {
+          case "couple_friendly":
+            return `("Property".policies->'houseRules' @> '["Unmarried couples allowed"]')`;
+          default:
+            return `EXISTS (SELECT 1 FROM jsonb_array_elements("Property"."amenity") AS elem WHERE lower(elem->>'amenity_name') = lower('${tagName}') AND elem->>'is_selected' = 'true')`;
+        }
       });
-
+      if (tagConditions.length > 0) {
+        extraPropertyFilters.push(
+          Sequelize.literal(`(${tagConditions.join(" OR ")})`)
+        );
+      }
+    }
+    if (amenities.length) {
+      const amenityConditions = amenities.map(
+        (a) =>
+          `EXISTS (SELECT 1 FROM jsonb_array_elements("Property"."amenities") AS elem WHERE elem->>'amenity_name' = '${a}' AND elem->>'is_selected' = 'true')`
+      );
       extraPropertyFilters.push(
         Sequelize.literal(amenityConditions.join(" AND "))
       );
     }
 
-    if (minPrice && maxPrice) {
-      extraPropertyFilters.push({
-        base_price: {
-          [Op.between]: [minPrice, maxPrice],
-        },
-      });
-    }
     let availableProperties = [];
 
-    // 🟢 If only lat/long given and no dates — just return active properties within 10km
     if (lat && long && !startDate && !finalDate) {
       const whereNearby = {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
-          Sequelize.literal(`
-      earth_distance(
-        ll_to_earth(${lat}, ${long}),
-        ll_to_earth(
-          (location->>'lat')::float, 
-          (location->>'lng')::float
-        )
-      ) <= 10000
-    `),
-          extraPropertyFilters,
+          Sequelize.literal(
+            `(lower(location->>'city') = lower('${city}') OR lower(location->>'locality') = lower('${city}') OR lower(location->>'searchLocation') = lower('${city}'))`
+          ),
+          ...extraPropertyFilters,
         ].filter(Boolean),
+        id: { [Op.notIn]: availableProperties.map((p) => p.id) },
       };
-
       const nearbyProperties = await Property.findAll({ where: whereNearby });
 
-      const finalProperties = await enrichProperties(nearbyProperties, null);
+      const finalProperties = await enrichPropertiesFilter(
+        nearbyProperties,
+        null,
+        minPrice,
+        maxPrice
+      );
 
       return res.json({
         success: true,
@@ -1039,26 +1227,20 @@ exports.filterActiveProperties = async (req, res) => {
       });
     }
 
-    // ✅ Regular flow if dates provided — Nearby properties within 10km
     if (lat && long) {
       const whereNearby = {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
-          Sequelize.literal(`
-      earth_distance(
-        ll_to_earth(${lat}, ${long}),
-        ll_to_earth(
-          (location->>'lat')::float, 
-          (location->>'lng')::float
-        )
-      ) <= 10000
-    `),
+          Sequelize.literal(
+            `earth_distance(ll_to_earth(${lat}, ${long}), ll_to_earth((location->>'lat')::float, (location->>'lng')::float)) <= 10000`
+          ),
           extraPropertyFilters,
         ].filter(Boolean),
       };
-
-      const nearbyProperties = await Property.findAll({ where: whereNearby });
+      const nearbyProperties = await Property.findAll({
+        where: { [Op.and]: whereNearby },
+      });
 
       for (const property of nearbyProperties) {
         const available = await checkAvailableRoomsForFilter(
@@ -1075,24 +1257,18 @@ exports.filterActiveProperties = async (req, res) => {
       }
     }
 
-    // ✅ Step 2: Search by city if properties < 20 and city provided
     if (availableProperties.length < 20 && city) {
       const whereCity = {
         active: true,
         [Op.and]: [
           propertyTypeFilter,
-          Sequelize.literal(`(
-      lower(location->>'city') = lower('${city}')
-      OR lower(location->>'locality') = lower('${city}')
-      OR lower(location->>'searchLocation') = lower('${city}')
-    )`),
+          Sequelize.literal(
+            `(lower(location->>'city') = lower('${city}') OR lower(location->>'locality') = lower('${city}') OR lower(location->>'searchLocation') = lower('${city}'))`
+          ),
           extraPropertyFilters,
         ].filter(Boolean),
-        id: {
-          [Op.notIn]: availableProperties.map((p) => p.id),
-        },
+        id: { [Op.notIn]: availableProperties.map((p) => p.id) },
       };
-
       const cityProperties = await Property.findAll({
         where: whereCity,
         limit: 20 - availableProperties.length,
@@ -1114,13 +1290,14 @@ exports.filterActiveProperties = async (req, res) => {
       }
     }
 
-    // ✅ Final enrichment and response
-    const finalProperties = await enrichProperties(
+    const finalProperties = await enrichPropertiesFilter(
       availableProperties,
       startDate,
       requestedRooms,
       adults,
-      children
+      children,
+      minPrice,
+      maxPrice
     );
 
     return res.json({
@@ -1133,7 +1310,6 @@ exports.filterActiveProperties = async (req, res) => {
     res.status(500).json({ message: err.message, status: 500 });
   }
 };
-
 exports.getAmenitiesForProperty = async (req, res) => {
   try {
     const { propertyId } = req.body;
