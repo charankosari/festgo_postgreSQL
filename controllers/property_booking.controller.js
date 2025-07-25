@@ -220,6 +220,21 @@ exports.bookProperty = async (req, res) => {
       gst_company_name,
       gst_company_address,
     } = req.body;
+    // ✅ Date validation block (add right after destructuring req.body)
+    const now = new Date();
+    const checkInDate = new Date(check_in_date);
+    const checkOutDate = new Date(check_out_date);
+
+    if (checkInDate < now.setHours(0, 0, 0, 0)) {
+      return res
+        .status(400)
+        .json({ message: "Check-in date cannot be in the past." });
+    }
+    if (checkOutDate <= checkInDate) {
+      return res
+        .status(400)
+        .json({ message: "Check-out date must be after check-in date." });
+    }
 
     // Fetch property
     const property = await Property.findOne({
@@ -369,6 +384,7 @@ exports.bookProperty = async (req, res) => {
       transaction: t,
       user_tx,
     });
+    console.log(amount_to_be_paid);
     let gst_rate = 0;
     if (amount_to_be_paid >= 8000) gst_rate = 18;
     else if (amount_to_be_paid >= 1000) gst_rate = 12;
@@ -389,6 +405,7 @@ exports.bookProperty = async (req, res) => {
 
     // ✅ Gross amount to be paid before discounts or coins
     const gross_payable = amount_to_be_paid + gst_amount + service_fee;
+    console.log("Gross Payable:", gross_payable);
     // Create booking
     const newBooking = await property_booking.create(
       {
@@ -461,12 +478,18 @@ exports.bookProperty = async (req, res) => {
         t // this is the `sequelize.transaction` object
       );
     }
-    for (let i = 0; i < coin_history_inputs.length; i++) {
-      coin_history_inputs[i].referenceId = newBooking.id;
+    if (coin_history_inputs && coin_history_inputs.length > 0) {
+      for (let i = 0; i < coin_history_inputs.length; i++) {
+        coin_history_inputs[i].referenceId = newBooking.id;
+      }
+
+      await FestGoCoinHistory.bulkCreate(coin_history_inputs, {
+        transaction: user_tx,
+      });
+    } else {
+      console.log("ℹ️ No coin history entries to create.");
     }
-    await FestGoCoinHistory.bulkCreate(coin_history_inputs, {
-      transaction: user_tx,
-    });
+
     await t.commit();
     await user_tx.commit();
     const u = await User.findByPk(userId, {

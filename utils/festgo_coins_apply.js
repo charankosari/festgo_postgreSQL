@@ -18,13 +18,19 @@ async function applyUsableFestgoCoins({
   user_tx,
 }) {
   const now = new Date();
-  //   const user_tx = await usersequel.transaction();
-  // ✅ Step 1: Check total allowed monthly usage (FestgoCoinUsageLimit)
+
+  console.log("🧾 Params received:", {
+    userId,
+    requestedCoins,
+    total_room_price,
+  });
 
   const coinLimit = await FestgoCoinUsageLimit.findOne({ transaction });
+
   if (!coinLimit || !coinLimit?.allother) {
     throw new Error("Coin usage limit not configured");
   }
+
   const allOtherMonthlyLimit = Number(coinLimit.allother);
 
   const firstDayOfMonth = moment().startOf("month").toDate();
@@ -48,14 +54,15 @@ async function applyUsableFestgoCoins({
     })) || 0;
 
   if (totalUsedAcrossAll >= allOtherMonthlyLimit) {
+    console.log("🚫 User exceeded monthly limit. No coins can be used.");
     return {
       usable_coins: 0,
       coins_discount_value: 0,
-      amount_paid: total_room_price,
+      amount_to_be_paid: total_room_price,
+      coin_history_inputs: null,
     };
   }
 
-  // ✅ Step 2: Get property-specific monthly + per-tx limit
   const setting = await FestgoCoinSetting.findOne({
     where: { type: "property" },
     transaction,
@@ -66,7 +73,6 @@ async function applyUsableFestgoCoins({
   const monthlyLimitProperty = Number(setting.monthly_limit_value);
   const singleTransactionLimit = Number(setting.single_transaction_limit_value);
 
-  // Calculate coins used this month **from only property_recommend type**
   const propertyRecommendUsed =
     (await FestGoCoinHistory.sum("coins", {
       where: {
@@ -81,7 +87,12 @@ async function applyUsableFestgoCoins({
   const remainingThisMonthForProperty =
     monthlyLimitProperty - propertyRecommendUsed;
 
-  // ✅ Step 3: Fetch available FestGoCoinTransactions
+  console.log("📉 Property Coins Used This Month:", propertyRecommendUsed);
+  console.log(
+    "📈 Remaining Property Coin Limit This Month:",
+    remainingThisMonthForProperty
+  );
+
   const txns = await FestgoCoinTransaction.findAll({
     where: {
       userId,
@@ -92,13 +103,13 @@ async function applyUsableFestgoCoins({
     transaction: user_tx,
   });
 
-  // Calculate available coins from both remaining and expired-but-unused ones
   let totalAvailable = 0;
   for (const txn of txns) {
     totalAvailable += txn.remaining;
   }
 
-  // ✅ Step 4: Calculate usable amount
+  console.log("💰 Total Available Coins:", totalAvailable);
+
   let usable_coins = Math.min(
     requestedCoins || 0,
     totalAvailable,
@@ -107,9 +118,12 @@ async function applyUsableFestgoCoins({
     allOtherMonthlyLimit - totalUsedAcrossAll
   );
 
+  console.log("✅ Calculated Usable Coins:", usable_coins);
+
   let remainingToUse = usable_coins;
   let totalCoinsUsed = 0;
   const coin_history_inputs = [];
+
   for (const txn of txns) {
     if (remainingToUse <= 0) break;
     const deduct = Math.min(txn.remaining, remainingToUse);
@@ -118,6 +132,9 @@ async function applyUsableFestgoCoins({
     totalCoinsUsed += deduct;
     remainingToUse -= deduct;
   }
+
+  console.log("🧾 Final Coins Deducted From Transactions:", totalCoinsUsed);
+
   coin_history_inputs.push({
     userId,
     type: "used",
@@ -132,6 +149,13 @@ async function applyUsableFestgoCoins({
 
   const coins_discount_value = usable_coins * 1;
   const amount_to_be_paid = total_room_price - coins_discount_value;
+
+  console.log("🎯 Final Summary:");
+  console.log("    ➤ Usable Coins:", usable_coins);
+  console.log("    ➤ Discount Value:", coins_discount_value);
+  console.log("    ➤ Total Price:", total_room_price);
+  console.log("    ➤ Amount to be Paid:", amount_to_be_paid);
+
   return {
     usable_coins,
     coins_discount_value,
