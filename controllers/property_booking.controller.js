@@ -27,6 +27,7 @@ const {
   cancelPropertyBooking,
   cancelEventBooking,
 } = require("../utils/cancelBookings");
+const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const handleUserReferralForPropertyBooking = async (
   referral_id,
   referredUserId,
@@ -365,14 +366,19 @@ exports.bookProperty = async (req, res) => {
 
     // ✅ Gross amount to be paid before discounts or coins
     const gross_payable = total_room_price + gst_amount + service_fee;
-
-    // Apply FestGo coins
-    let usable_coins = 0;
-    if (festgo_coins >= 10 && user.festgo_coins >= festgo_coins) {
-      usable_coins = festgo_coins;
-    } else if (festgo_coins >= 10 && user.festgo_coins < festgo_coins) {
-      usable_coins = user.festgo_coins;
-    }
+    const coinSetting = await FestgoCoinSetting.findOne({
+      where: { type: "property" },
+    });
+    const requestedCoins = coinSetting.single_transaction_limit_value;
+    applyUsableFestgoCoins(
+      userId,
+      requestedCoins,
+      gross_payable,
+      total_room_price,
+      gst_amount,
+      t,
+      user_tx
+    );
     const coins_discount_value = usable_coins * FESTGO_COIN_VALUE;
     const amount_paid = gross_payable - coins_discount_value;
 
