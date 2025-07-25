@@ -487,6 +487,7 @@ exports.bookProperty = async (req, res) => {
   } catch (error) {
     console.error("Booking creation error:", error);
     await t.rollback();
+    await user_tx.rollback();
     res.status(500).json({
       message: "Something went wrong while creating booking",
       error: error.message,
