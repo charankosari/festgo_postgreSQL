@@ -805,7 +805,7 @@ exports.getMyBookings = async (req, res) => {
     const propertyBookingsWithDetails = await Promise.all(
       propertyBookings.map(async (booking) => {
         const prop = await Property.findByPk(booking.property_id, {
-          attributes: ["location", "name", "photos"],
+          attributes: ["location", "name", "photos", "property_type"],
         });
 
         const room = await Room.findByPk(booking.room_id, {
@@ -827,6 +827,7 @@ exports.getMyBookings = async (req, res) => {
         return {
           ...booking.toJSON(),
           property_location: prop ? prop.location : null,
+          property_type: prop ? prop.property_type : null,
           property_name: prop ? prop.name : null,
           property_photos: photos,
           room_name: room ? room.room_name : null,
