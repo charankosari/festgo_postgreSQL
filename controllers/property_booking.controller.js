@@ -486,17 +486,14 @@ exports.bookProperty = async (req, res) => {
       },
     });
     if (gst_number || gst_company_name || gst_company_address) {
-      await UserGstDetails.create(
-        {
-          gst_number,
-          gst_company_name,
-          gst_company_address,
-          property_id,
-          booking_id: newBooking.id,
-          userId: userId,
-        },
-        { transaction: user_tx }
-      );
+      await UserGstDetails.create({
+        gst_number,
+        gst_company_name,
+        gst_company_address,
+        property_id,
+        booking_id: newBooking.id,
+        userId: userId,
+      });
     }
     return res.status(201).json({
       message: "Booking created successfully",
