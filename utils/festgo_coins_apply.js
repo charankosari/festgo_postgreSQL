@@ -97,7 +97,7 @@ async function applyUsableFestgoCoins({
       expiresAt: { [Op.gt]: now },
     },
     order: [["expiresAt", "ASC"]],
-    transaction,
+    transaction: user_tx,
   });
 
   // Calculate available coins from both remaining and expired-but-unused ones
