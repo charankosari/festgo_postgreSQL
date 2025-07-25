@@ -9,6 +9,7 @@ const {
   FestgoCoinSetting,
   FestgoCoinUsageLimit,
 } = require("../models/services");
+
 async function applyUsableFestgoCoins({
   userId,
   requestedCoins,
@@ -21,6 +22,13 @@ async function applyUsableFestgoCoins({
   const now = new Date();
   //   const user_tx = await usersequel.transaction();
   // ✅ Step 1: Check total allowed monthly usage (FestgoCoinUsageLimit)
+  console.log(
+    userId,
+    requestedCoins,
+    gross_payable,
+    total_room_price,
+    gst_amount
+  );
   const coinLimit = await FestgoCoinUsageLimit.findOne({ transaction });
   if (!coinLimit || !coinLimit?.allother) {
     throw new Error("Coin usage limit not configured");

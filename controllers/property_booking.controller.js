@@ -373,7 +373,7 @@ exports.bookProperty = async (req, res) => {
     const requestedCoins = coinSetting.single_transaction_limit_value;
     const { usable_coins, coins_discount_value, amount_paid } =
       await applyUsableFestgoCoins(
-        userId,
+        user.id,
         requestedCoins,
         gross_payable,
         total_room_price,
