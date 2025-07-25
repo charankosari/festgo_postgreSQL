@@ -144,7 +144,8 @@ const cancelPropertyBooking = async (req, res) => {
       if (refundedCoins > 0) {
         const txnsToRestore = await FestgoCoinTransaction.findAll({
           where: { userId: booking.user_id },
-          order: [["expiredAt", "ASC"]],
+          order: [["expiresAt", "ASC"]],
+
           transaction: user_tx,
         });
 
