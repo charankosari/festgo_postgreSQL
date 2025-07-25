@@ -955,9 +955,10 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
       : 0;
 
     const reviews = reviewRecords.map((r) => ({
-      userName: r.userName,
-      reviewText: r.reviewText,
+      userName: r.name,
+      reviewText: r.comment,
       rating: parseFloat(r.rating),
+      image: r.image || "",
     }));
 
     // Prepare final response
