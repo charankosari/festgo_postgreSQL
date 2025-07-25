@@ -201,6 +201,7 @@ exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
   });
+  const user_tx = await usersequel.transaction();
   const userId = req.user.id;
 
   try {
