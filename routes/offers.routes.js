@@ -6,7 +6,7 @@ const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 router.post(
   "/create",
   isAuthorized,
-  authorizedRoles("admin", "merchant"),
+  authorizedRoles("admin", "vendor"),
   offerController.createOffer
 );
 

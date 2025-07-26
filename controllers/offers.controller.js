@@ -36,8 +36,7 @@ exports.createOffer = async (req, res) => {
     let validEntityIds = selectedPropertyIds.map(String);
     let validEntityNames = propertyNames;
 
-    if (userRole === "merchant") {
-      // Force offerFor to "property" for merchants
+    if (userRole === "vendor") {
       finalOfferFor = "property";
 
       const userProperties = await Property.findAll({
