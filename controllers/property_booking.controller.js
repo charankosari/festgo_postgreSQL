@@ -8,7 +8,6 @@ const {
   beach_fests,
   Event,
   EventType,
-  CronThing,
   FestgoCoinSetting,
   Offers,
   zeroBookingInstance,
@@ -31,6 +30,7 @@ const {
   cancelPropertyBooking,
   cancelEventBooking,
 } = require("../utils/cancelBookings");
+const { upsertCronThing } = require("../utils/cronUtils");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const handleUserReferralForPropertyBooking = async (
   referral_id,
@@ -179,14 +179,11 @@ const handleUserReferralForPropertyBooking = async (
     console.log("📦 Coin issue record created for next day.");
 
     // Upsert cron job entry
-    await CronThing.upsert(
-      {
-        entity: "property_coins_issue",
-        active: true,
-        last_run: new Date(),
-      },
-      { transaction: service_tx }
-    );
+    await upsertCronThing({
+      entity: "property_coins_issue",
+      transaction: service_tx,
+    });
+
     console.log("🕓 CronThing upserted for property_coins_issue");
 
     // Commit user transaction
@@ -514,25 +511,17 @@ exports.bookProperty = async (req, res) => {
         { transaction: t }
       );
 
-      // 🟡 Update cronthing for zero booking
-      await CronThing.upsert(
-        {
-          entity: "zero_booking",
-          active: true,
-          last_run: new Date(),
-        },
-        { transaction: t }
-      );
+      await upsertCronThing({
+        entity: "zero_booking",
+        transaction: service_tx,
+      });
     } else {
       // 🔵 Default cronthing update
-      await CronThing.upsert(
-        {
-          entity: "property_booking",
-          active: true,
-          last_run: new Date(),
-        },
-        { transaction: t }
-      );
+
+      await upsertCronThing({
+        entity: "property_booking",
+        transaction: service_tx,
+      });
     }
 
     if (req.body.referral_id && req.body.referral_id.trim() !== "") {

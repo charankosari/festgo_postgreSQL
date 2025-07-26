@@ -28,6 +28,11 @@ const expireStaleBookings = async () => {
           [Op.lte]: new Date(Date.now() - 15 * 60 * 1000),
         },
       },
+      include: {
+        model: property_booking,
+        as: "booking",
+        where: { zero_booking: false },
+      },
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
