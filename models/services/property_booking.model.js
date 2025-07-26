@@ -54,6 +54,11 @@ module.exports = (sequelize) => {
       offer_discount: {
         type: DataTypes.FLOAT,
         defaultValue: 0,
+        allowNull: true,
+      },
+      coupon_code: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
       reciept: {
         type: DataTypes.STRING,

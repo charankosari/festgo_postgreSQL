@@ -10,6 +10,7 @@ const {
   EventType,
   CronThing,
   FestgoCoinSetting,
+  Offers,
   sequelize, // your services sequelize instance
 } = require("../models/services");
 
@@ -199,7 +200,7 @@ const handleUserReferralForPropertyBooking = async (
   }
 };
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const generateReferralCode = customAlphabet(alphabet, 8);
+const generateReferNo = customAlphabet(alphabet, 8);
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
@@ -225,7 +226,7 @@ exports.bookProperty = async (req, res) => {
     const now = new Date();
     const checkInDate = new Date(check_in_date);
     const checkOutDate = new Date(check_out_date);
-
+    const coupon_code = req.body.coupon_code;
     if (checkInDate < now.setHours(0, 0, 0, 0)) {
       return res
         .status(400)
@@ -367,7 +368,39 @@ exports.bookProperty = async (req, res) => {
     const total_room_price =
       total_base_price + total_extra_adult_charge + total_child_charge;
 
-    // ✅ GST slab on total cumulative price
+    let offer_discount = 0;
+    let applied_offer_id = null;
+    let price_after_offer = total_room_price;
+    if (coupon_code && coupon_code.trim() !== "") {
+      const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
+
+      const offer = await Offers.findOne({
+        where: {
+          promoCode: coupon_code.trim(),
+          offerFor: "property",
+          status: "active",
+          bookingWindowStart: { [Op.lte]: today },
+          bookingWindowEnd: { [Op.gte]: today },
+          stayDatesStart: { [Op.lte]: check_in_date },
+          stayDatesEnd: { [Op.gte]: check_out_date },
+        },
+        transaction: t,
+      }); // ✅ 3. Apply discount if offer is valid for this property
+
+      if (offer && offer.entityIds && offer.entityIds.includes(property_id)) {
+        const discountValue = parseFloat(offer.discount); // "18%" -> 18
+        if (!isNaN(discountValue)) {
+          offer_discount = Math.round((total_room_price * discountValue) / 100);
+          price_after_offer = total_room_price - offer_discount;
+          applied_offer_id = coupon_code; // Save the UUID of the offer
+          console.log(
+            `✔️ Offer '${offer.name}' applied. Discount: ${offer_discount}`
+          );
+        }
+      } else {
+        console.log("❌ Invalid or inapplicable coupon code provided."); // Optionally, you could return an error here if the coupon is invalid // return res.status(400).json({ message: "Invalid coupon code." });
+      }
+    }
 
     const coinSetting = await FestgoCoinSetting.findOne({
       where: { type: "property" },
@@ -381,7 +414,7 @@ exports.bookProperty = async (req, res) => {
     } = await applyUsableFestgoCoins({
       userId: user.id,
       requestedCoins,
-      total_room_price,
+      total_room_price: price_after_offer,
       transaction: t,
       user_tx,
     });
@@ -402,13 +435,13 @@ exports.bookProperty = async (req, res) => {
       service_fee = 150;
     else if (amount_to_be_paid >= 7500 && amount_to_be_paid <= 9999)
       service_fee = 200;
-    else if (total_room_price >= 10000) service_fee = 250;
+    else if (amount_to_be_paid >= 10000) service_fee = 250;
 
     // ✅ Gross amount to be paid before discounts or coins
     const gross_payable = amount_to_be_paid + gst_amount + service_fee;
     console.log("Gross Payable:", gross_payable);
     // Create booking
-    const reciept_no = generateReferralCode();
+    const reciept_no = generateReferNo();
     const newBooking = await property_booking.create(
       {
         user_id: userId,
@@ -424,6 +457,8 @@ exports.bookProperty = async (req, res) => {
         child_charges: total_child_charge,
         festgo_coins_used: usable_coins,
         coins_discount_value,
+        offer_discount: offer_discount,
+        coupon_code: applied_offer_id,
         gst_amount,
         gst_rate,
         service_fee,
