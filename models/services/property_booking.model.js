@@ -43,10 +43,6 @@ module.exports = (sequelize) => {
         defaultValue: 0,
       },
 
-      total_amount: {
-        type: DataTypes.FLOAT,
-        allowNull: false,
-      },
       festgo_coins_used: {
         type: DataTypes.FLOAT,
         defaultValue: 0,
@@ -54,6 +50,14 @@ module.exports = (sequelize) => {
       coins_discount_value: {
         type: DataTypes.FLOAT,
         defaultValue: 0,
+      },
+      offer_discount: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+      reciept: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
       gst_amount: {
         type: DataTypes.FLOAT,

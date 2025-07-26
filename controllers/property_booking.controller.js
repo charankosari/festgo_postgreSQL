@@ -23,7 +23,7 @@ const {
 } = require("../models/users");
 const { createOrder } = require("../libs/payments/razorpay");
 const { Op, Transaction } = require("sequelize");
-
+const { customAlphabet } = require("nanoid");
 const {
   cancelBeachFestBooking,
   cancelPropertyBooking,
@@ -198,7 +198,8 @@ const handleUserReferralForPropertyBooking = async (
     throw err;
   }
 };
-
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const generateReferralCode = customAlphabet(alphabet, 8);
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
@@ -407,6 +408,7 @@ exports.bookProperty = async (req, res) => {
     const gross_payable = amount_to_be_paid + gst_amount + service_fee;
     console.log("Gross Payable:", gross_payable);
     // Create booking
+    const reciept_no = generateReferralCode();
     const newBooking = await property_booking.create(
       {
         user_id: userId,
@@ -434,6 +436,7 @@ exports.bookProperty = async (req, res) => {
         gst_company_name,
         gst_company_address,
         notes,
+        reciept: reciept_no,
       },
       { transaction: t }
     );
