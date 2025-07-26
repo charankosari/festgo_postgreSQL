@@ -38,6 +38,7 @@ app.use("/api/properties", propertyRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/festbite", festbiteRoutes);
+// app.use("/api/offers", festbiteRoutes);
 app.use("/api/upload", upload);
 app.use("/api/property-booking", propertyBookingRoutes);
 app.use("/api/beachfest-booking", beachfestBookingRoutes);

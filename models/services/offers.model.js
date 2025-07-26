@@ -42,19 +42,30 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      propertyNames: {
+
+      entityIds: {
+        type: DataTypes.ARRAY(DataTypes.STRING), // Could be property IDs, event IDs, etc.
+        allowNull: false,
+        defaultValue: [],
+      },
+      entityNames: {
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: false,
         defaultValue: [],
       },
-      selectedPropertyIds: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+
+      offerFor: {
+        type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: [],
+        validate: {
+          isIn: [["property", "event", "beach_fests", "city_fests"]],
+        },
       },
+
       description: {
         type: DataTypes.TEXT,
       },
+
       from: {
         type: DataTypes.STRING,
         allowNull: false,
