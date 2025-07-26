@@ -317,13 +317,12 @@ exports.updateProfile = async (req, res) => {
     fields.forEach((field) => {
       const value = req.body[field];
 
-      if (value !== undefined && value !== "") {
+      if (value !== undefined) {
         updateData[field] = value;
       }
     });
 
     // Debug: log what is being updated
-    console.log("Updating fields:", updateData);
 
     if (Object.keys(updateData).length > 0) {
       await user.update(updateData);
