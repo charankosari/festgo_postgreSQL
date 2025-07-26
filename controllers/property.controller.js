@@ -1094,34 +1094,34 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       }
     }
 
-    // ✅ Step 3: Fallback active properties (same property_type if given)
-    if (availableProperties.length < 20) {
-      const whereFallback = {
-        active: true,
-        [Op.and]: [propertyTypeFilter].filter(Boolean),
-        id: {
-          [Op.notIn]: availableProperties.map((p) => p.id),
-        },
-      };
+    // // ✅ Step 3: Fallback active properties (same property_type if given)
+    // if (availableProperties.length < 20) {
+    //   const whereFallback = {
+    //     active: true,
+    //     [Op.and]: [propertyTypeFilter].filter(Boolean),
+    //     id: {
+    //       [Op.notIn]: availableProperties.map((p) => p.id),
+    //     },
+    //   };
 
-      const fallbackProperties = await Property.findAll({
-        where: whereFallback,
-        limit: 20 - availableProperties.length,
-      });
+    //   const fallbackProperties = await Property.findAll({
+    //     where: whereFallback,
+    //     limit: 20 - availableProperties.length,
+    //   });
 
-      for (const property of fallbackProperties) {
-        const available = await checkAvailableRooms(
-          property,
-          adults,
-          children,
-          requestedRooms,
-          startDate,
-          finalDate
-        );
-        if (available) availableProperties.push(available);
-        if (availableProperties.length === 20) break;
-      }
-    }
+    //   for (const property of fallbackProperties) {
+    //     const available = await checkAvailableRooms(
+    //       property,
+    //       adults,
+    //       children,
+    //       requestedRooms,
+    //       startDate,
+    //       finalDate
+    //     );
+    //     if (available) availableProperties.push(available);
+    //     if (availableProperties.length === 20) break;
+    //   }
+    // }
 
     // ✅ Final enrichment and response
     const finalProperties = await enrichProperties(
