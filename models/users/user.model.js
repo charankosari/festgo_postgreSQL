@@ -20,7 +20,7 @@ module.exports = (sequelize) => {
       number: { type: DataTypes.STRING, allowNull: true, unique: true },
       password: { type: DataTypes.STRING, allowNull: true },
       image_url: { type: DataTypes.STRING, defaultValue: "" },
-      date_of_birth: { type: DataTypes.DATEONLY, allowNull: true },
+      date_of_birth: { type: DataTypes.STRING, allowNull: true },
       gender: { type: DataTypes.STRING, allowNull: true },
       email_otp: { type: DataTypes.STRING, defaultValue: null },
       mobile_otp: { type: DataTypes.STRING, defaultValue: null },
