@@ -5,6 +5,11 @@ module.exports = (sequelize) => {
 
   Offer.init(
     {
+      id: {
+        type: DataTypes.UUIDV4,
+        primaryKey: true,
+        defaultValue: DataTypes.UUIDV4,
+      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -70,7 +75,7 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          isIn: [["admin", "merchant"]],
+          isIn: [["admin", "vendor"]],
         },
       },
     },
