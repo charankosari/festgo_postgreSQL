@@ -9,5 +9,11 @@ router.post(
   authorizedRoles("admin", "vendor"),
   offerController.createOffer
 );
+router.get(
+  "/get",
+  isAuthorized,
+  authorizedRoles("admin", "vendor"),
+  offerController.getAllOffers
+);
 
 module.exports = router;

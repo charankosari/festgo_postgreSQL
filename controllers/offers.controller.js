@@ -77,6 +77,7 @@ exports.createOffer = async (req, res) => {
       offerFor: finalOfferFor,
       description,
       from: userRole,
+      vendorId: userId,
     });
 
     return res.status(201).json({
@@ -86,10 +87,65 @@ exports.createOffer = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Offer Error:", error);
-    return res.status(500).json({
+
+    // Handle unique constraint error for promoCode
+    if (error.name === "SequelizeUniqueConstraintError") {
+      const promoCodeError = error.errors.find(
+        (err) => err.path === "promoCode"
+      );
+      if (promoCodeError) {
+        return res.status(409).json({
+          success: false,
+          message: `Promo code "${promoCodeError.value}" already exists. Please use a different code.`,
+        });
+      }
+    }
+
+    return res.status(400).json({
       success: false,
-      message: "Something went wrong while creating the offer.",
+      message: "Failed to create offer. Please check the input and try again.",
       error: error.message,
     });
+  }
+};
+
+exports.getAllOffers = async (req, res) => {
+  try {
+    const userRole = req.user.role; // 'admin' or 'vendor'
+    const userId = req.user.id;
+
+    const whereClause = userRole === "vendor" ? { vendorId: userId } : {};
+
+    const offers = await Offers.findAll({ where: whereClause, raw: true });
+
+    const result = offers.map((offer) => {
+      const isVendor = userRole === "vendor";
+
+      return {
+        id: offer.id,
+        name: offer.name,
+        type: offer.type,
+        discount: offer.discount,
+        bookingWindowStart: offer.bookingWindowStart,
+        bookingWindowEnd: offer.bookingWindowEnd,
+        stayDatesStart: offer.stayDatesStart,
+        stayDatesEnd: offer.stayDatesEnd,
+        status: offer.status,
+        ...(isVendor
+          ? {
+              propertyNames: offer.entityNames || [],
+              selectedPropertyIds: offer.entityIds || [],
+            }
+          : {
+              entityNames: offer.entityNames || [],
+              entityIds: offer.entityIds || [],
+            }),
+      };
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching offers:", error);
+    res.status(400).json({ error: "Failed to fetch offers." });
   }
 };
