@@ -11,6 +11,7 @@ const {
   CronThing,
   FestgoCoinSetting,
   Offers,
+  zeroBookingInstance,
   sequelize, // your services sequelize instance
 } = require("../models/services");
 
@@ -221,6 +222,7 @@ exports.bookProperty = async (req, res) => {
       gst_number,
       gst_company_name,
       gst_company_address,
+      zero_booking,
     } = req.body;
     // ✅ Date validation block (add right after destructuring req.body)
     const now = new Date();
@@ -502,10 +504,37 @@ exports.bookProperty = async (req, res) => {
       },
     });
 
-    await CronThing.upsert(
-      { entity: "property_booking", active: true, last_run: new Date() },
-      { transaction: t }
-    );
+    if (req.body.zero_booking === true) {
+      // 🟡 Save razorpay order instance in zero_booking_instances
+      await zeroBookingInstance.create(
+        {
+          property_booking_id: newBooking.id,
+          instance: razorpayOrder,
+        },
+        { transaction: t }
+      );
+
+      // 🟡 Update cronthing for zero booking
+      await CronThing.upsert(
+        {
+          entity: "zero_booking",
+          active: true,
+          last_run: new Date(),
+        },
+        { transaction: t }
+      );
+    } else {
+      // 🔵 Default cronthing update
+      await CronThing.upsert(
+        {
+          entity: "property_booking",
+          active: true,
+          last_run: new Date(),
+        },
+        { transaction: t }
+      );
+    }
+
     if (req.body.referral_id && req.body.referral_id.trim() !== "") {
       console.log("entering referral handling");
       await handleUserReferralForPropertyBooking(
@@ -752,6 +781,12 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         transaction: user_tx,
       }
     );
+    if (booking.zero_booking) {
+      await zeroBookingInstance.destroy({
+        where: { property_booking_id: bookingId },
+        transaction: t,
+      });
+    }
 
     await t.commit();
     await user_tx.commit();

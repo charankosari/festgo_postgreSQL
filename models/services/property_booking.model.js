@@ -88,7 +88,10 @@ module.exports = (sequelize) => {
         type: DataTypes.FLOAT,
         defaultValue: 0,
       },
-
+      zero_booking: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       amount_paid: {
         type: DataTypes.FLOAT,
         allowNull: false,

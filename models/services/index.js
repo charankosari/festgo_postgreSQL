@@ -1,4 +1,5 @@
 const { servicesSequelize, usersSequelize } = require("../../db");
+const zeroBookingInstance = require("./zero_booking_instances.model");
 const city_fest = require("./city_fest.model")(servicesSequelize);
 const city_fest_category = require("./city_fest_category.model")(
   servicesSequelize
@@ -119,6 +120,11 @@ RoomBookedDate.belongsTo(Property, {
   foreignKey: "propertyId",
   as: "property",
   onDelete: "CASCADE",
+});
+// In RoomBookedDate model
+RoomBookedDate.belongsTo(property_booking, {
+  foreignKey: "bookingId",
+  as: "booking",
 });
 
 Room.hasMany(RoomBookedDate, {
@@ -255,6 +261,7 @@ const db = {
   FestgoCoinSetting,
   FestgoCoinUsageLimit,
   Offers,
+  zeroBookingInstance,
 };
 
 // Sync all models

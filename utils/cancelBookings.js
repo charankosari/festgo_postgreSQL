@@ -6,6 +6,7 @@ const {
   beach_fests,
   Event,
   sequelize, // your services sequelize instance
+  zeroBookingInstance,
 } = require("../models/services");
 const {
   FestgoCoinToIssue,
