@@ -22,10 +22,14 @@ exports.createOffer = async (req, res) => {
     const userId = req.user.id;
 
     const validTypes = ["property", "event", "beach_fests", "city_fests"];
-    if (!validTypes.includes(offerFor)) {
+
+    // Default `offerFor` to "property" if empty or missing
+    let finalOfferFor = offerFor?.trim() || "property";
+
+    if (!validTypes.includes(finalOfferFor)) {
       return res.status(400).json({
         success: false,
-        message: `'for' field must be one of: ${validTypes.join(", ")}`,
+        message: `'offerFor' must be one of: ${validTypes.join(", ")}`,
       });
     }
 
@@ -33,12 +37,8 @@ exports.createOffer = async (req, res) => {
     let validEntityNames = propertyNames;
 
     if (userRole === "merchant") {
-      if (offerFor !== "property") {
-        return res.status(403).json({
-          success: false,
-          message: "Merchants can only apply offers to their own properties.",
-        });
-      }
+      // Force offerFor to "property" for merchants
+      finalOfferFor = "property";
 
       const userProperties = await Property.findAll({
         where: { vendorId: userId },
@@ -75,7 +75,7 @@ exports.createOffer = async (req, res) => {
       status,
       entityIds: validEntityIds,
       entityNames: validEntityNames,
-      offerFor,
+      offerFor: finalOfferFor,
       description,
       from: userRole,
     });
