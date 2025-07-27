@@ -1,5 +1,7 @@
 const { servicesSequelize, usersSequelize } = require("../../db");
-const zeroBookingInstance = require("./zero_booking_instances.model");
+const zeroBookingInstance = require("./zero_booking_instances.model")(
+  servicesSequelize
+);
 const city_fest = require("./city_fest.model")(servicesSequelize);
 const city_fest_category = require("./city_fest_category.model")(
   servicesSequelize
