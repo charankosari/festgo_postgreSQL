@@ -470,6 +470,7 @@ exports.bookProperty = async (req, res) => {
         gst_company_name,
         gst_company_address,
         notes,
+        zero_booking,
         reciept: reciept_no,
       },
       { transaction: t }
@@ -513,14 +514,14 @@ exports.bookProperty = async (req, res) => {
 
       await upsertCronThing({
         entity: "zero_booking",
-        transaction: service_tx,
+        transaction: t,
       });
     } else {
       // 🔵 Default cronthing update
 
       await upsertCronThing({
         entity: "property_booking",
-        transaction: service_tx,
+        transaction: t,
       });
     }
 

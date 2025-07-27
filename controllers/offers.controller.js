@@ -130,6 +130,7 @@ exports.getAllOffers = async (req, res) => {
         bookingWindowEnd: offer.bookingWindowEnd,
         stayDatesStart: offer.stayDatesStart,
         stayDatesEnd: offer.stayDatesEnd,
+        promoCode: offer.promoCode,
         status: offer.status,
         ...(isVendor
           ? {

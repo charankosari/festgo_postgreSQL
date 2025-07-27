@@ -57,7 +57,7 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
       coupon_code: {
-        type: DataTypes.UUID,
+        type: DataTypes.STRING,
         allowNull: true,
       },
       reciept: {
