@@ -17,5 +17,10 @@ router.get(
   isAuthorized,
   propertyBookingController.getMyBookings
 );
+router.get(
+  "/zero-bookings",
+  isAuthorized,
+  propertyBookingController.getMyBookings
+);
 
 module.exports = router;

@@ -5,7 +5,7 @@ const {
   property_booking,
   CronThing,
   sequelize,
-  zero_booking_instance,
+  zeroBookingInstance,
 } = require("../models/services");
 
 const expireZeroBookings = async () => {
@@ -42,7 +42,7 @@ const expireZeroBookings = async () => {
 
     for (const room of expiredRoomDates) {
       const booking = room.booking;
-      const checkinDate = moment(booking.checkin_date);
+      const checkinDate = moment(booking.check_in_date);
       const day = checkinDate.day(); // 0 = Sunday, 6 = Saturday
       const diffDays = checkinDate.diff(now, "days");
 
@@ -76,10 +76,23 @@ const expireZeroBookings = async () => {
         }
       );
 
-      await zero_booking_instance.destroy({
-        where: { booking_id: { [Op.in]: bookingIds } },
-        transaction: t,
-      });
+      for (const bookingId of bookingIds) {
+        const instance = await zeroBookingInstance.findOne({
+          where: { property_booking_id: bookingId }, // ✅ correct column name
+          transaction: t,
+        });
+
+        if (instance) {
+          await instance.destroy({ transaction: t });
+          console.log(
+            `🗑️ Deleted zero_booking_instance for booking ${bookingId}`
+          );
+        } else {
+          console.log(
+            `⏳ No zero_booking_instance yet for booking ${bookingId}, skipping...`
+          );
+        }
+      }
 
       console.log(
         `✅ Cancelled ${toExpireIds.length} RoomBookedDates and ${bookingIds.length} bookings`
