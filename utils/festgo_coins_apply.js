@@ -13,16 +13,17 @@ const {
 async function applyUsableFestgoCoins({
   userId,
   requestedCoins,
-  total_room_price,
+  total_price,
   transaction,
   user_tx,
+  type,
 }) {
   const now = new Date();
 
   console.log("🧾 Params received:", {
     userId,
     requestedCoins,
-    total_room_price,
+    total_price,
   });
 
   const coinLimit = await FestgoCoinUsageLimit.findOne({ transaction });
@@ -61,13 +62,20 @@ async function applyUsableFestgoCoins({
     return {
       usable_coins: 0,
       coins_discount_value: 0,
-      amount_to_be_paid: total_room_price,
+      amount_to_be_paid: total_price,
       coin_history_inputs: null,
     };
   }
 
   const setting = await FestgoCoinSetting.findOne({
-    where: { type: "property" },
+    where: {
+      type:
+        type === "beachfest"
+          ? "beach_fest"
+          : type === "cityfest"
+          ? "city_fest"
+          : type,
+    },
     transaction,
   });
 
@@ -75,17 +83,6 @@ async function applyUsableFestgoCoins({
 
   const monthlyLimitProperty = Number(setting.monthly_limit_value);
   const singleTransactionLimit = Number(setting.single_transaction_limit_value);
-
-  // const propertyRecommendUsed =
-  //   (await FestGoCoinHistory.sum("coins", {
-  //     where: {
-  //       userId,
-  //       type: "used",
-  //       reason: "property_recommend",
-  //       createdAt: { [Op.between]: [firstDayOfMonth, lastDayOfMonth] },
-  //     },
-  //     transaction: user_tx,
-  //   })) || 0;
 
   const remainingThisMonthForProperty = monthlyLimitProperty;
 
@@ -139,22 +136,22 @@ async function applyUsableFestgoCoins({
   coin_history_inputs.push({
     userId,
     type: "used",
-    reason: "property_booking",
+    reason: `${type}_booking`,
     referenceId: null, // will set after booking
     coins: totalCoinsUsed,
     status: "pending",
     metaData: {
-      booking_amount: total_room_price,
+      booking_amount: total_price,
     },
   });
 
   const coins_discount_value = usable_coins * 1;
-  const amount_to_be_paid = total_room_price - coins_discount_value;
+  const amount_to_be_paid = total_price - coins_discount_value;
 
   console.log("🎯 Final Summary:");
   console.log("    ➤ Usable Coins:", usable_coins);
   console.log("    ➤ Discount Value:", coins_discount_value);
-  console.log("    ➤ Total Price:", total_room_price);
+  console.log("    ➤ Total Price:", total_price);
   console.log("    ➤ Amount to be Paid:", amount_to_be_paid);
 
   return {

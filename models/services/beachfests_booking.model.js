@@ -60,7 +60,24 @@ module.exports = (sequelize) => {
         type: DataTypes.DATE,
         allowNull: false,
       },
+      festgo_coins_used: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
 
+      festgo_coin_discount: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+      offer_discount: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+        allowNull: true,
+      },
+      coupon_code: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       service_fee: {
         type: DataTypes.FLOAT,
         defaultValue: 0,

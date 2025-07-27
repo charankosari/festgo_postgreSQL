@@ -122,6 +122,7 @@ const handleUserReferralForPropertyBooking = async (
     const referralCount = await FestGoCoinHistory.count({
       where: {
         userId: referrer.id,
+        reason: "property_recommend",
         createdAt: {
           [Op.gte]: thisMonthStart,
         },
@@ -416,6 +417,7 @@ exports.bookProperty = async (req, res) => {
       total_room_price: price_after_offer,
       transaction: t,
       user_tx,
+      type: "property",
     });
     console.log(amount_to_be_paid);
     let gst_rate = 0;
