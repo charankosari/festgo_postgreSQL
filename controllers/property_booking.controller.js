@@ -897,10 +897,20 @@ exports.getMyBookings = async (req, res) => {
     // 📌 Fetch property bookings (paid/refunded)
     const propertyBookings = await property_booking.findAll({
       where: {
-        user_id: userId,
-        payment_status: {
-          [Op.in]: ["paid", "refunded", "norefund"],
-        },
+        [Op.or]: [
+          {
+            payment_status: {
+              [Op.in]: ["paid", "refunded", "norefund"],
+            },
+          },
+          {
+            zero_booking: true,
+            booking_status: {
+              [Op.in]: ["confirmed", "pending"],
+            },
+          },
+        ],
+        user_id: userId, // AND condition with user_id
       },
       order: [["createdAt", "DESC"]],
     });
