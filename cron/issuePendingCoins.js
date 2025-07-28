@@ -145,7 +145,7 @@ const issueBeachFestPendingCoins = async () => {
       where: {
         issue: true,
         status: "pending",
-        type: "beachfest",
+        type: "beachfest_referral",
 
         issueAt: { [Op.lte]: now },
       },
@@ -226,7 +226,7 @@ const issueBeachFestPendingCoins = async () => {
       where: {
         issue: true,
         status: "pending",
-        type: "beachfest",
+        type: "beachfest_referral",
       },
       transaction: user_tx,
     });

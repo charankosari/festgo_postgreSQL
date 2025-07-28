@@ -12,6 +12,7 @@ const {
   sequelize,
 } = require("../models/services");
 const { Op } = require("sequelize");
+const { upsertCronThing } = require("./cronUtils");
 const createInitialFestgoTransaction = async (userId) => {
   try {
     const now = new Date();
@@ -341,8 +342,7 @@ const handleUserReferralForBeachFestBooking = async (
   referredUserId,
   bookingId,
   beachfest_id,
-  issueAt,
-  service_tx
+  issueAt
 ) => {
   if (!referral_id || referral_id.trim() === "") {
     console.log("🚫 Referral ID empty. Skipping.");
@@ -350,6 +350,7 @@ const handleUserReferralForBeachFestBooking = async (
   }
 
   const user_tx = await usersequel.transaction();
+  const service_tx = await sequelize.transaction();
   console.log("🔄 Started user referral transaction");
 
   try {
@@ -373,7 +374,6 @@ const handleUserReferralForBeachFestBooking = async (
     }
     const setting = await FestgoCoinSetting.findOne({
       where: { type: "beach_fest" },
-      transaction: service_tx,
     });
     if (!setting || Number(setting.coins_per_referral) <= 0) {
       console.log("🚫 No coin setting found or zero coins.");
@@ -438,19 +438,18 @@ const handleUserReferralForBeachFestBooking = async (
       { transaction: user_tx }
     );
 
-    await CronThing.upsert(
-      {
-        entity: "beachfest_coins_issue",
-        active: true,
-        last_run: new Date(),
-      },
-      { transaction: service_tx }
-    );
+    await upsertCronThing({
+      entity: "beachfest_coins_issue",
+      active: true,
+      transaction: service_tx,
+    });
 
     await user_tx.commit();
+    await service_tx.commit();
     console.log(`✅ Referral reward set for user ${referrer.id}`);
   } catch (err) {
     await user_tx.rollback();
+    await service_tx.rollback();
     console.error("❌ Error in referral handler:", err);
     throw err;
   }
