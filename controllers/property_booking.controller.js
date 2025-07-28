@@ -367,10 +367,11 @@ exports.bookProperty = async (req, res) => {
 
     const total_room_price =
       total_base_price + total_extra_adult_charge + total_child_charge;
-
+    console.log(total_base_price, total_room_price);
     let offer_discount = 0;
     let applied_offer_id = null;
     let price_after_offer = total_room_price;
+    console.log(price_after_offer);
     if (coupon_code && coupon_code.trim() !== "") {
       const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
 
@@ -414,7 +415,7 @@ exports.bookProperty = async (req, res) => {
     } = await applyUsableFestgoCoins({
       userId: user.id,
       requestedCoins,
-      total_room_price: price_after_offer,
+      total_price: price_after_offer,
       transaction: t,
       user_tx,
       type: "property",
@@ -939,6 +940,15 @@ exports.getMyBookings = async (req, res) => {
         //   }
         // }
         const photos = (prop.photos || []).map((photo) => photo.imageURL);
+        let razorpayOrder = null;
+        if (booking.zero_booking) {
+          const zeroBooking = await zeroBookingInstance.findOne({
+            where: { property_booking_id: booking.id },
+            attributes: ["instance"],
+          });
+
+          razorpayOrder = zeroBooking?.instance || null;
+        }
         return {
           ...booking.toJSON(),
           property_location: prop ? prop.location : null,
@@ -946,6 +956,7 @@ exports.getMyBookings = async (req, res) => {
           property_name: prop ? prop.name : null,
           property_photos: photos,
           room_name: room ? room.room_name : null,
+          razorpayOrder,
         };
       })
     );
