@@ -45,7 +45,6 @@ module.exports = (sequelize) => {
       promoCode: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true,
       },
       status: {
         type: DataTypes.STRING,
