@@ -15,7 +15,7 @@ const {
   handleUserReferralForBeachFestBooking,
 } = require("../utils/issueCoins");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
-
+const { Op } = require("sequelize");
 exports.createBeachFestBooking = async (req, res) => {
   const t = await sequelize.transaction();
   const user_tx = await usersequel.transaction();
