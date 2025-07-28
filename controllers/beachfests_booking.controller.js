@@ -2,6 +2,7 @@ const {
   beach_fests,
   beachfests_booking,
   sequelize,
+
   Offers,
 } = require("../models/services");
 const {
@@ -16,6 +17,7 @@ const {
 } = require("../utils/issueCoins");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const { Op } = require("sequelize");
+const { upsertCronThing } = require("../utils/cronUtils");
 exports.createBeachFestBooking = async (req, res) => {
   const t = await sequelize.transaction();
   const user_tx = await usersequel.transaction();
@@ -362,14 +364,10 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
       await coinToIssue.save({ transaction: user_tx });
     }
 
-    await CronThing.upsert(
-      {
-        entity: "beachfest_coins_issue",
-        active: true,
-        last_run: new Date(),
-      },
-      { transaction: t }
-    );
+    await upsertCronThing({
+      entity: "beachfest_coins_issue",
+      transaction: t,
+    });
     await user_tx.commit();
     await t.commit();
     console.log(`✅ Booking ${bookingId} confirmed, passes deducted.`);
