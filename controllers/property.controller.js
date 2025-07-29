@@ -2177,7 +2177,14 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
 
       const totalPricePayable =
         finalPrice + gst_amount + service_fee - coinDiscount;
-
+      let zero_booking = false;
+      const checkIn = moment(startDate, "YYYY-MM-DD");
+      const today = moment().startOf("day");
+      const dayGap = checkIn.diff(today, "days");
+      const isWeekend = checkIn.day() === 6 || checkIn.day() === 0; // Saturday or Sunday
+      if ((isWeekend && dayGap >= 4) || (!isWeekend && dayGap >= 2)) {
+        zero_booking = true;
+      }
       const photos = (plainRoom.photos || []).map((photo) => photo.imageURL);
       const videos = (plainRoom.videos || []).map((video) => video.imageURL);
 
@@ -2199,6 +2206,7 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
         },
         cancellationPolicy,
         availableRooms,
+        zero_booking,
         amenities: normalizedAmenities.amenities,
         photos,
         videos,

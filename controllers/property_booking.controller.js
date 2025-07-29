@@ -227,6 +227,21 @@ exports.bookProperty = async (req, res) => {
     const checkInDate = new Date(check_in_date);
     const checkOutDate = new Date(check_out_date);
     const coupon_code = req.body.coupon_code;
+    // Auto-calculate zero_booking if not explicitly true
+    const checkIn = new Date(check_in_date);
+    const today = new Date();
+    const checkInDay = checkIn.getDay(); // 0 = Sunday, 6 = Saturday
+    const dayGap = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
+    const isWeekend = checkInDay === 0 || checkInDay === 6;
+
+    let computedZeroBooking = false;
+    if ((isWeekend && dayGap >= 4) || (!isWeekend && dayGap >= 2)) {
+      computedZeroBooking = true;
+    }
+
+    // Final zero_booking flag used in booking logic
+    const finalZeroBooking = zero_booking === true ? true : computedZeroBooking;
+
     if (checkInDate < now.setHours(0, 0, 0, 0)) {
       return res
         .status(400)
@@ -402,24 +417,39 @@ exports.bookProperty = async (req, res) => {
         console.log("❌ Invalid or inapplicable coupon code provided."); // Optionally, you could return an error here if the coupon is invalid // return res.status(400).json({ message: "Invalid coupon code." });
       }
     }
+    let usable_coins = 0;
+    let coins_discount_value = 0;
+    let amount_to_be_paid = price_after_offer;
+    let coin_history_inputs = null;
 
-    const coinSetting = await FestgoCoinSetting.findOne({
-      where: { type: "property" },
-    });
-    const requestedCoins = coinSetting.single_transaction_limit_value;
-    const {
-      usable_coins,
-      coins_discount_value,
-      amount_to_be_paid,
-      coin_history_inputs,
-    } = await applyUsableFestgoCoins({
-      userId: user.id,
-      requestedCoins,
-      total_price: price_after_offer,
-      transaction: t,
-      user_tx,
-      type: "property",
-    });
+    const requestedUserCoins = Number(req.body.festgo_coins) || 0;
+
+    if (requestedUserCoins > 0) {
+      const coinSetting = await FestgoCoinSetting.findOne({
+        where: { type: "property" },
+      });
+
+      const maxAllowedCoins = coinSetting?.single_transaction_limit_value || 0;
+
+      const coinsToUse = Math.min(requestedUserCoins, maxAllowedCoins);
+
+      if (coinsToUse > 0) {
+        const coinUsageResult = await applyUsableFestgoCoins({
+          userId: user.id,
+          requestedCoins: coinsToUse,
+          total_price: price_after_offer,
+          transaction: t,
+          user_tx,
+          type: "property",
+        });
+
+        usable_coins = coinUsageResult.usable_coins;
+        coins_discount_value = coinUsageResult.coins_discount_value;
+        amount_to_be_paid = coinUsageResult.amount_to_be_paid;
+        coin_history_inputs = coinUsageResult.coin_history_inputs;
+      }
+    }
+
     console.log(amount_to_be_paid);
     let gst_rate = 0;
     if (amount_to_be_paid >= 8000) gst_rate = 18;
@@ -473,7 +503,7 @@ exports.bookProperty = async (req, res) => {
         gst_company_name,
         gst_company_address,
         notes,
-        zero_booking,
+        zero_booking: finalZeroBooking,
         reciept: reciept_no,
       },
       { transaction: t }
@@ -505,7 +535,7 @@ exports.bookProperty = async (req, res) => {
       },
     });
 
-    if (req.body.zero_booking === true) {
+    if (finalZeroBooking) {
       // 🟡 Save razorpay order instance in zero_booking_instances
       await zeroBookingInstance.create(
         {
