@@ -25,6 +25,7 @@ const {
 const { createOrder, refundPayment } = require("../libs/payments/razorpay");
 const { Op, Transaction } = require("sequelize");
 const { customAlphabet } = require("nanoid");
+const moment = require("moment");
 const {
   cancelBeachFestBooking,
   cancelPropertyBooking,
@@ -229,10 +230,17 @@ exports.bookProperty = async (req, res) => {
     const coupon_code = req.body.coupon_code;
     // Auto-calculate zero_booking if not explicitly true
     const checkIn = new Date(check_in_date);
+    checkIn.setHours(0, 0, 0, 0);
+
+    // Set today's date to midnight
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const checkInDay = checkIn.getDay(); // 0 = Sunday, 6 = Saturday
-    const dayGap = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
     const isWeekend = checkInDay === 0 || checkInDay === 6;
+
+    // Now the dayGap calculation is accurate
+    const dayGap = (checkIn - today) / (1000 * 60 * 60 * 24);
 
     let computedZeroBooking = false;
     if ((isWeekend && dayGap >= 4) || (!isWeekend && dayGap >= 2)) {
@@ -972,14 +980,30 @@ exports.getMyBookings = async (req, res) => {
         // }
         const photos = (prop.photos || []).map((photo) => photo.imageURL);
         let razorpayOrder = null;
-        if (booking.zero_booking) {
+        let booking_deadline = null;
+        if (booking.zero_booking && booking.booking_status === "pending") {
           const zeroBooking = await zeroBookingInstance.findOne({
             where: { property_booking_id: booking.id },
             attributes: ["instance"],
           });
 
           razorpayOrder = zeroBooking?.instance || null;
+
+          // Calculate the deadline date based on the established rules
+          const checkIn = moment(booking.check_in_date).startOf("day");
+          const isWeekend = [0, 6].includes(checkIn.day());
+          let deadlineDate;
+
+          if (isWeekend) {
+            deadlineDate = checkIn.clone().subtract(5, "days");
+          } else {
+            deadlineDate = checkIn.clone().subtract(3, "days");
+          }
+
+          // Format it into a readable string like "Pay by Monday, August 25th at midnight"
+          booking_deadline = deadlineDate;
         }
+
         return {
           ...booking.toJSON(),
           property_location: prop ? prop.location : null,
@@ -988,6 +1012,7 @@ exports.getMyBookings = async (req, res) => {
           property_photos: photos,
           room_name: room ? room.room_name : null,
           razorpayOrder,
+          deadline: booking_deadline,
         };
       })
     );

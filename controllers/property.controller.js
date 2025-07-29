@@ -2182,8 +2182,21 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
       const today = moment().startOf("day");
       const dayGap = checkIn.diff(today, "days");
       const isWeekend = checkIn.day() === 6 || checkIn.day() === 0; // Saturday or Sunday
-      if ((isWeekend && dayGap >= 4) || (!isWeekend && dayGap >= 2)) {
+      let zero_booking_deadline = null;
+      if (isWeekend && dayGap > 4) {
         zero_booking = true;
+        zero_booking_deadline = checkIn
+          .clone()
+          .subtract(5, "days")
+          .endOf("day")
+          .toDate();
+      } else if (!isWeekend && dayGap > 2) {
+        zero_booking = true;
+        zero_booking_deadline = checkIn
+          .clone()
+          .subtract(3, "days")
+          .endOf("day")
+          .toDate();
       }
       const photos = (plainRoom.photos || []).map((photo) => photo.imageURL);
       const videos = (plainRoom.videos || []).map((video) => video.imageURL);
@@ -2207,6 +2220,7 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
         cancellationPolicy,
         availableRooms,
         zero_booking,
+        deadline: zero_booking_deadline,
         amenities: normalizedAmenities.amenities,
         photos,
         videos,

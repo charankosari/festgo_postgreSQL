@@ -42,7 +42,7 @@ const expireZeroBookings = async () => {
 
     for (const room of expiredRoomDates) {
       const booking = room.booking;
-      const checkinDate = moment(booking.check_in_date);
+      const checkinDate = moment(booking.check_in_date).startOf("day");
       const day = checkinDate.day(); // 0 = Sunday, 6 = Saturday
       const diffDays = checkinDate.diff(now, "days");
 
