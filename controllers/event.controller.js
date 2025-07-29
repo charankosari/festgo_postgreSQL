@@ -9,138 +9,147 @@ const {
   FestGoCoinHistory,
   FestgoCoinTransaction,
 } = require("../models/users");
+const { Op } = require("sequelize");
+const moment = require("moment");
 const { handleReferralForEvent } = require("../utils/issueCoins"); // adjust path as per your project}
 // Create Event
 exports.createEvent = async (req, res) => {
+  // Initialize separate transactions for the two database services.
   const t = await sequelize.transaction();
-  const user_tx = await usersequel.transaction();
+  const user_tx = await usersequel.transaction(); // Assuming 'usersequel' is your second DB connection
 
   try {
     const userId = req.user.id;
     if (!userId) {
+      await t.rollback();
+      await user_tx.rollback();
       return res.status(401).json({ message: "Unauthorized: User not found" });
     }
 
-    // 🧹 Remove 'status' from req.body if present
-    if ("status" in req.body) {
-      delete req.body.status;
-    }
-
-    const eventData = {
-      ...req.body,
-      userId,
-      status: "pending",
-    };
-
-    // ⏺️ Create event
-    const event = await Event.create(eventData, { transaction: t });
-
-    // 🪙 Inline Coin Application
-    const requestedCoins = Number(req.body.requestedCoins) || 0;
+    // --- 1. Prepare Initial Data ---
+    const requestedCoins = Number(req.body.festgo_coins) || 0;
     const total_price = Number(req.body.eventBudget) || 0;
-    const type = "event";
-    const now = new Date();
-
-    let coinLimit = await FestgoCoinUsageLimit.findOne({ transaction: t });
-
-    if (!coinLimit) {
-      throw new Error("Festgo coin usage limit not set for user.");
-    }
-    coinLimit = coinLimit.event;
-    const monthlyLimit = Number(coinLimit.monthly_limit);
-    const singleLimit = Number(coinLimit.transaction_limit);
-
-    const txns = await FestgoCoinTransaction.findAll({
-      where: {
-        userId,
-        remaining: { [Op.gt]: 0 },
-        expiresAt: { [Op.gt]: now },
-      },
-      order: [["expiresAt", "ASC"]],
-      transaction: user_tx,
-    });
-
-    const startOfMonth = moment().startOf("month").toDate();
-    const endOfMonth = moment().endOf("month").toDate();
-
-    const usedThisMonth = await FestGoCoinHistory.sum("coins", {
-      where: {
-        userId,
-        type: "used",
-        createdAt: {
-          [Op.between]: [startOfMonth, endOfMonth],
-        },
-      },
-      transaction: user_tx,
-    });
-
-    const availableThisMonth = monthlyLimit - (usedThisMonth || 0);
-
     let festgo_coins_used = 0;
     let amount_to_be_paid = total_price;
 
-    if (availableThisMonth > 0) {
-      const usable_coins = Math.min(
-        requestedCoins,
-        availableThisMonth,
-        singleLimit
-      );
-      let remainingToUse = usable_coins;
-      let totalUsed = 0;
+    const eventData = { ...req.body };
+    if ("status" in eventData) {
+      delete eventData.status;
+    }
+    eventData.userId = userId;
+    eventData.status = "pending";
 
-      for (const txn of txns) {
-        if (remainingToUse <= 0) break;
-        const deduct = Math.min(txn.remaining, remainingToUse);
-        txn.remaining -= deduct;
-        await txn.save({ transaction: t });
+    // --- 2. Coin Application Logic ---
+    if (requestedCoins > 0) {
+      const now = new Date();
 
-        totalUsed += deduct;
-        remainingToUse -= deduct;
+      const coinLimitConfig = await FestgoCoinUsageLimit.findOne({
+        transaction: t,
+      });
+      if (!coinLimitConfig || !coinLimitConfig.event) {
+        throw new Error(
+          "FestGo coin usage limits for events are not configured."
+        );
       }
 
-      if (totalUsed > 0) {
-        await FestGoCoinHistory.create(
-          {
-            userId,
-            type: "used",
-            coins: totalUsed,
-            reason: type,
-            status: "pending",
-          },
-          { transaction: user_tx }
+      const { monthly_limit: monthlyLimit, transaction_limit: singleLimit } =
+        coinLimitConfig.event;
+
+      const startOfMonth = moment().startOf("month").toDate();
+      const endOfMonth = moment().endOf("month").toDate();
+
+      const usedThisMonth = await FestGoCoinHistory.sum("coins", {
+        where: {
+          userId,
+          type: "used",
+          createdAt: { [Op.between]: [startOfMonth, endOfMonth] },
+        },
+        transaction: user_tx,
+      });
+
+      const availableThisMonth = (monthlyLimit || 0) - (usedThisMonth || 0);
+
+      if (availableThisMonth > 0) {
+        const usable_coins = Math.min(
+          requestedCoins,
+          availableThisMonth,
+          singleLimit || Infinity
         );
 
-        festgo_coins_used = totalUsed;
-        amount_to_be_paid = total_price - totalUsed;
+        let remainingToUse = usable_coins;
+        let totalUsed = 0;
+
+        if (remainingToUse > 0) {
+          const txns = await FestgoCoinTransaction.findAll({
+            where: {
+              userId,
+              remaining: { [Op.gt]: 0 },
+              expiresAt: { [Op.gt]: now },
+            },
+            order: [["expiresAt", "ASC"]],
+            transaction: user_tx,
+          });
+
+          for (const txn of txns) {
+            if (remainingToUse <= 0) break;
+            const deduct = Math.min(txn.remaining, remainingToUse);
+            txn.remaining -= deduct;
+            await txn.save({ transaction: user_tx });
+
+            totalUsed += deduct;
+            remainingToUse -= deduct;
+          }
+        }
+
+        if (totalUsed > 0) {
+          await FestGoCoinHistory.create(
+            {
+              userId,
+              type: "used",
+              coins: totalUsed,
+              reason: "event",
+              status: "pending",
+            },
+            { transaction: user_tx }
+          );
+
+          festgo_coins_used = totalUsed;
+          amount_to_be_paid = total_price - totalUsed;
+        }
       }
     }
 
-    // 📢 Handle referral if present
+    // --- 3. Add Final Coin Values to Event Data ---
+    eventData.festgo_coins_used = festgo_coins_used;
+    eventData.coins_discount_value = festgo_coins_used;
+    eventData.price_to_be_paid = amount_to_be_paid;
+
+    // --- 4. Create the Event Record ---
+    const event = await Event.create(eventData, { transaction: t });
+
+    // --- 5. Handle Referral (if applicable) ---
     const referralId = req.body.referral_id?.trim();
     if (referralId && referralId.length > 0) {
-      await handleReferralForEvent(referralId, event);
+      await handleReferralForEvent(referralId, event, { transaction: t });
     }
 
+    // --- 6. Commit Transactions ---
     await t.commit();
     await user_tx.commit();
 
     res.status(201).json({
       success: true,
       message: "Event created successfully",
-      status: 201,
       event,
-      festgo_coins_used,
-      coins_discount_value: festgo_coins_used,
-      amount_to_be_paid,
     });
   } catch (error) {
-    console.error("Error creating event:", error);
+    // --- Rollback Both Transactions on Error ---
     await t.rollback();
     await user_tx.rollback();
+    console.error("Error creating event:", error);
     res.status(400).json({
       success: false,
-      message: error.message,
-      status: 400,
+      message: "Failed to create event. Please try again.",
     });
   }
 };
