@@ -634,6 +634,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
     const totalBookedRooms = await RoomBookedDate.count({
       where: {
         roomId: booking.room_id,
+        bookingId: { [Op.ne]: bookingId }, // ✅ Exclude current booking
         [Op.and]: [
           { checkIn: { [Op.lt]: booking.check_out_date } },
           { checkOut: { [Op.gt]: booking.check_in_date } },
