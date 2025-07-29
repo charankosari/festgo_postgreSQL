@@ -33,11 +33,22 @@ module.exports = (sequelize) =>
         type: DataTypes.FLOAT,
         allowNull: false,
       },
+      festgo_coins_used: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+      coins_discount_value: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
       numberOfGuests: {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
-
+      price_to_be_paid: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
       venueOption: {
         type: DataTypes.JSONB,
         allowNull: false,
