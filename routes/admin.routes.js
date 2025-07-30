@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/admin.controller");
+const propertyController = require("../controllers/property.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 // ✅ Get all vendors
 router.get(
@@ -24,6 +25,12 @@ router.put(
   isAuthorized,
   authorizedRoles("admin"),
   adminController.authorizeProperty
+);
+router.get(
+  "/property/:vendorId/",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.getPropertiesByVendor
 );
 
 // ✅ De-authorize vendor
