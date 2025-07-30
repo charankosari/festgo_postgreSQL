@@ -321,8 +321,7 @@ exports.updateProfile = async (req, res) => {
         req.body.email.trim() === ""
       ) {
         return res.status(400).json({
-          message:
-            "Email cannot be updated or set empty for login type: " + loginType,
+          message: "Email cannot be empty ",
           status: 400,
         });
       }
@@ -333,8 +332,7 @@ exports.updateProfile = async (req, res) => {
         req.body.number.trim() === ""
       ) {
         return res.status(400).json({
-          message:
-            "Mobile number cannot be updated or set empty for login type: mobile",
+          message: "Mobile number cannot be empty ",
           status: 400,
         });
       }
