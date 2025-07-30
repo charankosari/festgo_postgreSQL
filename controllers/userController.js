@@ -311,7 +311,34 @@ exports.updateProfile = async (req, res) => {
     } else {
       fields = ["username", "email", "number", "image_url"];
     }
+    const loginType = user.logintype;
+    if (user.role === "user") {
+      if (
+        (loginType === "gmail" ||
+          loginType === "facebook" ||
+          loginType === "email") &&
+        "email" in req.body &&
+        req.body.email.trim() === ""
+      ) {
+        return res.status(400).json({
+          message:
+            "Email cannot be updated or set empty for login type: " + loginType,
+          status: 400,
+        });
+      }
 
+      if (
+        loginType === "mobile" &&
+        "number" in req.body &&
+        req.body.number.trim() === ""
+      ) {
+        return res.status(400).json({
+          message:
+            "Mobile number cannot be updated or set empty for login type: mobile",
+          status: 400,
+        });
+      }
+    }
     // Build update data based on allowed fields
     const updateData = {};
     fields.forEach((field) => {
