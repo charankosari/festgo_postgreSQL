@@ -463,8 +463,9 @@ exports.bookProperty = async (req, res) => {
     if (amount_to_be_paid >= 8000) gst_rate = 18;
     else if (amount_to_be_paid >= 1000) gst_rate = 12;
 
-    const gst_amount = (amount_to_be_paid * gst_rate) / 100;
-
+    // Best method
+    const gst_amount =
+      Math.round(((amount_to_be_paid * gst_rate) / 100) * 100) / 100;
     // ✅ Service Fee slab on total cumulative price
     let service_fee = 50;
     if (amount_to_be_paid >= 1000 && amount_to_be_paid <= 1999)
