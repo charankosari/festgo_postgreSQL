@@ -493,17 +493,19 @@ exports.bookProperty = async (req, res) => {
         num_adults,
         num_children,
         num_rooms,
-        total_amount: total_room_price,
-        extra_adult_charges: total_extra_adult_charge,
-        child_charges: total_child_charge,
+        total_amount: parseFloat((total_room_price || 0).toFixed(2)),
+        extra_adult_charges: parseFloat(
+          (total_extra_adult_charge || 0).toFixed(2)
+        ),
+        child_charges: parseFloat((total_child_charge || 0).toFixed(2)),
         festgo_coins_used: usable_coins,
         coins_discount_value,
-        offer_discount: offer_discount,
+        offer_discount: parseFloat((offer_discount || 0).toFixed(2)),
         coupon_code: applied_offer_id,
-        gst_amount,
+        gst_amount: parseFloat((gst_amount || 0).toFixed(2)),
         gst_rate,
         service_fee,
-        amount_paid: gross_payable,
+        amount_paid: parseFloat((gross_payable || 0).toFixed(2)),
         payment_method: "online",
         payment_status: "pending",
         booking_status: "pending",
@@ -617,12 +619,10 @@ exports.bookProperty = async (req, res) => {
         userId: userId,
       });
     }
-    const bookingData = newBooking.toJSON(); // or .dataValues if Sequelize
-    delete bookingData.gst_amount;
 
     return res.status(201).json({
       message: "Booking created successfully",
-      booking: bookingData,
+      booking: newBooking,
       razorpayOrder,
       user: u,
       status: 201,

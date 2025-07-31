@@ -22,10 +22,18 @@ const errorMiddleware = require("./middlewares/error");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, "logs", "access.log"), // logs/access.log
+  { flags: "a" } // 'a' means append mode
+);
+
 require("./cron");
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-app.use(logger("tiny"));
+app.use(logger("tiny", { stream: accessLogStream })); // Save to file
+app.use(logger("tiny")); // Optional: also log to console
 app.use(express.json());
 app.use("/api", users);
 app.use("/api/update-rates", RoomRatesRoutes);
