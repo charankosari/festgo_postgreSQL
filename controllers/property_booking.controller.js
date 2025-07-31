@@ -617,9 +617,12 @@ exports.bookProperty = async (req, res) => {
         userId: userId,
       });
     }
+    const bookingData = newBooking.toJSON(); // or .dataValues if Sequelize
+    delete bookingData.gst_amount;
+
     return res.status(201).json({
       message: "Booking created successfully",
-      booking: newBooking,
+      booking: bookingData,
       razorpayOrder,
       user: u,
       status: 201,
