@@ -23,7 +23,8 @@ module.exports = (sequelize) => {
           "cityfest_referral",
           "trip_referral",
           "user_referral",
-          "login_bonus"
+          "login_bonus",
+          "refund_grace_period"
         ),
         allowNull: false,
       },
