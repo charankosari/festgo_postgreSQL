@@ -66,7 +66,7 @@ module.exports = (sequelize) => {
       },
       gst_amount: {
         type: DataTypes.DOUBLE,
-        defaultValue: 0,
+        defaultValue: 0.0,
       },
       gst_rate: {
         type: DataTypes.FLOAT,
