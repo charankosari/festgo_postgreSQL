@@ -183,7 +183,13 @@ exports.updateEventStatus = async (req, res) => {
         message: "Event not found",
       });
     }
-
+    if (["accepted", "cancelled"].includes(event.status)) {
+      await service_tx.rollback();
+      await user_tx.rollback();
+      return res.status(409).json({
+        message: `Event is already finalized with status: ${event.status}`,
+      });
+    }
     // ✅ Update status
     event.status = status;
     await event.save({ transaction: service_tx });
@@ -221,7 +227,6 @@ exports.updateEventStatus = async (req, res) => {
         await FestGoCoinHistory.update(
           {
             status: "issued",
-            issuedAt: new Date(),
           },
 
           {
@@ -229,14 +234,100 @@ exports.updateEventStatus = async (req, res) => {
               reason: "event referral", // or whatever your reason is
               referenceId: event.id, // or booking.id etc.
               status: "pending",
+              type: "earned",
+            },
+          }
+        );
+        await FestGoCoinHistory.update(
+          {
+            status: "issued",
+          },
+
+          {
+            where: {
+              reason: "event", // or whatever your reason is
+              referenceId: event.id, // or booking.id etc.
+              status: "pending",
+              type: "used",
             },
           }
         );
       }
+    } else if (status === "cancelled") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: { event_id: event.id, issue: false },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        coinToIssue.issue = false;
+        await coinToIssue.save({ transaction: t });
+
+        // 🔄 Upsert FestgoCoinHistory
+        await FestGoCoinHistory.update(
+          {
+            status: "not valid",
+          },
+
+          {
+            where: {
+              reason: "event referral",
+              referenceId: event.id,
+              status: "pending",
+              type: "earned",
+            },
+          }
+        );
+
+        const usedCoinHistory = await FestGoCoinHistory.findOne({
+          where: {
+            reason: "event",
+            referenceId: event.id,
+            status: "pending",
+            type: "used",
+          },
+        });
+
+        let refundedCoins = 0;
+        if (usedCoinHistory) {
+          const totalUsedCoins = usedCoinHistory.coins;
+          refundedCoins = totalUsedCoins;
+
+          if (refundedCoins > 0) {
+            const txnsToRestore = await FestgoCoinTransaction.findAll({
+              where: { userId: event.userId },
+              order: [["expiresAt", "ASC"]],
+              transaction: user_tx,
+            });
+
+            let remainingToRefund = refundedCoins;
+
+            for (const txn of txnsToRestore) {
+              const originallyUsed = txn.amount - txn.remaining;
+              const refundable = Math.min(originallyUsed, remainingToRefund);
+
+              if (refundable <= 0) continue;
+
+              txn.remaining += refundable;
+              remainingToRefund -= refundable;
+
+              await txn.save({ transaction: user_tx });
+
+              if (remainingToRefund <= 0) break;
+            }
+
+            // Mark original usage history as not valid
+            await usedCoinHistory.update(
+              { status: "not valid" },
+              { transaction: user_tx }
+            );
+          }
+        }
+      }
     }
 
     await t.commit();
-
+    await user_tx.commit();
     return res.status(200).json({
       success: true,
       message: `Event status updated to '${status}'`,
@@ -244,6 +335,7 @@ exports.updateEventStatus = async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
+    await user_tx.rollback();
     console.error("Error updating event status:", error);
     return res.status(500).json({
       success: false,
