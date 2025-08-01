@@ -1,5 +1,11 @@
 const { some } = require("hono/combine");
-const { Offers, Property } = require("../models/services"); // Adjust as needed
+const {
+  Offers,
+  Property,
+  EventType,
+  beach_fests,
+  city_fest,
+} = require("../models/services"); // Adjust as needed
 const { Op } = require("sequelize");
 
 exports.createOffer = async (req, res) => {
@@ -192,9 +198,39 @@ exports.getOffersForUsers = async (req, res) => {
       },
       raw: true,
     });
+    const enrichedOffers = await Promise.all(
+      offers.map(async (offer) => {
+        let image = "";
+
+        if (offer.offerFor === "property") {
+          const property = await Property.findByPk(offer.entityIds[0]);
+          if (property?.photos && Array.isArray(property.photos)) {
+            image = property.photos.find((p) => p.imageURL)?.imageURL || "";
+          }
+        } else if (offer.offerFor === "event") {
+          const eventTypes = await EventType.findAll();
+          if (eventTypes.length > 0) {
+            const randomIndex = Math.floor(Math.random() * eventTypes.length);
+            image = eventTypes[randomIndex]?.imageUrl || "";
+          }
+        } else if (offer.offerFor === "beach_fests") {
+          const beachFest = await beach_fests.findByPk(offer.entityIds[0]);
+          if (beachFest?.image_urls && beachFest.image_urls.length > 0) {
+            image = beachFest.image_urls[0];
+          }
+        } else if (offer.offerFor === "city_fests") {
+          const cityFest = await city_fest.findByPk(offer.entityIds[0]);
+          if (cityFest?.image_urls && cityFest.image_urls.length > 0) {
+            image = cityFest.image_urls[0];
+          }
+        }
+
+        return { ...offer, image };
+      })
+    );
 
     res.status(200).json({
-      offers,
+      offers: enrichedOffers,
       message: "fetched offers",
       status: 200,
     });
