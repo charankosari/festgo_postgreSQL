@@ -1,3 +1,4 @@
+const { some } = require("hono/combine");
 const { Offers, Property } = require("../models/services"); // Adjust as needed
 const { Op } = require("sequelize");
 
@@ -175,6 +176,28 @@ exports.getAllOffers = async (req, res) => {
     });
 
     res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching offers:", error);
+    res.status(400).json({ error: "Failed to fetch offers." });
+  }
+};
+exports.getOffersForUsers = async (req, res) => {
+  try {
+    const now = new Date(); // Correct format
+
+    const offers = await Offers.findAll({
+      where: {
+        bookingWindowStart: { [Op.lte]: now },
+        bookingWindowEnd: { [Op.gte]: now },
+      },
+      raw: true,
+    });
+
+    res.status(200).json({
+      offers,
+      message: "fetched offers",
+      status: 200,
+    });
   } catch (error) {
     console.error("Error fetching offers:", error);
     res.status(400).json({ error: "Failed to fetch offers." });

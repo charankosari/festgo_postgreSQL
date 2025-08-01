@@ -15,5 +15,6 @@ router.get(
   authorizedRoles("admin", "vendor"),
   offerController.getAllOffers
 );
+router.get("/getoffers", isAuthorized, offerController.getAllOffers);
 
 module.exports = router;
