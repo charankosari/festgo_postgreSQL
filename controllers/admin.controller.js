@@ -217,8 +217,8 @@ exports.updateEventStatus = async (req, res) => {
           {
             userId: coinToIssue.userId,
             type: "event_referral",
-            amount: coinToIssue.amount,
-            remaining: coinToIssue.amount,
+            amount: coinToIssue.coinsToIssue,
+            remaining: coinToIssue.coinsToIssue,
             sourceType: "event",
             sourceId: event.id,
             expiresAt: new Date(now.setMonth(now.getMonth() + 12)),
@@ -276,6 +276,8 @@ exports.updateEventStatus = async (req, res) => {
 
       if (coinToIssue) {
         coinToIssue.issue = false;
+        coinToIssue.status = "cancelled";
+
         await coinToIssue.save({ transaction: user_tx });
 
         // 🔄 Mark "earned" history as not valid

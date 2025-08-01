@@ -245,11 +245,9 @@ const createPropertyReferralTempCoin = async (
   }
 };
 
-const handleReferralForEvent = async ({ referralId, event }) => {
+const handleReferralForEvent = async ({ referralId, event, transactions }) => {
   if (!referralId || !event || !event.eventBudget) return;
-  const service_tx = await sequelize.transaction();
-  const user_tx = await usersequel.transaction();
-
+  const { service_tx, user_tx } = transactions;
   // 🔍 Step 1: Find referring user by referralCode
   const referrer = await User.findOne({
     where: { referralCode: referralId },
@@ -265,15 +263,15 @@ const handleReferralForEvent = async ({ referralId, event }) => {
     where: { type: "event" },
     transaction: service_tx,
   });
-
+  console.log(setting);
   if (!setting) {
     console.warn("⚠️ FestgoCoinSetting not found for type 'event'");
     return;
   }
 
-  const maxReferrals = setting.monthly_referral_limit;
   const coinsPerReferral = parseFloat(setting.coins_per_referral || 0);
-
+  const maxReferrals = setting.monthly_referral_limit;
+  console.log(maxReferrals, coinsPerReferral);
   // 📆 Step 3: Get current month’s referral count for referrer
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -286,8 +284,8 @@ const handleReferralForEvent = async ({ referralId, event }) => {
     },
     transaction: user_tx,
   });
-
-  if (referralCount >= maxReferrals) {
+  console.log(referralCount);
+  if (maxReferrals > 0 && referralCount >= maxReferrals) {
     console.warn("⚠️ Monthly referral limit reached");
     return;
   }
@@ -335,8 +333,6 @@ const handleReferralForEvent = async ({ referralId, event }) => {
   console.log(
     `✅ Pending coins (${coinsToIssue}) created for referrer: ${referrer.id}`
   );
-  await user_tx.commit();
-  await service_tx.commit();
 };
 const handleUserReferralForBeachFestBooking = async (
   referral_id,

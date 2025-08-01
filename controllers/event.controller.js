@@ -143,9 +143,13 @@ exports.createEvent = async (req, res) => {
     // --- 5. Handle Referral (if applicable) ---
     const referralId = req.body.referral_id?.trim();
     if (referralId && referralId.length > 0) {
-      await handleReferralForEvent(referralId, event, { transaction: t });
+      // ✅ Corrected call: Pass a single object with all required properties
+      await handleReferralForEvent({
+        referralId,
+        event,
+        transactions: { service_tx: t, user_tx: user_tx },
+      });
     }
-
     // --- 6. Commit Transactions ---
     await t.commit();
     await user_tx.commit();
