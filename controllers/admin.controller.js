@@ -12,6 +12,7 @@ const {
   FestgoCoinTransaction,
   FestGoCoinHistory,
 } = require("../models/users");
+const { Op } = require("sequelize");
 
 // ✅ Get all vendors
 exports.getAllVendors = async (req, res) => {
@@ -197,7 +198,14 @@ exports.updateEventStatus = async (req, res) => {
     // 💰 Issue coins if accepted
     if (status === "accepted") {
       const coinToIssue = await FestgoCoinToIssue.findOne({
-        where: { event_id: event.id, issue: false },
+        where: {
+          status: "pending",
+          type: "event_referral",
+          issue: false,
+          sourceType: "event",
+          sourceId: event.id,
+          issue: false,
+        },
         transaction: user_tx,
       });
 
@@ -238,24 +246,31 @@ exports.updateEventStatus = async (req, res) => {
             },
           }
         );
-        await FestGoCoinHistory.update(
-          {
-            status: "issued",
-          },
-
-          {
-            where: {
-              reason: "event", // or whatever your reason is
-              referenceId: event.id, // or booking.id etc.
-              status: "pending",
-              type: "used",
-            },
-          }
-        );
       }
+      await FestGoCoinHistory.update(
+        {
+          status: "issued",
+        },
+
+        {
+          where: {
+            reason: "event", // or whatever your reason is
+            referenceId: event.id, // or booking.id etc.
+            status: "pending",
+            type: "used",
+          },
+        }
+      );
     } else if (status === "cancelled") {
       const coinToIssue = await FestgoCoinToIssue.findOne({
-        where: { event_id: event.id, issue: false },
+        where: {
+          status: "pending",
+          type: "event_referral",
+          issue: false,
+          sourceType: "event",
+          sourceId: event.id,
+          issue: false,
+        },
         transaction: user_tx,
       });
 
@@ -276,89 +291,88 @@ exports.updateEventStatus = async (req, res) => {
             transaction: user_tx,
           }
         );
+      }
+      const usedCoinHistory = await FestGoCoinHistory.findOne({
+        where: {
+          reason: "event",
+          referenceId: event.id,
+          userId: event.userId,
+          status: "pending",
+          type: "used",
+        },
+        transaction: user_tx,
+      });
 
-        const usedCoinHistory = await FestGoCoinHistory.findOne({
-          where: {
-            reason: "event",
-            referenceId: event.id,
-            userId: event.userId,
-            status: "pending",
-            type: "used",
-          },
-          transaction: user_tx,
-        });
+      let refundedCoins = 0;
+      if (usedCoinHistory) {
+        const totalUsedCoins = usedCoinHistory.coins;
+        refundedCoins = totalUsedCoins;
 
-        let refundedCoins = 0;
-        if (usedCoinHistory) {
-          const totalUsedCoins = usedCoinHistory.coins;
-          refundedCoins = totalUsedCoins;
-
-          if (refundedCoins > 0) {
-            const txnsToRestore = await FestgoCoinTransaction.findAll({
-              where: {
-                userId: event.userId,
-                expiresAt: {
-                  [Op.gte]: new Date(),
-                },
+        if (refundedCoins > 0) {
+          const txnsToRestore = await FestgoCoinTransaction.findAll({
+            where: {
+              userId: event.userId,
+              expiresAt: {
+                [Op.gte]: new Date(),
               },
-              order: [["expiresAt", "ASC"]],
-              transaction: user_tx,
-            });
+            },
+            order: [["expiresAt", "ASC"]],
+            transaction: user_tx,
+          });
 
-            let remainingToRefund = refundedCoins;
+          let remainingToRefund = refundedCoins;
 
-            if (txnsToRestore.length === 0) {
-              // No usable transactions — full refund as grace period fallback
+          if (txnsToRestore.length === 0) {
+            // No usable transactions — full refund as grace period fallback
+            await FestgoCoinTransaction.create(
+              {
+                userId: event.userId,
+                type: "refund_grace_period",
+                amount: refundedCoins,
+                remaining: refundedCoins,
+                sourceType: "event_cancellation",
+                sourceId: event.id,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+              { transaction: user_tx }
+            );
+          } else {
+            // Refund into existing coin transactions
+            for (const txn of txnsToRestore) {
+              const originallyUsed = txn.amount - txn.remaining;
+              const refundable = Math.min(originallyUsed, remainingToRefund);
+
+              if (refundable <= 0) continue;
+
+              txn.remaining += refundable;
+              remainingToRefund -= refundable;
+
+              await txn.save({ transaction: user_tx });
+
+              if (remainingToRefund <= 0) break;
+            }
+
+            // ⛳ If not fully refunded, create fallback transaction
+            if (remainingToRefund > 0) {
               await FestgoCoinTransaction.create(
                 {
                   userId: event.userId,
-                  type: "refund_grace_period",
-                  amount: refundedCoins,
-                  remaining: refundedCoins,
+                  type: "refund_fallback",
+                  amount: remainingToRefund,
+                  remaining: remainingToRefund,
                   sourceType: "event_cancellation",
                   sourceId: event.id,
                   expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                 },
                 { transaction: user_tx }
               );
-            } else {
-              // Refund into existing coin transactions
-              for (const txn of txnsToRestore) {
-                const originallyUsed = txn.amount - txn.remaining;
-                const refundable = Math.min(originallyUsed, remainingToRefund);
-
-                if (refundable <= 0) continue;
-
-                txn.remaining += refundable;
-                remainingToRefund -= refundable;
-
-                await txn.save({ transaction: user_tx });
-
-                if (remainingToRefund <= 0) break;
-              }
-
-              // ⛳ If not fully refunded, create fallback transaction
-              if (remainingToRefund > 0) {
-                await FestgoCoinTransaction.create(
-                  {
-                    userId: event.userId,
-                    type: "refund_fallback",
-                    amount: remainingToRefund,
-                    remaining: remainingToRefund,
-                    sourceType: "event_cancellation",
-                    sourceId: event.id,
-                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                  },
-                  { transaction: user_tx }
-                );
-              }
             }
-
-            await usedCoinHistory.update(
-              { status: "not valid" },
-              { transaction: user_tx }
-            );
           }
+
+          await usedCoinHistory.update(
+            { status: "not valid" },
+            { transaction: user_tx }
+          );
         }
       }
     }
@@ -371,7 +385,7 @@ exports.updateEventStatus = async (req, res) => {
       event,
     });
   } catch (error) {
-    await t.rollback();
+    await service_tx.rollback();
     await user_tx.rollback();
     console.error("Error updating event status:", error);
     return res.status(500).json({

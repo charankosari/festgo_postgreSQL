@@ -24,6 +24,7 @@ const createInitialFestgoTransaction = async (userId) => {
       type: "login_bonus",
       amount: 2000,
       remaining: 2000,
+      status: "issued",
       expiresAt: oneYearLater,
       CurrentMonthCount: 0,
       monthlyRefillDate: null,

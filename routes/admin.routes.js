@@ -74,4 +74,10 @@ router.get(
   authorizedRoles("admin"),
   adminController.getCoinUsageLimit
 );
+router.post(
+  "/events/:eventId",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.updateEventStatus
+);
 module.exports = router;

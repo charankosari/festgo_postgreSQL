@@ -101,22 +101,22 @@ exports.createEvent = async (req, res) => {
           }
         }
 
-        if (totalUsed > 0) {
-          await FestGoCoinHistory.create(
-            {
-              userId,
-              referemceId: event.id,
-              type: "used",
-              coins: totalUsed,
-              reason: "event",
-              status: "pending",
-            },
-            { transaction: user_tx }
-          );
+        // if (totalUsed > 0) {
+        //   await FestGoCoinHistory.create(
+        //     {
+        //       userId,
+        //       referemceId: event.id,
+        //       type: "used",
+        //       coins: totalUsed,
+        //       reason: "event",
+        //       status: "pending",
+        //     },
+        //     { transaction: user_tx }
+        //   );
 
-          festgo_coins_used = totalUsed;
-          amount_to_be_paid = total_price - totalUsed;
-        }
+        festgo_coins_used = totalUsed;
+        amount_to_be_paid = total_price - totalUsed;
+        // }
       }
     }
 
@@ -127,7 +127,19 @@ exports.createEvent = async (req, res) => {
 
     // --- 4. Create the Event Record ---
     const event = await Event.create(eventData, { transaction: t });
-
+    if (festgo_coins_used > 0) {
+      await FestGoCoinHistory.create(
+        {
+          userId,
+          referenceId: event.id, // ✅ Now event.id is available
+          type: "used",
+          coins: festgo_coins_used,
+          reason: "event",
+          status: "pending",
+        },
+        { transaction: user_tx }
+      );
+    }
     // --- 5. Handle Referral (if applicable) ---
     const referralId = req.body.referral_id?.trim();
     if (referralId && referralId.length > 0) {
