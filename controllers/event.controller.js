@@ -105,6 +105,7 @@ exports.createEvent = async (req, res) => {
           await FestGoCoinHistory.create(
             {
               userId,
+              referemceId: event.id,
               type: "used",
               coins: totalUsed,
               reason: "event",
