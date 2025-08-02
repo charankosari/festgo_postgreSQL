@@ -26,19 +26,18 @@ router.put(
   authorizedRoles("admin"),
   adminController.authorizeProperty
 );
-router.get(
-  "/property/:vendorId/",
-  isAuthorized,
-  authorizedRoles("admin"),
-  propertyController.getPropertiesByVendor
-);
-
 // ✅ De-authorize vendor
 router.put(
   "/property/:id/deauthorize",
   isAuthorized,
   authorizedRoles("admin"),
   adminController.deauthorizeProperty
+);
+router.get(
+  "/property/:vendorId/",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.getPropertiesByVendor
 );
 
 // ✅ Delete vendor

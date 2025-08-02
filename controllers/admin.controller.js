@@ -44,6 +44,11 @@ exports.authorizeProperty = async (req, res) => {
     if (!property) {
       return res.status(404).json({ message: "property not found" });
     }
+    if (!property.is_completed) {
+      return res
+        .status(404)
+        .json({ message: "property process is not completed" });
+    }
     property.active = true;
     await property.save();
     res
