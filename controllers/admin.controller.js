@@ -70,7 +70,7 @@ exports.deauthorizeProperty = async (req, res) => {
     await property.save();
     res
       .status(200)
-      .json({ message: "property de-authorized successfully", vendor });
+      .json({ message: "property de-authorized successfully", property });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
