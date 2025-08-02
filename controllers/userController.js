@@ -10,6 +10,7 @@ const {
   beachfests_booking,
   Event,
   FestgoCoinSetting,
+  Offers,
 } = require("../models/services");
 const { Sequelize, where } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
@@ -69,6 +70,16 @@ function safeUser(user, extraFieldsToExclude = [], includeFields = []) {
 
   return data;
 }
+const offerCount = async () => {
+  const now = new Date(); // Correct format
+  const oc = await Offers.count({
+    where: {
+      bookingWindowStart: { [Op.lte]: now },
+      bookingWindowEnd: { [Op.gte]: now },
+    },
+  });
+  return oc;
+};
 
 const handleUserReferral = async (referral_id, referredId) => {
   try {
@@ -602,7 +613,7 @@ exports.getUserDetails = async (req, res) => {
 
     // 📌 Attach profile completion to cleanUser object
     cleanUser.profileCompletion = profileCompletion;
-    cleanUser.offers = 0;
+    cleanUser.offers = await offerCount();
 
     // 📌 Final response
     res.status(200).json({
@@ -682,7 +693,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         cleanUser.festgo_coins = festgoCoins;
         cleanUser.loginHistories = loginHistories;
         cleanUser.gst_details = gst_details;
-        cleanUser.offers = 0;
+        cleanUser.offers = await offerCount();
         const message = "Login successful";
         return sendToken(cleanUser, 201, message, res);
       }
@@ -730,7 +741,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
       cleanUser.festgo_coins = festgoCoins;
       cleanUser.loginHistories = loginHistories;
       cleanUser.gst_details = gst_details;
-      cleanUser.offers = 0;
+      cleanUser.offers = await offerCount();
       const message = "Login successful";
       return sendToken(cleanUser, 201, message, res);
     }
@@ -900,7 +911,7 @@ exports.verifyEmailToken = async (req, res) => {
     cleanUser.festgo_coins = festgoCoins;
     cleanUser.loginHistories = loginHistories;
     cleanUser.gst_details = gst_details;
-    cleanUser.offers = 0;
+    cleanUser.offers = await offerCount();
     sendToken(cleanUser, 200, message, res);
   } catch (err) {
     console.error("Error in verifyEmailToken:", err);
@@ -981,7 +992,7 @@ exports.verifyOtp = async (req, res) => {
   );
   cleanUser.loginHistories = loginHistories;
   cleanUser.gst_details = gst_details;
-  cleanUser.offers = 0;
+  cleanUser.offers = await offerCount();
   const festgoCoins = await calculateFestgoCoins(user.id);
   cleanUser.festgo_coins = festgoCoins;
   const message = "Login successful";
