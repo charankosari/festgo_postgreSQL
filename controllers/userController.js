@@ -159,7 +159,7 @@ const checkAndIssueLoginBonus = async (userId) => {
 
 exports.registerUser = async (req, res, roleType) => {
   try {
-    const { username, email, number, password } = req.body;
+    const { userName, username, email, number, password } = req.body;
 
     const existingUser = await User.findOne({
       where: {
@@ -169,9 +169,14 @@ exports.registerUser = async (req, res, roleType) => {
 
     if (existingUser)
       return res.status(400).json({ message: "User already exists" });
-
+    const finalUsername =
+      userName?.trim() !== ""
+        ? userName
+        : username?.trim() !== ""
+        ? username
+        : "vendor";
     const user = await User.create({
-      username,
+      username: finalUsername,
       email,
       number,
       password,
