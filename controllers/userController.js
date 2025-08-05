@@ -183,7 +183,14 @@ exports.registerUser = async (req, res, roleType) => {
       role: roleType,
     });
     const message = "Registration successfull";
-    const su = safeUser(user);
+    const su = safeUser(user, [
+      "firstname",
+      "lastname",
+      "gender",
+      "billing_details",
+      "location",
+      "date_of_birth",
+    ]);
     sendToken(su, 201, message, res);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -613,12 +620,13 @@ exports.getUserDetails = async (req, res) => {
         filledFields++;
       }
     });
+    if (cleanUser.role === "user") {
+      const profileCompletion = Math.round((filledFields / totalFields) * 100);
 
-    const profileCompletion = Math.round((filledFields / totalFields) * 100);
-
-    // 📌 Attach profile completion to cleanUser object
-    cleanUser.profileCompletion = profileCompletion;
-    cleanUser.offers = await offerCount();
+      // 📌 Attach profile completion to cleanUser object
+      cleanUser.profileCompletion = profileCompletion;
+      cleanUser.offers = await offerCount();
+    }
 
     // 📌 Final response
     res.status(200).json({
