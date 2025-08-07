@@ -1335,9 +1335,10 @@ exports.filterActiveProperties = async (req, res) => {
           Sequelize.literal(
             `earth_distance(ll_to_earth(${lat}, ${long}), ll_to_earth((location->>'lat')::float, (location->>'lng')::float)) <= 10000`
           ),
-          extraPropertyFilters,
+          ...extraPropertyFilters,
         ].filter(Boolean),
       };
+
       const nearbyProperties = await Property.findAll({
         where: { [Op.and]: whereNearby },
       });
@@ -1365,10 +1366,11 @@ exports.filterActiveProperties = async (req, res) => {
           Sequelize.literal(
             `(lower(location->>'city') = lower('${city}') OR lower(location->>'locality') = lower('${city}') OR lower(location->>'searchLocation') = lower('${city}'))`
           ),
-          extraPropertyFilters,
+          ...extraPropertyFilters,
         ].filter(Boolean),
         id: { [Op.notIn]: availableProperties.map((p) => p.id) },
       };
+
       const cityProperties = await Property.findAll({
         where: whereCity,
         limit: 20 - availableProperties.length,
