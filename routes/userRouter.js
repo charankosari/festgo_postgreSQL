@@ -79,4 +79,10 @@ router.get(
   authorizedRoles("user"),
   userController.getSentReferrals
 );
+router.get(
+  "/user/transactions",
+  isAuthorized,
+  authorizedRoles("user"),
+  userController.getCoinsTransactionsHistory
+);
 module.exports = router;

@@ -62,6 +62,7 @@ const logCoinIssuance = async ({
       type,
       reason,
       coins,
+      status: "issued",
       referenceId,
       metaData,
     });

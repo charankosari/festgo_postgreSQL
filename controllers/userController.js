@@ -4,6 +4,7 @@ const {
   FestgoCoinTransaction,
   ReferralHistory,
   UserGstDetails,
+  FestGoCoinHistory,
 } = require("../models/users");
 const {
   property_booking,
@@ -1064,6 +1065,35 @@ exports.getSentReferrals = async (req, res) => {
 
     // 5. Send the successful response.
     return res.status(200).json(formattedReferrals);
+  } catch (error) {
+    console.error("Error fetching sent referrals:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+exports.getCoinsTransactionsHistory = async (req, res) => {
+  try {
+    // 1. Get the user ID from the authenticated request object.
+    const userId = req.user.id;
+
+    // Optional: Check if the user exists.
+    const user = await User.findOne({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 2. Find all referral history records where the user is the referrer.
+    const History = await FestGoCoinHistory.findAll({
+      where: {
+        userId: userId,
+      },
+
+      order: [["createdAt", "DESC"]], // Show the most recent referrals first.
+    });
+
+    // 4. Map the results to the desired output format with the corrected properties. ✨
+
+    // 5. Send the successful response.
+    return res.status(200).json(History);
   } catch (error) {
     console.error("Error fetching sent referrals:", error);
     return res.status(500).json({ message: "Internal server error." });
