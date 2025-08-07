@@ -451,6 +451,123 @@ const handleUserReferralForBeachFestBooking = async (
     throw err;
   }
 };
+const handleUserReferralForCityFestBooking = async (
+  referral_id,
+  referredUserId,
+  bookingId,
+  cityfest_id,
+  issueAt
+) => {
+  if (!referral_id || referral_id.trim() === "") {
+    console.log("🚫 Referral ID empty. Skipping.");
+    return;
+  }
+
+  const user_tx = await usersequel.transaction();
+  const service_tx = await sequelize.transaction();
+  console.log("🔄 Started user referral transaction");
+
+  try {
+    const referredUser = await User.findByPk(referredUserId, {
+      transaction: user_tx,
+    });
+    if (!referredUser) {
+      console.log(`🚫 Referred user not found: ${referredUserId}`);
+      await user_tx.rollback();
+      return;
+    }
+
+    const referrer = await User.findOne({
+      where: { referralCode: referral_id },
+      transaction: user_tx,
+    });
+    if (!referrer || referrer.id === referredUserId) {
+      console.log("🚫 Invalid referral. Referrer not found or self-referral.");
+      await user_tx.rollback();
+      return;
+    }
+    const setting = await FestgoCoinSetting.findOne({
+      where: { type: "city_fest" },
+    });
+    if (!setting || Number(setting.coins_per_referral) <= 0) {
+      console.log("🚫 No coin setting found or zero coins.");
+      await user_tx.rollback();
+      return;
+    }
+
+    const thisMonthStart = new Date();
+    thisMonthStart.setDate(1);
+    thisMonthStart.setHours(0, 0, 0, 0);
+
+    const referralCount = await FestGoCoinHistory.count({
+      where: {
+        userId: referrer.id,
+        reason: "cityfest referral",
+        createdAt: { [Op.gte]: thisMonthStart },
+        status: ["pending", "issued"],
+      },
+      transaction: user_tx,
+    });
+
+    if (referralCount >= (setting.monthly_referral_limit || 0)) {
+      console.log("🚫 Monthly referral limit reached.");
+      await user_tx.rollback();
+      return;
+    }
+
+    await FestGoCoinHistory.create(
+      {
+        userId: referrer.id,
+        type: "earned",
+        reason: "cityfest referral",
+        referenceId: bookingId,
+        coins: Number(setting.coins_per_referral),
+        status: "pending",
+        metaData: {
+          referral: referral_id,
+          referredUser: referredUserId,
+          cityfestId: cityfest_id,
+        },
+      },
+      { transaction: user_tx }
+    );
+
+    await FestgoCoinToIssue.create(
+      {
+        booking_id: bookingId,
+        userId: referrer.id,
+        referral_id,
+        sourceType: "cityfest",
+        sourceId: cityfest_id,
+        coinsToIssue: Number(setting.coins_per_referral),
+        status: "pending",
+        type: "cityfest_referral",
+        issueAt: new Date(issueAt.getTime() + 86400000),
+        issue: false,
+        metaData: {
+          referredUserId,
+          bookingId: bookingId,
+        },
+      },
+      { transaction: user_tx }
+    );
+
+    await upsertCronThing({
+      entity: "cityfest_coins_issue",
+      active: true,
+      transaction: service_tx,
+    });
+
+    await user_tx.commit();
+    await service_tx.commit();
+    console.log(`✅ Referral reward set for user ${referrer.id}`);
+  } catch (err) {
+    await user_tx.rollback();
+    await service_tx.rollback();
+    console.error("❌ Error in referral handler:", err);
+    throw err;
+  }
+};
 
 module.exports = {
   createInitialFestgoTransaction,
@@ -459,4 +576,5 @@ module.exports = {
   // createPropertyReferralTempCoin,
   handleReferralForEvent,
   handleUserReferralForBeachFestBooking,
+  handleUserReferralForCityFestBooking,
 };
