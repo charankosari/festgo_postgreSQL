@@ -986,7 +986,40 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     const children = parseInt(clean(child)) || 0;
     const city = clean(location);
     const propType = clean(property_type);
+    let isBookZeroApplicable = false;
+    if (popularTags.includes("book_zero") && clean(todate)) {
+      const checkInDate = moment(todate, "DD-MM-YYYY");
+      const now = moment();
 
+      // Calculate the difference in full days
+      const daysDifference = checkInDate
+        .startOf("day")
+        .diff(now.startOf("day"), "days");
+
+      // Rule: Not applicable for today or past dates
+      if (daysDifference >= 1) {
+        const isSaturday = checkInDate.day() === 6; // moment().day() for Saturday is 6
+
+        if (isSaturday) {
+          // For Saturday check-ins, require a 4-day gap
+          if (daysDifference >= 4) {
+            isBookZeroApplicable = true;
+          }
+        } else {
+          // For other days, require a 2-day gap
+          if (daysDifference >= 2) {
+            isBookZeroApplicable = true;
+          }
+        }
+      }
+    }
+    if (popularTags.includes("book_zero") && !isBookZeroApplicable) {
+      return res.json({
+        success: true,
+        status: 200,
+        properties: [], // Return empty array and exit
+      });
+    }
     const propertyTypeFilter = propType
       ? Sequelize.where(
           Sequelize.fn("lower", Sequelize.col("property_type")),
@@ -1245,7 +1278,7 @@ exports.filterActiveProperties = async (req, res) => {
           case "couple_friendly":
             return `("Property".policies->'houseRules' @> '["Unmarried couples allowed"]')`;
           default:
-            return `EXISTS (SELECT 1 FROM jsonb_array_elements("Property"."amenity") AS elem WHERE lower(elem->>'amenity_name') = lower('${tagName}') AND elem->>'is_selected' = 'true')`;
+            return `EXISTS (SELECT 1 FROM jsonb_array_elements("Property"."amenities") AS elem WHERE lower(elem->>'amenity_name') = lower('${tagName}') AND elem->>'is_selected' = 'true')`;
         }
       });
       if (tagConditions.length > 0) {
