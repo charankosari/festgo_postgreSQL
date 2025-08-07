@@ -1054,6 +1054,7 @@ exports.getSentReferrals = async (req, res) => {
         name: referredUser
           ? `${referredUser.firstname} ${referredUser.lastname}`.trim()
           : "User",
+        amount: referral.coinsAwarded,
         image: referredUser
           ? referredUser.image_url
           : "https://festgo.blr1.digitaloceanspaces.com/festgo/public/1754559603327-userimage.png",
