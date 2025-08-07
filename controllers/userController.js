@@ -1069,6 +1069,7 @@ exports.getSentReferrals = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
 // login and signup with google
 
 // exports.googleAuth = async (req, res, next) => {
