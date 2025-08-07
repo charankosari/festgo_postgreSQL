@@ -1,3 +1,5 @@
+const { DataTypes, Model } = require("sequelize");
+
 module.exports = (sequelize) => {
   class CityFestBooking extends Model {}
 

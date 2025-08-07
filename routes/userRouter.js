@@ -73,4 +73,10 @@ router.delete(
   isAuthorized,
   wishlistController.deleteWishlistItem
 );
+router.get(
+  "/user/referals",
+  isAuthorized,
+  authorizedRoles("user"),
+  userController.getSentReferrals
+);
 module.exports = router;

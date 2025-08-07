@@ -20,6 +20,7 @@ const { loginOtpTemplate } = require("../libs/sms/messageTemplates");
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const moment = require("moment");
 const {
   otpTemplate,
   changePasswordTemplate,
@@ -1012,6 +1013,61 @@ exports.verifyOtp = async (req, res) => {
   sendToken(cleanUser, 200, message, res);
 };
 
+exports.getSentReferrals = async (req, res) => {
+  try {
+    // 1. Get the user ID from the authenticated request object.
+    const userId = req.user.id;
+
+    // Optional: Check if the user exists.
+    const user = await User.findOne({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 2. Find all referral history records where the user is the referrer.
+    const referrals = await ReferralHistory.findAll({
+      where: {
+        referrerId: userId,
+      },
+      // 3. Include the associated 'referred' user's details.
+      include: [
+        {
+          model: User,
+          as: "referred", // This alias must match the one in your association definition.
+          attributes: ["firstname", "lastname", "image_url"], // Only fetch these fields.
+        },
+      ],
+      order: [["createdAt", "DESC"]], // Show the most recent referrals first.
+    });
+
+    if (!referrals.length) {
+      return res.status(200).json({
+        message: "You haven't referred anyone yet.",
+        data: [],
+      });
+    }
+
+    // 4. Map the results to the desired output format with the corrected properties. ✨
+    const formattedReferrals = referrals.map((referral) => {
+      const referredUser = referral.referred;
+      return {
+        name: referredUser
+          ? `${referredUser.firstname} ${referredUser.lastname}`.trim()
+          : "User",
+        image: referredUser
+          ? referredUser.image_url
+          : "https://festgo.blr1.digitaloceanspaces.com/festgo/public/1754559603327-userimage.png",
+        date: moment(referral.createdAt).format("Do MMMM YYYY"),
+      };
+    });
+
+    // 5. Send the successful response.
+    return res.status(200).json(formattedReferrals);
+  } catch (error) {
+    console.error("Error fetching sent referrals:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
 // login and signup with google
 
 // exports.googleAuth = async (req, res, next) => {
