@@ -1082,6 +1082,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
     const formattedHistory = historyRecords.map((record) => {
       const recordObject = record.get({ plain: true });
       recordObject.date = moment(recordObject.createdAt).format("Do, MMM YYYY");
+      delete recordObject.metaData;
       return recordObject;
     });
     return res.status(200).json(formattedHistory);
