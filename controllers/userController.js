@@ -12,6 +12,8 @@ const {
   Event,
   FestgoCoinSetting,
   Offers,
+  Property,
+  beach_fests,
 } = require("../models/services");
 const { Sequelize, where } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
@@ -1073,19 +1075,78 @@ exports.getSentReferrals = async (req, res) => {
 exports.getCoinsTransactionsHistory = async (req, res) => {
   try {
     const userId = req.user.id;
+
     const historyRecords = await FestGoCoinHistory.findAll({
       where: {
-        userId: userId,
+        userId,
         type: "used",
       },
       order: [["createdAt", "DESC"]],
     });
-    const formattedHistory = historyRecords.map((record) => {
-      const recordObject = record.get({ plain: true });
-      recordObject.date = moment(recordObject.createdAt).format("Do, MMM YYYY");
-      delete recordObject.metaData;
-      return recordObject;
-    });
+
+    const formattedHistory = await Promise.all(
+      historyRecords.map(async (record) => {
+        const recordObject = record.get({ plain: true });
+
+        // Default values
+        let name = null;
+        let image = null;
+
+        try {
+          if (
+            recordObject.reason === "property_booking" &&
+            recordObject.metaData?.id
+          ) {
+            const propertyData = await Property.findByPk(
+              recordObject.metaData.id
+            );
+            if (propertyData) {
+              name = propertyData.name;
+              image = propertyData.photos?.[0] || null;
+            }
+          } else if (
+            recordObject.reason === "beachfest_booking" &&
+            recordObject.metaData?.id
+          ) {
+            const beachFestData = await beach_fests.findByPk(
+              recordObject.metaData.id
+            );
+            if (beachFestData) {
+              name = beachFestData.type;
+              image = beachFestData.image_urls?.[0] || null;
+            }
+          } else if (
+            recordObject.reason === "event" &&
+            recordObject.referenceId
+          ) {
+            const eventData = await Event.findByPk(recordObject.referenceId);
+            if (eventData) {
+              name = eventData.eventType;
+              image = eventData.themes?.[0] || null;
+            }
+          }
+        } catch (fetchErr) {
+          console.error(
+            `Error fetching related data for record ID ${recordObject.id}:`,
+            fetchErr
+          );
+        }
+
+        // Format date
+        recordObject.date = moment(recordObject.createdAt).format(
+          "Do, MMM YYYY"
+        );
+
+        // Add name & image
+        recordObject.name = name;
+        recordObject.image = image;
+
+        delete recordObject.metaData;
+
+        return recordObject;
+      })
+    );
+
     return res.status(200).json(formattedHistory);
   } catch (error) {
     console.error("Error fetching coin transaction history:", error);
