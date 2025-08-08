@@ -1076,6 +1076,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
     const historyRecords = await FestGoCoinHistory.findAll({
       where: {
         userId: userId,
+        type: "used",
       },
       order: [["createdAt", "DESC"]],
     });

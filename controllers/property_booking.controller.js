@@ -449,6 +449,7 @@ exports.bookProperty = async (req, res) => {
           transaction: t,
           user_tx,
           type: "property",
+          id: property.id,
         });
 
         usable_coins = coinUsageResult.usable_coins;

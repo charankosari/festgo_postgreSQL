@@ -113,6 +113,7 @@ exports.createBeachFestBooking = async (req, res) => {
         transaction: t,
         user_tx: user_tx,
         type: "beachfest",
+        id: fest.id,
       });
     }
     const afterCoinAmount = coinResult.amount_to_be_paid;

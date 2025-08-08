@@ -17,6 +17,7 @@ async function applyUsableFestgoCoins({
   transaction,
   user_tx,
   type,
+  id,
 }) {
   const now = new Date();
 
@@ -142,6 +143,7 @@ async function applyUsableFestgoCoins({
     status: "pending",
     metaData: {
       booking_amount: total_price,
+      id: id,
     },
   });
 
