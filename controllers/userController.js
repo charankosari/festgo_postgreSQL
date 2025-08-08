@@ -1091,6 +1091,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
         // Default values
         let name = null;
         let image = null;
+        let location = null;
 
         try {
           if (
@@ -1103,6 +1104,8 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
             if (propertyData) {
               name = propertyData.name;
               image = propertyData.photos?.[0].imageURL || null;
+              location =
+                propertyData.location.city + "," + propertyData.location.state;
             }
           } else if (
             recordObject.reason === "beachfest_booking" &&
@@ -1114,6 +1117,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
             if (beachFestData) {
               name = beachFestData.type;
               image = beachFestData.image_urls?.[0] || null;
+              location = beachFestData.location;
             }
           } else if (
             recordObject.reason === "event" &&
@@ -1123,6 +1127,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
             if (eventData) {
               name = eventData.eventType;
               image = eventData.themes?.[0] || null;
+              location = eventData.eventLocation;
             }
           }
         } catch (fetchErr) {
@@ -1140,6 +1145,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
         // Add name & image
         recordObject.name = name;
         recordObject.image = image;
+        recordObject.location = location;
 
         delete recordObject.metaData;
 
