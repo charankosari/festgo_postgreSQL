@@ -1102,7 +1102,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
             );
             if (propertyData) {
               name = propertyData.name;
-              image = propertyData.photos?.[0] || null;
+              image = propertyData.photos?.[0].imageURL || null;
             }
           } else if (
             recordObject.reason === "beachfest_booking" &&
