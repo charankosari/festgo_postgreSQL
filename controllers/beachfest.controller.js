@@ -53,6 +53,41 @@ exports.updateBeachFest = async (req, res) => {
         .json({ success: false, message: "Beach fest not found" });
     }
 
+    // Validate dates if provided
+    if (data.event_start || data.event_end) {
+      const eventStart = data.event_start
+        ? new Date(data.event_start)
+        : new Date(fest.event_start);
+      const eventEnd = data.event_end
+        ? new Date(data.event_end)
+        : new Date(fest.event_end);
+
+      // Check valid dates
+      if (isNaN(eventStart.getTime()) || isNaN(eventEnd.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format for event_start or event_end",
+        });
+      }
+
+      // Check order
+      if (eventEnd <= eventStart) {
+        return res.status(400).json({
+          success: false,
+          message: "event_end must be after event_start",
+        });
+      }
+
+      // Optional: prevent setting start date in past
+      const now = new Date();
+      if (eventStart < now) {
+        return res.status(400).json({
+          success: false,
+          message: "event_start cannot be in the past",
+        });
+      }
+    }
+
     await fest.update(data);
 
     res.status(200).json({
@@ -65,7 +100,6 @@ exports.updateBeachFest = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 // ✅ Get All Beach Fests
 exports.getAllBeachFestsForAdmin = async (req, res) => {
   try {
