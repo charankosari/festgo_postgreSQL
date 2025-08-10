@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/admin.controller");
 const propertyController = require("../controllers/property.controller");
+const beachfestController = require("../controllers/beachfest.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 // ✅ Get all vendors
 router.get(
@@ -78,5 +79,11 @@ router.post(
   isAuthorized,
   authorizedRoles("admin"),
   adminController.updateEventStatus
+);
+router.get(
+  "/beach-fests",
+  isAuthorized,
+  authorizedRoles("admin"),
+  beachfestController.getAllBeachFestsForAdmin
 );
 module.exports = router;

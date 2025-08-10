@@ -1,10 +1,32 @@
 const { beach_fests } = require("../models/services");
-
+const { Op, Sequelize } = require("sequelize");
 // ✅ Create a Beach Fest
 exports.createBeachFest = async (req, res) => {
   try {
     const data = req.body;
+    const { event_start, event_end } = data;
+    if (!event_start || !event_end) {
+      return res.status(400).json({
+        success: false,
+        message: "Both eventStart and eventEnd dates are required",
+      });
+    }
 
+    const startDate = new Date(event_start);
+    const endDate = new Date(event_end);
+    if (endDate <= startDate) {
+      return res.status(400).json({
+        success: false,
+        message: "eventEnd must be after eventStart",
+      });
+    }
+    const now = new Date();
+    if (startDate < now) {
+      return res.status(400).json({
+        success: false,
+        message: "eventStart cannot be in the past",
+      });
+    }
     const newFest = await beach_fests.create(data);
 
     res.status(201).json({
@@ -45,7 +67,7 @@ exports.updateBeachFest = async (req, res) => {
 };
 
 // ✅ Get All Beach Fests
-exports.getAllBeachFests = async (req, res) => {
+exports.getAllBeachFestsForAdmin = async (req, res) => {
   try {
     const fests = await beach_fests.findAll({
       order: [["createdAt", "DESC"]],
@@ -61,7 +83,29 @@ exports.getAllBeachFests = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// ✅ Get All Valid Beach Fests
+exports.getAllBeachFests = async (req, res) => {
+  try {
+    const now = new Date();
 
+    const fests = await beach_fests.findAll({
+      where: {
+        event_end: { [Op.gte]: now }, // event not ended yet
+        event_start: { [Op.lt]: Sequelize.col("event_end") }, // start < end
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Valid beach fests fetched successfully",
+      data: fests,
+    });
+  } catch (error) {
+    console.error("Error fetching beach fests:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // ✅ Get a Specific Beach Fest
 exports.getBeachFestById = async (req, res) => {
   try {
