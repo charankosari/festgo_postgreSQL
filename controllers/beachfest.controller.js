@@ -39,7 +39,6 @@ exports.createBeachFest = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 // ✅ Update a Beach Fest
 exports.updateBeachFest = async (req, res) => {
   try {

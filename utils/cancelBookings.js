@@ -49,31 +49,31 @@ const cancelPropertyBooking = async (req, res) => {
     let refundPercentage = 0;
 
     switch (policy) {
-      case "Flexible":
+      case "Flexible - Full refund 1 day prior":
         if (daysBeforeCheckin >= 1) refundPercentage = 100;
         break;
 
-      case "Moderate":
+      case "Moderate - Full refund 5 days prior":
         if (daysBeforeCheckin >= 5) refundPercentage = 100;
         break;
 
-      case "Firm":
+      case "Firm - 50% refund up to 30 days prior":
         if (daysBeforeCheckin >= 30) refundPercentage = 50;
         break;
 
-      case "Strict":
+      case "Strict - 50% refund up to 7 days prior":
         if (daysBeforeCheckin >= 7) refundPercentage = 50;
         break;
 
-      case "Super Strict 30":
+      case "Super Strict 30 - 50% refund up to 30 days prior":
         if (daysBeforeCheckin >= 30) refundPercentage = 50;
         break;
 
-      case "Super Strict 60":
+      case "Super Strict 60 - 50% refund up to 60 days prior":
         if (daysBeforeCheckin >= 60) refundPercentage = 50;
         break;
 
-      case "Non-Refundable":
+      case "Non Refundable":
       default:
         refundPercentage = 0;
         break;
