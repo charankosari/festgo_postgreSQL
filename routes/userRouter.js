@@ -85,4 +85,5 @@ router.get(
   authorizedRoles("user"),
   userController.getCoinsTransactionsHistory
 );
+router.delete("/user/delete",isAuthorized,authorizedRoles("user","admin"),userContoller.deleteUserById)
 module.exports = router;
