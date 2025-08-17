@@ -59,6 +59,15 @@ exports.getFestbitesByUser = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+exports.getFestbitesForAdmin = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const festbites = await Festbite.findAll({ where: { userId } });
+    res.json(festbites);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
 // menu type
 exports.createMenuType = async (req, res) => {
   try {

@@ -20,6 +20,12 @@ router.get(
   isAuthorized,
   festbiteController.getFestbitesByUser
 );
+router.get(
+  "/get-users/:id",
+  isAuthorized,
+  authorizedRoles("admin"),
+  festbiteController.getFestbitesForAdmin
+);
 
 // Public Get by ID
 router.get("/festbites/:id", festbiteController.getFestbiteById);
