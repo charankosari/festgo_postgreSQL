@@ -1160,7 +1160,7 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
   }
 };
 exports.deleteUserById = async (req, res) => {
-  const userId = req.params.id;
+  const userId = req.user.id;
 
   try {
     // Check if user exists
