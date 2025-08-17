@@ -14,7 +14,12 @@ router.get(
 router.get("/e/:id", isAuthorized, eventCtrl.getEventById);
 router.put("/e/:id", isAuthorized, eventCtrl.updateEvent);
 router.delete("/e/:id", isAuthorized, eventCtrl.deleteEvent);
-router.get("/vendor-events/:userId", eventCtrl.getEventsByUserId);
+router.get(
+  "/user-events/:userId",
+  isAuthorized,
+  authorizedRoles("admin"),
+  eventCtrl.getEventsByUserId
+);
 router.get("/event-type-events/:eventTypeId", eventCtrl.getEventsByEventTypeId);
 
 // EventType routes
