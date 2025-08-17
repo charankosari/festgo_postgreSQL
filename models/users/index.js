@@ -87,12 +87,12 @@ LoginHistory.belongsTo(User, {
   onDelete: "CASCADE",
 });
 //Cascade delete for FestgoCoinTransaction
-FestgoCoinTransaction.belongsTo(User, { foreignKey: "userId", as: "user", onDelete: "CASCADE" });
-User.hasMany(FestgoCoinTransaction, { foreignKey: "userId", as: "coinTransactions", onDelete: "CASCADE" });
+//FestgoCoinTransaction.belongsTo(User, { foreignKey: "userId", as: "user", onDelete: "CASCADE" });
+//User.hasMany(FestgoCoinTransaction, { foreignKey: "userId", as: "coinTransactions", onDelete: "CASCADE" });
 
 // Cascade delete for FestgoCoinToIssue
-FestgoCoinToIssue.belongsTo(User, { foreignKey: "userId", as: "user", onDelete: "CASCADE" });
-User.hasMany(FestgoCoinToIssue, { foreignKey: "userId", as: "coinsToIssue", onDelete: "CASCADE" });
+//FestgoCoinToIssue.belongsTo(User, { foreignKey: "userId", as: "user", onDelete: "CASCADE" });
+//User.hasMany(FestgoCoinToIssue, { foreignKey: "userId", as: "coinsToIssue", onDelete: "CASCADE" });
 
 // Cascade delete for UserGstDetails
 UserGstDetails.belongsTo(User, { foreignKey: "userId", as: "user", onDelete: "CASCADE" });
