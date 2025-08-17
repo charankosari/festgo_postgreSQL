@@ -1159,6 +1159,35 @@ exports.getCoinsTransactionsHistory = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+exports.deleteUserById = async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    // Check if user exists
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found", status: 404 });
+    }
+
+    // Delete related models
+    await UserGstDetails.destroy({ where: { userId } });
+    await FestgoCoinTransaction.destroy({ where: { userId } });
+    await FestgoCoinToIssue.destroy({ where: { userId } });
+    await FestGoCoinHistory.destroy({ where: { userId } });
+    await LoginHistory.destroy({ where: { userId } });
+
+
+    // Delete the user
+    await user.destroy();
+
+    return res
+      .status(200)
+      .json({ message: "User data deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    return res.status(500).json({ message: "Internal server error", status: 500 });
+  }
+};
 
 // login and signup with google
 
