@@ -5,6 +5,7 @@ const {
   ReferralHistory,
   UserGstDetails,
   FestGoCoinHistory,
+  FestgoCoinToIssue,
 } = require("../models/users");
 const {
   property_booking,
@@ -1176,16 +1177,15 @@ exports.deleteUserById = async (req, res) => {
     await FestGoCoinHistory.destroy({ where: { userId } });
     await LoginHistory.destroy({ where: { userId } });
 
-
     // Delete the user
     await user.destroy();
 
-    return res
-      .status(200)
-      .json({ message: "User data deleted successfully" });
+    return res.status(200).json({ message: "User data deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
-    return res.status(500).json({ message: "Internal server error", status: 500 });
+    return res
+      .status(500)
+      .json({ message: "Internal server error", status: 500 });
   }
 };
 
