@@ -1,11 +1,6 @@
 const app = require("./app");
 const { config } = require("dotenv");
-const {
-  usersPool,
-  servicesPool,
-  usersSequelize,
-  servicesSequelize,
-} = require("./db");
+const { usersPool, servicesPool } = require("./db");
 
 process.on("uncaughtException", (err) => {
   console.error(`Uncaught Exception: ${err.message}`);
