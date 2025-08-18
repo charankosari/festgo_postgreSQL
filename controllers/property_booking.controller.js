@@ -26,11 +26,7 @@ const { createOrder, refundPayment } = require("../libs/payments/razorpay");
 const { Op, Transaction } = require("sequelize");
 const { customAlphabet } = require("nanoid");
 const moment = require("moment");
-const {
-  cancelBeachFestBooking,
-  cancelPropertyBooking,
-  cancelEventBooking,
-} = require("../utils/cancelBookings");
+const cancelBookings = require("../utils/cancelBookings");
 const { upsertCronThing } = require("../utils/cronUtils");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const handleUserReferralForPropertyBooking = async (
@@ -1118,13 +1114,15 @@ exports.cancelBooking = async (req, res) => {
 
   switch (type) {
     case "property_booking":
-      return cancelPropertyBooking(req, res);
+      return cancelBookings.cancelPropertyBooking(req, res);
 
     case "event":
-      return cancelEventBooking(req, res);
+      return cancelBookings.cancelEventBooking(req, res);
+    case "festbite":
+      return cancelBookings.cancelFestbite(req, res);
 
     case "beach_fest":
-      return cancelBeachFestBooking(req, res);
+      return cancelBookings.cancelBeachFestBooking(req, res);
 
     default:
       return res

@@ -80,6 +80,12 @@ router.post(
   authorizedRoles("admin"),
   adminController.updateEventStatus
 );
+router.post(
+  "/festbite/:festbiteId",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.updateFestbiteStatus
+);
 router.get(
   "/beach-fests",
   isAuthorized,

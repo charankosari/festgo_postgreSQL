@@ -53,6 +53,26 @@ module.exports = (sequelize) =>
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
+      festgo_coins_used: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      coins_discount_value: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      price_to_be_paid: {
+        type: DataTypes.FLOAT,
+        defaultValue: 0,
+      },
+      status: {
+        type: DataTypes.ENUM("pending", "confirmed", "cancelled"),
+        defaultValue: "pending",
+      },
+      referral_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     },
     {
       timestamps: true,

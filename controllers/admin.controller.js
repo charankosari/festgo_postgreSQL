@@ -4,6 +4,7 @@ const {
   FestgoCoinUsageLimit,
   Event,
   sequelize,
+  Festbite,
 } = require("../models/services");
 const {
   User,
@@ -224,8 +225,6 @@ exports.updateEventStatus = async (req, res) => {
             type: "event_referral",
             amount: coinToIssue.coinsToIssue,
             remaining: coinToIssue.coinsToIssue,
-            sourceType: "event",
-            sourceId: event.id,
             expiresAt: new Date(now.setMonth(now.getMonth() + 12)),
           },
           { transaction: user_tx }
@@ -458,6 +457,237 @@ exports.getCoinUsageLimit = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+exports.updateFestbiteStatus = async (req, res) => {
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+  try {
+    const { festbiteId } = req.params;
+    const { status } = req.body;
+
+    // ✅ Validate status
+    const validStatuses = ["pending", "hold", "accepted", "cancelled"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    // 🔍 Find festbite
+    const festbite = await Festbite.findByPk(festbiteId, {
+      transaction: service_tx,
+    });
+    if (!festbite) {
+      return res.status(404).json({
+        success: false,
+        message: "Festbite not found",
+      });
+    }
+
+    if (["accepted", "cancelled"].includes(festbite.status)) {
+      await service_tx.rollback();
+      await user_tx.rollback();
+      return res.status(409).json({
+        message: `Festbite is already finalized with status: ${festbite.status}`,
+      });
+    }
+
+    // ✅ Update status
+    festbite.status = status;
+    await festbite.save({ transaction: service_tx });
+
+    // 💰 Handle accepted
+    if (status === "accepted") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: {
+          status: "pending",
+          type: "festbite_referral",
+          issue: false,
+          sourceType: "festbite",
+          sourceId: festbite.id,
+        },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        const now = new Date();
+
+        // 🔄 Create FestgoCoinTransaction
+        await FestgoCoinTransaction.create(
+          {
+            userId: coinToIssue.userId,
+            type: "festbite_referral",
+            amount: coinToIssue.coinsToIssue,
+            remaining: coinToIssue.coinsToIssue,
+            expiresAt: new Date(now.setMonth(now.getMonth() + 12)),
+          },
+          { transaction: user_tx }
+        );
+
+        // 🔄 Update FestgoCoinToIssue
+        coinToIssue.issue = true;
+        coinToIssue.issueAt = new Date();
+        await coinToIssue.save({ transaction: user_tx });
+
+        // 🔄 Mark earned history as issued
+        await FestGoCoinHistory.update(
+          { status: "issued" },
+          {
+            where: {
+              reason: "festbite referral",
+              referenceId: festbite.id,
+              status: "pending",
+              type: "earned",
+            },
+            transaction: user_tx,
+          }
+        );
+      }
+
+      // 🔄 Mark used history as issued
+      await FestGoCoinHistory.update(
+        { status: "issued" },
+        {
+          where: {
+            reason: "festbite",
+            referenceId: festbite.id,
+            status: "pending",
+            type: "used",
+          },
+          transaction: user_tx,
+        }
+      );
+    }
+
+    // ❌ Handle cancelled
+    else if (status === "cancelled") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: {
+          status: "pending",
+          type: "festbite_referral",
+          issue: false,
+          sourceType: "festbite",
+          sourceId: festbite.id,
+        },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        coinToIssue.issue = false;
+        coinToIssue.status = "cancelled";
+        await coinToIssue.save({ transaction: user_tx });
+
+        await FestGoCoinHistory.update(
+          { status: "not valid" },
+          {
+            where: {
+              reason: "festbite referral",
+              referenceId: festbite.id,
+              status: "pending",
+              type: "earned",
+            },
+            transaction: user_tx,
+          }
+        );
+      }
+
+      // 🔄 Refund used coins
+      const usedCoinHistory = await FestGoCoinHistory.findOne({
+        where: {
+          reason: "festbite",
+          referenceId: festbite.id,
+          userId: festbite.userId,
+          status: "pending",
+          type: "used",
+        },
+        transaction: user_tx,
+      });
+
+      if (usedCoinHistory) {
+        let refundedCoins = usedCoinHistory.coins;
+
+        if (refundedCoins > 0) {
+          const txnsToRestore = await FestgoCoinTransaction.findAll({
+            where: {
+              userId: festbite.userId,
+              expiresAt: { [Op.gte]: new Date() },
+            },
+            order: [["expiresAt", "ASC"]],
+            transaction: user_tx,
+          });
+
+          let remainingToRefund = refundedCoins;
+
+          if (txnsToRestore.length === 0) {
+            // No usable transactions → fallback
+            await FestgoCoinTransaction.create(
+              {
+                userId: festbite.userId,
+                type: "refund_grace_period",
+                amount: refundedCoins,
+                remaining: refundedCoins,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+              { transaction: user_tx }
+            );
+          } else {
+            for (const txn of txnsToRestore) {
+              const originallyUsed = txn.amount - txn.remaining;
+              const refundable = Math.min(originallyUsed, remainingToRefund);
+
+              if (refundable <= 0) continue;
+
+              txn.remaining += refundable;
+              remainingToRefund -= refundable;
+
+              await txn.save({ transaction: user_tx });
+
+              if (remainingToRefund <= 0) break;
+            }
+
+            if (remainingToRefund > 0) {
+              await FestgoCoinTransaction.create(
+                {
+                  userId: festbite.userId,
+                  type: "refund_grace_period",
+                  amount: remainingToRefund,
+                  remaining: remainingToRefund,
+                  sourceType: "festbite_cancellation",
+                  sourceId: festbite.id,
+                  expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                },
+                { transaction: user_tx }
+              );
+            }
+          }
+
+          await usedCoinHistory.update(
+            { status: "not valid" },
+            { transaction: user_tx }
+          );
+        }
+      }
+    }
+
+    await service_tx.commit();
+    await user_tx.commit();
+    return res.status(200).json({
+      success: true,
+      message: `Festbite status updated to '${status}'`,
+      festbite,
+    });
+  } catch (error) {
+    await service_tx.rollback();
+    await user_tx.rollback();
+    console.error("Error updating festbite status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
       error: error.message,
     });
   }

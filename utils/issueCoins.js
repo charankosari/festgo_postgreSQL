@@ -335,6 +335,100 @@ const handleReferralForEvent = async ({ referralId, event, transactions }) => {
     `✅ Pending coins (${coinsToIssue}) created for referrer: ${referrer.id}`
   );
 };
+const handleReferralForFestbite = async ({
+  referralId,
+  festbite,
+  transactions,
+}) => {
+  if (!referralId || !festbite) return;
+  const { service_tx, user_tx } = transactions;
+  // 🔍 Step 1: Find referring user by referralCode
+  const referrer = await User.findOne({
+    where: { referralCode: referralId },
+  });
+
+  if (!referrer) {
+    console.warn("⚠️ Invalid referral code");
+    return;
+  }
+
+  // ⚙️ Step 2: Get event referral settings
+  const setting = await FestgoCoinSetting.findOne({
+    where: { type: "festbite" },
+    transaction: service_tx,
+  });
+  console.log(setting);
+  if (!setting) {
+    console.warn("⚠️ FestgoCoinSetting not found for type 'event'");
+    return;
+  }
+
+  const coinsPerReferral = parseFloat(setting.coins_per_referral || 0);
+  const maxReferrals = setting.monthly_referral_limit;
+  console.log(maxReferrals, coinsPerReferral);
+  // 📆 Step 3: Get current month’s referral count for referrer
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const referralCount = await FestGoCoinHistory.count({
+    where: {
+      userId: referrer.id,
+      reason: "festbite referral",
+      createdAt: { [Op.gte]: startOfMonth },
+    },
+    transaction: user_tx,
+  });
+  console.log(referralCount);
+  if (maxReferrals > 0 && referralCount >= maxReferrals) {
+    console.warn("⚠️ Monthly referral limit reached");
+    return;
+  }
+
+  // 💰 Step 4: Compute coin issuance cap (2% of event budget)
+  // const budget = parseFloat(festbite.eventBudget);
+  // const coinCap = budget * 0.02;
+  // const coinsToIssue = Math.min(coinsPerReferral, coinCap);
+  const coinsToIssue = coinsPerReferral;
+
+  if (coinsToIssue <= 0) {
+    console.warn("⚠️ Computed coins to issue is 0");
+    return;
+  }
+
+  // 🪙 Step 5: Create pending FestGoCoinHistory
+  await FestGoCoinHistory.create(
+    {
+      userId: referrer.id,
+      status: "pending",
+      type: "earned",
+      reason: "festbite referral",
+      referenceId: festbite.id,
+      coins: coinsToIssue,
+      metaData: {
+        festbiteId: festbite.id,
+        type: "festbite_referral",
+      },
+    },
+    { transaction: user_tx }
+  );
+  await FestgoCoinToIssue.create(
+    {
+      userId: referrer.id,
+      referral_id: referralId,
+      sourceType: "festbite",
+      sourceId: festbite.id,
+      coinsToIssue,
+      status: "pending",
+      type: "festbite_referral",
+      issue: false,
+      issueAt: null,
+    },
+    { transaction: user_tx }
+  );
+  console.log(
+    `✅ Pending coins (${coinsToIssue}) created for referrer: ${referrer.id}`
+  );
+};
 const handleUserReferralForBeachFestBooking = async (
   referral_id,
   referredUserId,
@@ -574,6 +668,7 @@ module.exports = {
   createInitialFestgoTransaction,
   issueUserReferralCoins,
   calculateFestgoCoins,
+  handleReferralForFestbite,
   // createPropertyReferralTempCoin,
   handleReferralForEvent,
   handleUserReferralForBeachFestBooking,
