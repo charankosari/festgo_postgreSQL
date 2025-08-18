@@ -11,7 +11,8 @@ const {
   FestgoCoinSetting,
   Offers,
   zeroBookingInstance,
-  sequelize, // your services sequelize instance
+  sequelize,
+  Festbite, // your services sequelize instance
 } = require("../models/services");
 
 const {
@@ -1081,6 +1082,19 @@ exports.getMyBookings = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
+    // const festbites = await Festbite.findAll({
+    //   where: { userId },
+    //   attributes: {
+    //     include: [[sequelize.col("Festbite.imageUrl"), "festbiteImage"]],
+    //   },
+    //   include: [
+    //     {
+    //       model: Festbite,
+    //       attributes: [], // Exclude nested object since we're pulling its value into eventTypeImage
+    //     },
+    //   ],
+    //   order: [["createdAt", "DESC"]],
+    // });
 
     // 📌 Final response
     res.status(200).json({

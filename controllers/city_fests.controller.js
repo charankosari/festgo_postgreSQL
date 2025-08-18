@@ -94,6 +94,8 @@ exports.createCityFest = async (req, res) => {
       image_urls,
       gmap_url,
       whats_included,
+      latitude,
+      longitude,
     } = req.body;
 
     const fest = await city_fest.create({
@@ -108,6 +110,8 @@ exports.createCityFest = async (req, res) => {
       image_urls,
       gmap_url,
       whats_included,
+      latitude,
+      longitude,
     });
 
     res.status(201).json({
