@@ -79,6 +79,7 @@ router.get(
   "/menu-items/type/:menuTypeId",
   festbiteController.getMenuItemsByType
 );
+router.get("/menu-items/bytype", festbiteController.getMenuItemsByTypesForUser);
 
 router.put(
   "/menu-items/:id",

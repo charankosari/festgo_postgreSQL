@@ -304,6 +304,46 @@ exports.getMenuItemsByType = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+exports.getMenuItemsByTypesForUser = async (req, res) => {
+  try {
+    const menuItems = await MenuItem.findAll({
+      include: [
+        {
+          model: MenuType,
+          as: "menuType",
+          attributes: ["typeName"], // only fetch typeName
+        },
+      ],
+      attributes: [
+        "id",
+        "itemName",
+        "menuTypeId",
+        "imageUrl",
+        "createdAt",
+        "updatedAt",
+      ], // exclude menuTypeId if not needed
+    });
+
+    // Group items by menuType.typeName and remove the nested menuType object
+    const groupedItems = {};
+    menuItems.forEach((item) => {
+      const typeName = item.menuType?.typeName || "Unknown";
+
+      if (!groupedItems[typeName]) {
+        groupedItems[typeName] = [];
+      }
+
+      // Exclude the `menuType` field from the item
+      const { menuType, ...cleanItem } = item.toJSON();
+      groupedItems[typeName].push(cleanItem);
+    });
+
+    res.json(groupedItems);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 exports.deleteMenuItem = async (req, res) => {
   try {
     const menuItem = await MenuItem.findByPk(req.params.id);
