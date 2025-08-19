@@ -3,11 +3,11 @@ const { city_fest, city_fest_category } = require("../models/services");
 // 🎉 Create City Fest Category
 exports.createCityFestCategory = async (req, res) => {
   try {
-    const { image, festCategoryName } = req.body;
+    const { image, name } = req.body;
 
     const category = await city_fest_category.create({
       image,
-      festCategoryName,
+      name,
     });
     res.status(201).json({
       success: true,
