@@ -124,7 +124,6 @@ exports.createCityFest = async (req, res) => {
   }
 };
 
-// 🎉 Get All City Fests
 exports.getAllCityFests = async (req, res) => {
   try {
     const fests = await city_fest.findAll({
@@ -204,6 +203,16 @@ exports.deleteCityFest = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "Fest deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getCityFestsByCategory = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const fests = await city_fest.findAll({ where: { categoryId: id } });
+    res.status(200).json({ success: true, fests });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

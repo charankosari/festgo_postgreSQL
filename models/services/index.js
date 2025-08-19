@@ -31,10 +31,10 @@ const beachfests_booking = require("./beachfests_booking.model")(
 );
 
 // city fests models
-const CityFestCategory = require("./city_fest_category.model")(
-  servicesSequelize
-);
-const CityFest = require("./city_fest.model")(servicesSequelize);
+// const CityFestCategory = require("./city_fest_category.model")(
+//   servicesSequelize
+// );
+// const CityFest = require("./city_fest.model")(servicesSequelize);
 // property booking
 const property_booking = require("./property_booking.model")(servicesSequelize);
 
@@ -139,38 +139,38 @@ RoomBookedDate.belongsTo(Room, {
   as: "room",
   onDelete: "CASCADE",
 });
-CityFest.belongsTo(CityFestCategory, {
+city_fest.belongsTo(city_fest_category, {
   foreignKey: "categoryId",
   as: "festCategory", // <-- changed alias here
   onDelete: "CASCADE",
 });
 
-CityFestCategory.hasMany(CityFest, {
+city_fest_category.hasMany(city_fest, {
   foreignKey: "categoryId",
   as: "cityFests",
 });
 // City Fest Booking Associations
 
-city_fest_booking.belongsTo(CityFest, {
+city_fest_booking.belongsTo(city_fest, {
   foreignKey: "cityfest_id",
   as: "cityFest",
   onDelete: "CASCADE",
 });
 
-CityFest.hasMany(city_fest_booking, {
+city_fest.hasMany(city_fest_booking, {
   foreignKey: "cityfest_id",
   as: "bookings",
   onDelete: "CASCADE",
 });
 
 // Optional — if booking also directly stores categoryId:
-city_fest_booking.belongsTo(CityFestCategory, {
+city_fest_booking.belongsTo(city_fest_category, {
   foreignKey: "category_id",
   as: "festCategory",
   onDelete: "CASCADE",
 });
 
-CityFestCategory.hasMany(city_fest_booking, {
+city_fest_category.hasMany(city_fest_booking, {
   foreignKey: "category_id",
   as: "bookings",
   onDelete: "CASCADE",

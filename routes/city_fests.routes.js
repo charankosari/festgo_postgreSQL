@@ -11,6 +11,7 @@ router.post(
 );
 router.get("/", cityFestsController.getAllCityFests);
 router.get("/:id", cityFestsController.getCityFestById);
+router.get("/types/:id", cityFestsController.getCityFestsByCategory);
 router.put(
   "/:id",
   isAuthorized,
