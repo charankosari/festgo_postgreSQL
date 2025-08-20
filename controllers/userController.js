@@ -1180,7 +1180,9 @@ exports.deleteUserById = async (req, res) => {
     // Delete the user
     await user.destroy();
 
-    return res.status(200).json({ message: "User data deleted successfully" });
+    return res
+      .status(200)
+      .json({ status: 200, message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
     return res
