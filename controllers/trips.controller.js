@@ -20,6 +20,7 @@ exports.createTrip = async (req, res) => {
       pricing,
       pickupLocation,
       inclusions,
+      imageUrl,
     } = req.body;
 
     // ✅ Validation
@@ -48,6 +49,7 @@ exports.createTrip = async (req, res) => {
       pricing,
       pickupLocation,
       inclusions,
+      imageUrl,
     });
 
     res.status(201).json({ success: true, trip });
@@ -67,6 +69,7 @@ exports.updateTrip = async (req, res) => {
       pricing,
       pickupLocation,
       inclusions,
+      imageUrl,
     } = req.body;
 
     const trip = await Trips.findByPk(id);
@@ -100,6 +103,7 @@ exports.updateTrip = async (req, res) => {
       pricing,
       pickupLocation,
       inclusions,
+      imageUrl,
     });
 
     res.json({ success: true, trip });
