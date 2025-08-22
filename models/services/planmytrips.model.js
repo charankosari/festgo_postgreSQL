@@ -10,20 +10,24 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
       },
       number: {
-        type: DataTypes.STRING, // can store phone numbers like "+91..."
+        type: DataTypes.STRING,
         allowNull: false,
       },
       travelType: {
-        type: DataTypes.STRING, // solo, family, group etc.
+        type: DataTypes.STRING,
         allowNull: false,
       },
       totalPersons: {
-        type: DataTypes.INTEGER, // total number of persons traveling
+        type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 1,
       },
@@ -32,7 +36,7 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       referralId: {
-        type: DataTypes.STRING, // if you want foreign key, can change to UUID later
+        type: DataTypes.STRING,
         allowNull: true,
       },
       from: {
@@ -44,11 +48,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       amenities: {
-        type: DataTypes.ARRAY(DataTypes.STRING), // e.g. ["wifi", "pool", "gym"]
+        type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,
       },
       hotelCategory: {
-        type: DataTypes.STRING, // e.g. "3-star", "luxury", "budget"
+        type: DataTypes.STRING,
         allowNull: true,
       },
       status: {

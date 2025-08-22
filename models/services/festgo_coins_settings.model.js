@@ -24,7 +24,8 @@ module.exports = (sequelize) => {
           "beach_fest",
           "city_fest",
           "festbite",
-          "user_referral"
+          "user_referral",
+          "trips"
         ),
         allowNull: false,
       },

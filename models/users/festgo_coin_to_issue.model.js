@@ -29,7 +29,7 @@ module.exports = (sequelize) => {
         type: DataTypes.ENUM(
           "beachfest",
           "event",
-          "trip",
+          "trips",
           "festbite",
           "cityfest",
           "property",
@@ -61,7 +61,7 @@ module.exports = (sequelize) => {
           "beachfest_referral",
           "property_recommend",
           "cityfest_referral",
-          "trip_referral",
+          "trips_referral",
           "user_referral",
           "login_bonus"
         ),
