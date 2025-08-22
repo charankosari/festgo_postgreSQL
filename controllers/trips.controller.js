@@ -1,4 +1,4 @@
-const { Trips } = require("../models/services/trips.model"); // adjust path if needed
+const { Trips } = require("../models/services"); // adjust path if needed
 const { Op } = require("sequelize");
 const moment = require("moment");
 // ✅ Validation helper for pricing (must be number:number, not string:number)
