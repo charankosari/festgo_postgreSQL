@@ -42,6 +42,7 @@ const city_fest_booking = require("./city_fest_booking.model")(
   servicesSequelize
 );
 
+const Trips = require("./trips.model")(servicesSequelize);
 // room rate inventory
 const RoomRateInventory = require("./room_rate_inventory.model")(
   servicesSequelize
@@ -264,6 +265,7 @@ const db = {
   FestgoCoinUsageLimit,
   Offers,
   zeroBookingInstance,
+  Trips,
 };
 
 // Sync all models
