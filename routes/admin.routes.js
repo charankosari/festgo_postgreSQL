@@ -92,4 +92,10 @@ router.get(
   authorizedRoles("admin"),
   beachfestController.getAllBeachFestsForAdmin
 );
+router.post(
+  "/planmytrips/:tripId",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.updateTripStatus
+);
 module.exports = router;

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const TripsController = require("../controllers/trips.controller");
+const PlanMyTripsController = require("../controllers/planmytrips.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 router.route("/user").get(isAuthorized, TripsController.getValidTrips);
 router
@@ -12,5 +13,7 @@ router
   .put(isAuthorized, authorizedRoles("admin"), TripsController.updateTrip)
   .delete(isAuthorized, authorizedRoles("admin"), TripsController.deleteTrip)
   .get(isAuthorized, TripsController.getTripById);
-
+router
+  .route("/planmytrip")
+  .post(isAuthorized, PlanMyTripsController.createPlanMyTrip);
 module.exports = router;
