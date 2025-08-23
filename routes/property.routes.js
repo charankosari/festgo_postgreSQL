@@ -96,6 +96,12 @@ router.get(
   authorizedRoles("vendor"),
   propertyController.getPropertyRoomInventories
 );
+router.get(
+  "/get-property-names",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.getPropertiesNames
+);
 // room prices change by vendor
 router.put(
   "/change-price/:roomId",

@@ -24,7 +24,7 @@ const {
   normalizeAmenitiesdata,
   normalizeRoomAmenities,
 } = require("../utils/normalizePropertyData");
-const { Op, Sequelize } = require("sequelize");
+const { Op, Sequelize, fn, json, literal } = require("sequelize");
 const { calculateFestgoCoins } = require("../utils/issueCoins");
 // total steps in your property creation process
 const TOTAL_STEPS = 7;
@@ -2268,5 +2268,41 @@ exports.getUpdatedRoomsForProperty = async (req, res) => {
   } catch (error) {
     console.error("Error in getUpdatedRoomsForProperty:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getPropertiesNames = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+
+    const properties = await Property.findAll({
+      where: { vendorId },
+      attributes: [
+        "id",
+        "name",
+        [
+          fn(
+            "concat",
+            json("location.city"),
+            literal("', '"),
+            json("location.state"),
+            literal("', '"),
+            json("location.country")
+          ),
+          "location",
+        ],
+      ],
+    });
+    res.status(200).json({
+      success: true,
+      properties,
+    });
+  } catch (error) {
+    console.error("Error fetching properties:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch properties",
+      error: error.message,
+    });
   }
 };
