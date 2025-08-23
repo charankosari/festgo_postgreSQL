@@ -212,3 +212,22 @@ exports.createPlanMyTrip = async (req, res) => {
     });
   }
 };
+
+exports.getPlanMyTrips = async (req, res) => {
+  try {
+    const trips = await PlanMyTrips.findAll({ order: [["createdAt", "DESC"]] });
+
+    return res.status(200).json({
+      success: true,
+      message: "Fetched all users trips successfully",
+      data: trips,
+    });
+  } catch (error) {
+    console.error("Error fetching trips:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch trips",
+      error: error.message,
+    });
+  }
+};
