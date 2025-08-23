@@ -9,6 +9,7 @@ router.post(
   authorizedRoles("admin"),
   cityFestsController.createCityFest
 );
+router.get("/categories", cityFestsController.getCityFestCategories);
 router.get("/", cityFestsController.getAllCityFests);
 router.get("/:id", cityFestsController.getCityFestById);
 router.get("/types/:id", cityFestsController.getCityFestsByCategory);
@@ -32,7 +33,7 @@ router.post(
   authorizedRoles("admin"),
   cityFestsController.createCityFestCategory
 );
-router.get("/categories", cityFestsController.getCityFestCategories);
+
 router.put(
   "/categories/:id",
   isAuthorized,
