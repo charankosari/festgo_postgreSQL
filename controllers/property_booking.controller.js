@@ -1137,6 +1137,8 @@ exports.cancelBooking = async (req, res) => {
 
     case "beach_fest":
       return cancelBookings.cancelBeachFestBooking(req, res);
+    case "planmytrip":
+      return cancelBookings.cancelPlanmytrip(req, res);
 
     default:
       return res

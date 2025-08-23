@@ -8,6 +8,7 @@ const {
   Event,
   sequelize, // your services sequelize instance
   zeroBookingInstance,
+  PlanMyTrips,
 } = require("../models/services");
 const {
   FestgoCoinToIssue,
@@ -704,10 +705,155 @@ const cancelFestbite = async (req, res) => {
     });
   }
 };
+const cancelPlanmytrip = async (req, res) => {
+  const user_tx = await usersequel.transaction();
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const planmytrip = await PlanMyTrips.findByPk(id);
+
+    if (!planmytrip) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Festbite not found." });
+    }
+
+    if (planmytrip.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to cancel this festbite.",
+      });
+    }
+
+    // ❌ Cancel pending referral rewards
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          sourceId: planmytrip.id,
+          type: "trips_referral",
+          sourceType: "trips",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: planmytrip.id,
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
+    // 🪙 Refund used coins (if any)
+    const usedCoinHistory = await FestGoCoinHistory.findOne({
+      where: {
+        reason: "trips_booking",
+        referenceId: planmytrip.id,
+        userId: planmytrip.userId,
+        status: "pending",
+        type: "used",
+      },
+      transaction: user_tx,
+    });
+
+    let refundedCoins = 0;
+    if (usedCoinHistory) {
+      const totalUsedCoins = usedCoinHistory.coins;
+      refundedCoins = totalUsedCoins;
+
+      if (refundedCoins > 0) {
+        const txnsToRestore = await FestgoCoinTransaction.findAll({
+          where: {
+            userId: planmytrip.userId,
+            expiresAt: {
+              [Op.gte]: new Date(),
+            },
+          },
+          order: [["expiresAt", "ASC"]],
+          transaction: user_tx,
+        });
+
+        let remainingToRefund = refundedCoins;
+
+        if (txnsToRestore.length === 0) {
+          // No active transactions -> fallback refund (7 day validity)
+          await FestgoCoinTransaction.create(
+            {
+              userId: planmytrip.userId,
+              type: "refund_grace_period",
+              amount: refundedCoins,
+              remaining: refundedCoins,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            },
+            { transaction: user_tx }
+          );
+        } else {
+          // Refund back into existing transactions
+          for (const txn of txnsToRestore) {
+            const originallyUsed = txn.amount - txn.remaining;
+            const refundable = Math.min(originallyUsed, remainingToRefund);
+
+            if (refundable <= 0) continue;
+
+            txn.remaining += refundable;
+            remainingToRefund -= refundable;
+
+            await txn.save({ transaction: user_tx });
+
+            if (remainingToRefund <= 0) break;
+          }
+
+          // Still some left? create fallback refund txn
+          if (remainingToRefund > 0) {
+            await FestgoCoinTransaction.create(
+              {
+                userId: planmytrip.userId,
+                type: "refund_grace_period",
+                amount: remainingToRefund,
+                remaining: remainingToRefund,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+              { transaction: user_tx }
+            );
+          }
+        }
+
+        await usedCoinHistory.update(
+          { status: "not valid" },
+          { transaction: user_tx }
+        );
+      }
+    }
+
+    // ❌ Delete festbite itself
+    await planmytrip.destroy();
+
+    await user_tx.commit();
+    res.status(200).json({
+      success: true,
+      message: "Festbite cancelled successfully.",
+    });
+  } catch (error) {
+    await user_tx.rollback();
+    console.error("Error cancelling festbite:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while cancelling festbite.",
+    });
+  }
+};
 
 module.exports = {
   cancelPropertyBooking,
   cancelEventBooking,
   cancelBeachFestBooking,
   cancelFestbite,
+  cancelPlanmytrip,
 };
