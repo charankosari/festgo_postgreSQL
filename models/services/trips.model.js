@@ -16,6 +16,7 @@ module.exports = (sequelize) => {
       },
       imageUrl: {
         type: DataTypes.STRING,
+        allowNull: false,
       },
       startDate: {
         type: DataTypes.DATEONLY,
@@ -30,11 +31,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       highlights: {
-        type: DataTypes.ARRAY(DataTypes.STRING), // stores ["beach visit", "hiking", "campfire"]
+        type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,
       },
       pricing: {
-        type: DataTypes.JSONB, // { "4": 2000, "8": 3500, "16": 6000 }
+        type: DataTypes.JSONB,
         allowNull: false,
       },
       pickupLocation: {
@@ -42,7 +43,7 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       inclusions: {
-        type: DataTypes.ARRAY(DataTypes.STRING), // ["meals", "transport", "guide"]
+        type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,
       },
     },

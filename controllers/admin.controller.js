@@ -3,6 +3,7 @@ const {
   FestgoCoinSetting,
   FestgoCoinUsageLimit,
   Event,
+  PlanMyTrips,
   sequelize,
   Festbite,
 } = require("../models/services");
@@ -363,7 +364,7 @@ exports.updateEventStatus = async (req, res) => {
               await FestgoCoinTransaction.create(
                 {
                   userId: event.userId,
-                  type: "refund_fallback",
+                  type: "refund_grace_period",
                   amount: remainingToRefund,
                   remaining: remainingToRefund,
                   sourceType: "event_cancellation",
@@ -685,6 +686,241 @@ exports.updateFestbiteStatus = async (req, res) => {
     await service_tx.rollback();
     await user_tx.rollback();
     console.error("Error updating festbite status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+exports.updateTripStatus = async (req, res) => {
+  const service_tx = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+
+  try {
+    const { tripId } = req.params;
+    const { status } = req.body;
+
+    // ✅ Validate status
+    const validStatuses = ["pending", "hold", "accepted", "cancelled"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    // 🔍 Find trip
+    const trip = await PlanMyTrips.findByPk(tripId, {
+      transaction: service_tx,
+    });
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: "Trip not found",
+      });
+    }
+
+    if (["accepted", "cancelled"].includes(trip.status)) {
+      await service_tx.rollback();
+      await user_tx.rollback();
+      return res.status(409).json({
+        message: `Trip is already finalized with status: ${trip.status}`,
+      });
+    }
+
+    // ✅ Update status
+    trip.status = status;
+    await trip.save({ transaction: service_tx });
+
+    // 💰 Issue coins if accepted
+    if (status === "accepted") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: {
+          status: "pending",
+          type: "trips_referral",
+          issue: false,
+          sourceType: "trips",
+          sourceId: trip.id,
+        },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        const now = new Date();
+
+        // 🔄 Create FestgoCoinTransaction
+        await FestgoCoinTransaction.create(
+          {
+            userId: coinToIssue.userId,
+            type: "trip_referral",
+            amount: coinToIssue.coinsToIssue,
+            remaining: coinToIssue.coinsToIssue,
+            expiresAt: new Date(now.setMonth(now.getMonth() + 12)),
+          },
+          { transaction: user_tx }
+        );
+
+        // 🔄 Update FestgoCoinToIssue
+        coinToIssue.issue = true;
+        coinToIssue.issueAt = new Date();
+        await coinToIssue.save({ transaction: user_tx });
+
+        // 🔄 Update earned history
+        await FestGoCoinHistory.update(
+          { status: "issued" },
+          {
+            where: {
+              reason: "trips referral",
+              referenceId: trip.id,
+              status: "pending",
+              type: "earned",
+            },
+            transaction: user_tx,
+          }
+        );
+      }
+
+      // 🔄 Update used history
+      await FestGoCoinHistory.update(
+        { status: "issued" },
+        {
+          where: {
+            reason: "trips_booking",
+            referenceId: trip.id,
+            status: "pending",
+            type: "used",
+          },
+          transaction: user_tx,
+        }
+      );
+    }
+
+    // ❌ Handle cancelled
+    else if (status === "cancelled") {
+      const coinToIssue = await FestgoCoinToIssue.findOne({
+        where: {
+          status: "pending",
+          type: "trips_referral",
+          issue: false,
+          sourceType: "trips",
+          sourceId: trip.id,
+        },
+        transaction: user_tx,
+      });
+
+      if (coinToIssue) {
+        coinToIssue.issue = false;
+        coinToIssue.status = "cancelled";
+        await coinToIssue.save({ transaction: user_tx });
+
+        await FestGoCoinHistory.update(
+          { status: "not valid" },
+          {
+            where: {
+              reason: "trips referral",
+              referenceId: trip.id,
+              status: "pending",
+              type: "earned",
+            },
+            transaction: user_tx,
+          }
+        );
+      }
+
+      const usedCoinHistory = await FestGoCoinHistory.findOne({
+        where: {
+          reason: "trips_booking",
+          referenceId: trip.id,
+          userId: trip.userId,
+          status: "pending",
+          type: "used",
+        },
+        transaction: user_tx,
+      });
+
+      if (usedCoinHistory) {
+        let refundedCoins = usedCoinHistory.coins;
+
+        if (refundedCoins > 0) {
+          const txnsToRestore = await FestgoCoinTransaction.findAll({
+            where: {
+              userId: trip.userId,
+              expiresAt: { [Op.gte]: new Date() },
+            },
+            order: [["expiresAt", "ASC"]],
+            transaction: user_tx,
+          });
+
+          let remainingToRefund = refundedCoins;
+
+          if (txnsToRestore.length === 0) {
+            // No usable transactions — full refund as grace period fallback
+            await FestgoCoinTransaction.create(
+              {
+                userId: trip.userId,
+                type: "refund_grace_period",
+                amount: refundedCoins,
+                remaining: refundedCoins,
+                sourceType: "trip_cancellation",
+                sourceId: trip.id,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+              { transaction: user_tx }
+            );
+          } else {
+            // Refund into existing coin transactions
+            for (const txn of txnsToRestore) {
+              const originallyUsed = txn.amount - txn.remaining;
+              const refundable = Math.min(originallyUsed, remainingToRefund);
+
+              if (refundable <= 0) continue;
+
+              txn.remaining += refundable;
+              remainingToRefund -= refundable;
+              await txn.save({ transaction: user_tx });
+
+              if (remainingToRefund <= 0) break;
+            }
+
+            // ⛳ If not fully refunded, create fallback transaction
+            if (remainingToRefund > 0) {
+              await FestgoCoinTransaction.create(
+                {
+                  userId: trip.userId,
+                  type: "refund_grace_period",
+                  amount: remainingToRefund,
+                  remaining: remainingToRefund,
+                  sourceType: "trip_cancellation",
+                  sourceId: trip.id,
+                  expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                },
+                { transaction: user_tx }
+              );
+            }
+          }
+
+          await usedCoinHistory.update(
+            { status: "not valid" },
+            { transaction: user_tx }
+          );
+        }
+      }
+    }
+
+    await service_tx.commit();
+    await user_tx.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Trip status updated to '${status}'`,
+      trip,
+    });
+  } catch (error) {
+    await service_tx.rollback();
+    await user_tx.rollback();
+    console.error("Error updating trip status:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
