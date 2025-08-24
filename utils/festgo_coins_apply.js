@@ -51,6 +51,7 @@ async function applyUsableFestgoCoins({
             "property_booking",
             "beachfest_booking",
             "cityfest_booking",
+            "trips_booking",
           ],
         },
         createdAt: { [Op.between]: [firstDayOfMonth, lastDayOfMonth] },
@@ -75,6 +76,8 @@ async function applyUsableFestgoCoins({
           ? "beach_fest"
           : type === "cityfest"
           ? "city_fest"
+          : type === "trips"
+          ? "trips"
           : type,
     },
     transaction,
