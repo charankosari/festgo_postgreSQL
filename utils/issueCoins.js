@@ -336,7 +336,7 @@ const handleReferralForEvent = async ({ referralId, event, transactions }) => {
   );
 };
 const handleReferralForTrips = async ({ referralId, trip, transactions }) => {
-  if (!referralId || trip) return;
+  if (!referralId || !trip) return;
   const { service_tx, user_tx } = transactions;
   // 🔍 Step 1: Find referring user by referralCode
   const referrer = await User.findOne({
