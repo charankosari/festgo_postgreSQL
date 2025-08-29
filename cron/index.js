@@ -4,6 +4,8 @@ const expireZeroBookings = require("./expireZeroBooking");
 const {
   issuePendingCoins,
   issueBeachFestPendingCoins,
+  issueTripsPendingCoins,
+  issueCityFestPendingCoins,
 } = require("./issuePendingCoins");
 
 // 🕒 Run every 2 minutes: Expire stale room bookings
@@ -22,6 +24,14 @@ cron.schedule("*/10 * * * *", () => {
   console.log("🪙 Running cron to issue pending beach fest FestGo coins...");
   issueBeachFestPendingCoins();
 });
+// cron.schedule("*/10 * * * *", () => {
+//   console.log("🪙 Running cron to issue pending trips FestGo coins...");
+//   issueTripsPendingCoins();
+// });
+// cron.schedule("*/10 * * * *", () => {
+//   console.log("🪙 Running cron to issue pending cityfest FestGo coins...");
+//   issueCityFestPendingCoins();
+// });
 cron.schedule("*/10 * * * *", () => {
   console.log("🕒 Running cron to clean up zero  bookings...");
   expireZeroBookings();
