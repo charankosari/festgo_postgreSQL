@@ -277,13 +277,13 @@ exports.handleCityfestPaymentSuccess = async (bookingId, transactionId) => {
         where: { referenceId: bookingId, type: "used", status: "pending" },
         transaction: user_tx,
       });
-
       if (history) {
         let remainingToRefund = history.coins;
+
         const txnsToRestore = await FestgoCoinTransaction.findAll({
           where: {
             user_id: booking.user_id,
-            expiredAt: { [Op.gte]: new Date() },
+            expiredAt: { [Op.gte]: new Date() }, // only still valid
           },
           order: [["expiredAt", "ASC"]],
           transaction: user_tx,
@@ -300,6 +300,24 @@ exports.handleCityfestPaymentSuccess = async (bookingId, transactionId) => {
 
           if (remainingToRefund <= 0) break;
         }
+
+        // ✅ If still leftover (or no active txns), issue grace period refund
+        if (remainingToRefund > 0) {
+          await FestgoCoinTransaction.create(
+            {
+              user_id: booking.user_id,
+              type: "refund_grace_period",
+              amount: remainingToRefund,
+              remaining: remainingToRefund,
+              sourceType: "cityfest_cancellation",
+              sourceId: booking.id,
+              expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+            },
+            { transaction: user_tx }
+          );
+          remainingToRefund = 0;
+        }
+
         await history.update({ status: "not valid" }, { transaction: user_tx });
       }
       // --- End of Added Coin Refund Logic ---
@@ -376,18 +394,107 @@ exports.handleCityfestPaymentSuccess = async (bookingId, transactionId) => {
 // 📌 Payment Failure Handler
 exports.handleCityfestPaymentFailure = async (bookingId) => {
   try {
-    await city_fest_booking.update(
+    const booking = await city_fest_booking.findByPk(bookingId, {
+      transaction: t,
+    });
+    if (!booking) {
+      throw new Error(`Booking ${bookingId} not found for failure handling.`);
+    }
+
+    await booking.update(
       {
         payment_status: "failed",
         booking_status: "cancelled",
       },
-      { where: { id: bookingId } }
+      { transaction: t }
     );
+    const history = await FestGoCoinHistory.findOne({
+      where: {
+        referenceId: bookingId,
+        type: "used",
+        status: "pending",
+      },
+      transaction: user_tx,
+    });
+    if (history) {
+      let remainingToRefund = history.coins;
+
+      const txnsToRestore = await FestgoCoinTransaction.findAll({
+        where: {
+          user_id: booking.user_id,
+          expiredAt: { [Op.gte]: new Date() }, // only still valid
+        },
+        order: [["expiredAt", "ASC"]],
+        transaction: user_tx,
+      });
+
+      for (const txn of txnsToRestore) {
+        const originallyUsed = txn.amount - txn.remaining;
+        const refundable = Math.min(originallyUsed, remainingToRefund);
+        if (refundable <= 0) continue;
+
+        txn.remaining += refundable;
+        remainingToRefund -= refundable;
+        await txn.save({ transaction: user_tx });
+
+        if (remainingToRefund <= 0) break;
+      }
+
+      // ✅ If still leftover (or no active txns), issue grace period refund
+      if (remainingToRefund > 0) {
+        await FestgoCoinTransaction.create(
+          {
+            user_id: booking.user_id,
+            type: "refund_grace_period",
+            amount: remainingToRefund,
+            remaining: remainingToRefund,
+            sourceType: "cityfest_cancellation",
+            sourceId: booking.id,
+            expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          },
+          { transaction: user_tx }
+        );
+        remainingToRefund = 0;
+      }
+
+      await history.update({ status: "not valid" }, { transaction: user_tx });
+    }
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: bookingId,
+          type: "earned",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+    await FestgoCoinToIssue.update(
+      {
+        issue: false,
+        issueAt: null,
+        status: "cancelled",
+      },
+      {
+        where: {
+          booking_id: bookingId,
+          sourceType: "cityfest",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+    await user_tx.commit();
+    await t.commit();
+
     console.log(
-      `❌ CityFest Booking ${bookingId} cancelled due to payment failure.`
+      `❌ CityFest Booking ${bookingId} cancelled due to payment failure. Coins handled.`
     );
     return true;
   } catch (error) {
+    await t.rollback();
+    await user_tx.rollback();
     console.error("Error in handleCityfestPaymentFailure:", error);
     return false;
   }
