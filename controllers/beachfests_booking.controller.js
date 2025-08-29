@@ -296,12 +296,19 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
         transaction: user_tx,
       });
       if (history) {
+        const booking = await beachfests_booking.findOne({
+          where: { id: bookingId },
+          transaction: service_tx,
+        });
+
         let remainingToRefund = history.coins;
 
         const txnsToRestore = await FestgoCoinTransaction.findAll({
           where: {
             user_id: booking.user_id,
-            expiredAt: { [Op.gte]: new Date() },
+            expiresAt: {
+              [Op.gte]: new Date(),
+            },
           },
           order: [["expiredAt", "ASC"]],
           transaction: user_tx,
@@ -310,17 +317,38 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
         for (const txn of txnsToRestore) {
           const originallyUsed = txn.amount - txn.remaining;
           const refundable = Math.min(originallyUsed, remainingToRefund);
+
           if (refundable <= 0) continue;
 
           txn.remaining += refundable;
           remainingToRefund -= refundable;
 
           await txn.save({ transaction: user_tx });
+
           if (remainingToRefund <= 0) break;
         }
 
+        // ✅ Handle remaining coins by creating a refund_grace_period txn
+        if (remainingToRefund > 0) {
+          await FestgoCoinTransaction.create(
+            {
+              user_id: booking.user_id,
+              type: "refund_grace_period",
+              amount: remainingToRefund,
+              remaining: remainingToRefund,
+              sourceType: "beachfest_cancellation",
+              sourceId: booking.id,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+            },
+            { transaction: user_tx }
+          );
+          remainingToRefund = 0;
+        }
+
+        // finally update history status
         await history.update({ status: "not valid" }, { transaction: user_tx });
       }
+
       await t.commit();
       await user_tx.commit();
 
@@ -460,17 +488,38 @@ exports.handleBeachfestPaymentFailure = async (bookingId) => {
       for (const txn of txnsToRestore) {
         const originallyUsed = txn.amount - txn.remaining;
         const refundable = Math.min(originallyUsed, remainingToRefund);
+
         if (refundable <= 0) continue;
 
         txn.remaining += refundable;
         remainingToRefund -= refundable;
 
         await txn.save({ transaction: user_tx });
+
         if (remainingToRefund <= 0) break;
       }
 
-      await history.update({ status: "not_valid" }, { transaction: user_tx });
+      // ✅ Handle remaining coins by creating a refund_grace_period txn
+      if (remainingToRefund > 0) {
+        await FestgoCoinTransaction.create(
+          {
+            user_id: booking.user_id,
+            type: "refund_grace_period",
+            amount: remainingToRefund,
+            remaining: remainingToRefund,
+            sourceType: "beachfest_cancellation",
+            sourceId: booking.id,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          },
+          { transaction: user_tx }
+        );
+        remainingToRefund = 0;
+      }
+
+      // finally update history status
+      await history.update({ status: "not valid" }, { transaction: user_tx });
     }
+
     await user_tx.commit();
     await service_tx.commit();
     console.log(`❌ Beachfest Booking ${bookingId} cancelled.`);
