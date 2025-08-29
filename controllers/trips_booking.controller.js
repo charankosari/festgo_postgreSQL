@@ -325,6 +325,7 @@ exports.handleTripPaymentFailure = async (bookingId) => {
       {
         issue: false,
         issueAt: null,
+        status: "cancelled",
       },
       {
         where: {
