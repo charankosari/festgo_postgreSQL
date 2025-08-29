@@ -776,7 +776,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
               type: "refund_grace_period",
               amount: remainingToRefund,
               remaining: remainingToRefund,
-              sourceType: "trip_cancellation",
+              sourceType: "property_cancellation",
               sourceId: booking.id,
               expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
             },
@@ -931,7 +931,7 @@ exports.handlePaymentFailure = async (bookingId) => {
             type: "refund_grace_period",
             amount: remainingToRefund,
             remaining: remainingToRefund,
-            sourceType: "trip_cancellation",
+            sourceType: "property_cancellation",
             sourceId: booking.id,
             expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
           },
