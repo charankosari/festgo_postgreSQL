@@ -749,6 +749,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         const txnsToRestore = await FestgoCoinTransaction.findAll({
           where: {
             user_id: booking.user_id,
+            expiredAt: { [Op.gte]: new Date() },
           },
           order: [["expiredAt", "ASC"]],
           transaction: user_tx,
@@ -766,6 +767,22 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
           await txn.save({ transaction: user_tx });
 
           if (remainingToRefund <= 0) break;
+        }
+
+        if (remainingToRefund > 0) {
+          await FestgoCoinTransaction.create(
+            {
+              user_id: booking.user_id,
+              type: "refund_grace_period",
+              amount: remainingToRefund,
+              remaining: remainingToRefund,
+              sourceType: "trip_cancellation",
+              sourceId: booking.id,
+              expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
+            },
+            { transaction: user_tx }
+          );
+          remainingToRefund = 0;
         }
 
         await history.update({ status: "not valid" }, { transaction: user_tx });
@@ -887,6 +904,7 @@ exports.handlePaymentFailure = async (bookingId) => {
       const txnsToRestore = await FestgoCoinTransaction.findAll({
         where: {
           user_id: booking.user_id,
+          expiredAt: { [Op.gte]: new Date() },
         },
         order: [["expiredAt", "ASC"]],
         transaction: user_tx,
@@ -904,6 +922,22 @@ exports.handlePaymentFailure = async (bookingId) => {
         await txn.save({ transaction: user_tx });
 
         if (remainingToRefund <= 0) break;
+      }
+
+      if (remainingToRefund > 0) {
+        await FestgoCoinTransaction.create(
+          {
+            user_id: booking.user_id,
+            type: "refund_grace_period",
+            amount: remainingToRefund,
+            remaining: remainingToRefund,
+            sourceType: "trip_cancellation",
+            sourceId: booking.id,
+            expiredAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
+          },
+          { transaction: user_tx }
+        );
+        remainingToRefund = 0;
       }
 
       await history.update({ status: "not valid" }, { transaction: user_tx });

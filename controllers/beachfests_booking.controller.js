@@ -299,7 +299,10 @@ exports.handleBeachfestPaymentSuccess = async (bookingId, transactionId) => {
         let remainingToRefund = history.coins;
 
         const txnsToRestore = await FestgoCoinTransaction.findAll({
-          where: { user_id: booking.user_id },
+          where: {
+            user_id: booking.user_id,
+            expiredAt: { [Op.gte]: new Date() },
+          },
           order: [["expiredAt", "ASC"]],
           transaction: user_tx,
         });
