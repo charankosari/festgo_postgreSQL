@@ -9,6 +9,8 @@ const {
   sequelize, // your services sequelize instance
   zeroBookingInstance,
   PlanMyTrips,
+  Trips,
+  TripsBooking,
 } = require("../models/services");
 const {
   FestgoCoinToIssue,
@@ -849,6 +851,171 @@ const cancelPlanmytrip = async (req, res) => {
     });
   }
 };
+const cancelTripBooking = async (req, res) => {
+  const user_tx = await usersequel.transaction();
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const trip_booking = await TripsBooking.findByPk(id);
+
+    if (!trip_booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Trip booking not found." });
+    }
+
+    if (trip_booking.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to cancel this festbite.",
+      });
+    }
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          sourceId: trip_booking.id,
+          type: "trips_referral",
+          sourceType: "trips",
+          status: "pending",
+        },
+
+        transaction: user_tx,
+      }
+    );
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: trip_booking.id,
+          type: "earned",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+    const today = moment();
+    const eventStartDate = moment(trip_booking.startDate);
+    const daysBeforeEvent = eventStartDate.diff(today, "days");
+
+    let refundPercentage = 0;
+    if (daysBeforeEvent >= 4) {
+      refundPercentage = 100;
+    } else if (daysBeforeEvent >= 2) {
+      refundPercentage = 50;
+    }
+    let refundAmount = 0;
+
+    // 3.a Refund actual payment
+    if (refundPercentage > 0 && trip_booking.transaction_id) {
+      const refundableAmount =
+        trip_booking.amount_paid - (trip_booking.service_fee || 0);
+
+      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
+      if (refundAmount > 0) {
+        await refundPayment({
+          payment_id: trip_booking.transaction_id,
+          amount: refundAmount,
+        });
+      }
+    }
+    const usedCoinHistory = await FestGoCoinHistory.findOne({
+      where: {
+        referenceId: trip_booking.id,
+        type: "used",
+      },
+      transaction: user_tx,
+    });
+    if (usedCoinHistory && refundPercentage > 0) {
+      const refundCoins = Math.round(
+        usedCoinHistory.amount * (refundPercentage / 100)
+      );
+
+      if (refundCoins > 0) {
+        // Step 1: Create refund record in coin history
+        await FestGoCoinHistory.create(
+          {
+            userId: trip_booking.userId,
+            referenceId: trip_booking.id,
+            type: "refund",
+            amount: refundCoins,
+            status: "issued",
+            reason: "trip_cancellation",
+          },
+          { transaction: user_tx }
+        );
+
+        // Step 2: Try to restore coins back to original transactions
+        const txnsToRestore = await FestgoCoinTransaction.findAll({
+          where: {
+            userId: trip_booking.userId,
+            expiresAt: {
+              [Op.gte]: new Date(), // Only restore to non-expired txns
+            },
+          },
+          order: [["expiresAt", "ASC"]],
+          transaction: user_tx,
+        });
+
+        let remainingToRefund = refundCoins;
+
+        for (const txn of txnsToRestore) {
+          // originallyUsed = total coins spent from this txn
+          const originallyUsed = txn.amount - txn.remaining;
+
+          // refundable = min(coins used from this txn, remaining refund)
+          const refundable = Math.min(originallyUsed, remainingToRefund);
+
+          if (refundable <= 0) continue;
+
+          txn.remaining += refundable; // give back coins to txn
+          remainingToRefund -= refundable;
+
+          await txn.save({ transaction: user_tx });
+
+          if (remainingToRefund <= 0) break;
+        }
+
+        // Step 3: If some refund couldn't be restored, issue grace period txn
+        if (remainingToRefund > 0) {
+          await FestgoCoinTransaction.create(
+            {
+              userId: trip_booking.userId,
+              type: "refund_grace_period",
+              amount: remainingToRefund,
+              remaining: remainingToRefund,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
+            },
+            { transaction: user_tx }
+          );
+        }
+
+        // Step 4: Mark original usage history as not valid
+        await usedCoinHistory.update(
+          { status: "not valid" },
+          { transaction: user_tx }
+        );
+      }
+    }
+    await trip_booking.update({
+      booking_status: "cancelled",
+      payment_status: refundPercentage > 0 ? "refunded" : "norefund",
+    });
+    await user_tx.commit();
+    res.status(200).json({
+      success: true,
+      message: "Trip cancelled successfully.",
+    });
+  } catch (error) {
+    await user_tx.rollback();
+    console.error("Error cancelling festbite:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while cancelling festbite.",
+    });
+  }
+};
 
 module.exports = {
   cancelPropertyBooking,
@@ -856,4 +1023,5 @@ module.exports = {
   cancelBeachFestBooking,
   cancelFestbite,
   cancelPlanmytrip,
+  cancelTripBooking,
 };
