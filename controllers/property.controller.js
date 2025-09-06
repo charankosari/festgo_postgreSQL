@@ -2332,7 +2332,9 @@ exports.getMerchantPropertyBookings = async (req, res) => {
     const bookings = await property_booking.findAll({
       where: {
         property_id: propertyId,
-        payment_status: { [Op.ne]: "failed" },
+        payment_status: {
+          [Op.in]: ["paid", "pending"],
+        },
       },
     });
 
