@@ -9,6 +9,7 @@ const {
   RoomRateInventory,
   FestgoCoinSetting,
   FestgoCoinUsageLimit,
+  property_booking,
   sequelize,
 } = require("../models/services/index");
 const {
@@ -2304,5 +2305,98 @@ exports.getPropertiesNames = async (req, res) => {
       message: "Failed to fetch properties",
       error: error.message,
     });
+  }
+};
+
+exports.getMerchantPropertyBookings = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    // 1. Fetch property & its rooms
+    const property = await Property.findByPk(propertyId, {
+      include: [{ model: Room, as: "rooms" }],
+    });
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // 2. Check vendor access
+    if (property.vendorId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to access this property" });
+    }
+
+    // 3. Get all bookings for this property
+    const bookings = await property_booking.findAll({
+      where: {
+        property_id: propertyId,
+        payment_status: { [Op.ne]: "failed" },
+      },
+    });
+
+    if (bookings.length === 0) {
+      return res.json({
+        property: {
+          id: property.id,
+          name: property.name,
+          vendorId: property.vendorId,
+        },
+        rooms: property.rooms,
+        bookings: [],
+      });
+    }
+
+    // 4. Fetch all users for bookings in one query
+    const userIds = bookings.map((b) => b.user_id);
+    const users = await User.findAll({
+      where: { id: { [Op.in]: userIds } },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    // 5. Create a room lookup map for faster access
+    const roomMap = new Map(property.rooms.map((r) => [r.id, r]));
+
+    // 6. Transform bookings
+    const result = bookings.map((booking) => {
+      const user = userMap.get(booking.user_id);
+      const room = roomMap.get(booking.room_id);
+
+      // format guest name
+      let guestName = user
+        ? user.firstname && user.lastname
+          ? `${user.firstname} ${user.lastname}`
+          : user.username || "Guest"
+        : "Guest";
+
+      return {
+        guestName,
+        guests: booking.num_adults + booking.num_children,
+        checkIn: booking.check_in_date, // frontend can format if needed
+        checkOut: booking.check_out_date,
+        roomType: room ? room.room_type : "Unknown",
+        mealPlan: room ? room.meal_plan : "EP", // ✅ now from room
+        bookingId: booking.id,
+        guestContact: user.number,
+        guestEmail: user.email,
+
+        netAmount: booking.amount_paid,
+        paymentStatus: booking.payment_status,
+        bookingType: booking.zero_booking ? "zero booking" : "regular",
+      };
+    });
+
+    res.json({
+      property: {
+        id: property.id,
+        name: property.name,
+        vendorId: property.vendorId,
+      },
+      bookings: result,
+    });
+  } catch (error) {
+    console.error("Error fetching property bookings:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -115,5 +115,10 @@ router.post(
   isAuthorized,
   propertyController.getUpdatedRoomsForProperty
 );
+router.get(
+  "/merchant/history/:propertyId",
+  isAuthorized,
+  propertyController.getMerchantPropertyBookings
+);
 
 module.exports = router;
