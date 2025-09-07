@@ -2402,3 +2402,113 @@ exports.getMerchantPropertyBookings = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+exports.getDashboardMetrics = async (req, res) => {
+  try {
+    const properties = await Property.findAll({
+      where: { vendorId: req.user.id },
+      attributes: ["id"],
+    });
+    const propertyIds = properties.map((p) => p.id);
+
+    if (!propertyIds.length) {
+      return res.json({ metrics: [] });
+    }
+
+    const today = new Date();
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+    const last7Days = new Date();
+    last7Days.setDate(last7Days.getDate() - 7);
+
+    const todaysBookings = await property_booking.findAll({
+      where: {
+        property_id: { [Op.in]: propertyIds },
+        check_in_date: { [Op.between]: [startOfDay, endOfDay] },
+        payment_status: "paid",
+      },
+    });
+
+    const todaysRoomNights = todaysBookings.reduce((sum, b) => {
+      const nights = Math.ceil(
+        (new Date(b.check_out_date) - new Date(b.check_in_date)) /
+          (1000 * 60 * 60 * 24)
+      );
+      return sum + nights;
+    }, 0);
+
+    const todaysRevenue = todaysBookings.reduce(
+      (sum, b) => sum + (b.amount_paid || 0),
+      0
+    );
+
+    const todaysASP = todaysBookings.length
+      ? todaysRevenue / todaysBookings.length
+      : 0;
+
+    const todaysCheckIns = todaysBookings.length;
+
+    const visits = await PropertyVisit.sum("visits", {
+      where: {
+        vendor_id: req.user.id,
+        createdAt: { [Op.gte]: last7Days },
+      },
+    });
+
+    const totalBookings7d = await PropertyBooking.count({
+      where: {
+        property_id: { [Op.in]: propertyIds },
+        createdAt: { [Op.gte]: last7Days },
+      },
+    });
+
+    const conversion = visits > 0 ? (totalBookings7d / visits) * 100 : 0;
+
+    const metrics = [
+      {
+        title: "Today's Room Nights",
+        value: todaysRoomNights,
+        subtitle: `FOR LAST 7 DAYS • ${totalBookings7d} ROOM NIGHTS`,
+        hasViewMore: true,
+      },
+      {
+        title: "Today's Revenue",
+        value: todaysRevenue,
+        subtitle: `FOR LAST 7 DAYS • ₹ ${todaysRevenue}`, // you may want 7d revenue here
+        hasViewMore: true,
+        currency: true,
+      },
+      {
+        title: "Today's Average Selling Price",
+        value: todaysASP,
+        subtitle: `FOR LAST 7 DAYS • ₹ ${todaysASP}`,
+        hasViewMore: true,
+        currency: true,
+      },
+      {
+        title: "Today's Check-ins",
+        value: todaysCheckIns,
+        subtitle: `FOR LAST 7 DAYS • ${totalBookings7d} CHECK-INS`,
+        hasViewMore: true,
+      },
+      {
+        title: "Property Visits",
+        value: visits,
+        subtitle: `FOR LAST 7 DAYS • ${visits} VISITS`,
+        hasViewMore: true,
+      },
+      {
+        title: "Conversion",
+        value: conversion,
+        subtitle: `FOR LAST 7 DAYS • ${conversion.toFixed(2)}%`,
+        hasViewMore: true,
+        percentage: true,
+      },
+    ];
+
+    res.json({ metrics });
+  } catch (error) {
+    console.error("Dashboard metrics error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

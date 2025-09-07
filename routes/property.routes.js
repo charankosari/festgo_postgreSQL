@@ -78,6 +78,7 @@ router.delete(
 );
 router.post(
   "/p/property-details",
+  isAuthorized,
   propertyController.getSelectedPropertyDetailed
 );
 
