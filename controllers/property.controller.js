@@ -2421,6 +2421,7 @@ exports.getDashboardMetrics = async (req, res) => {
       return res.json({ metrics: [] });
     }
 
+    // ---- Date Ranges ----
     const today = new Date();
     const startOfDay = new Date(today.setHours(0, 0, 0, 0));
     const endOfDay = new Date(today.setHours(23, 59, 59, 999));
@@ -2428,6 +2429,7 @@ exports.getDashboardMetrics = async (req, res) => {
     const last7Days = new Date();
     last7Days.setDate(last7Days.getDate() - 7);
 
+    // ---- Today's Bookings ----
     const todaysBookings = await property_booking.findAll({
       where: {
         property_id: { [Op.in]: propertyIds },
@@ -2455,53 +2457,78 @@ exports.getDashboardMetrics = async (req, res) => {
 
     const todaysCheckIns = todaysBookings.length;
 
-    const visits = await PropertyVisit.sum("visits", {
-      where: {
-        vendor_id: req.user.id,
-        createdAt: { [Op.gte]: last7Days },
-      },
-    });
-
-    const totalBookings7d = await PropertyBooking.count({
+    // ---- Last 7 Days Bookings ----
+    const bookings7d = await property_booking.findAll({
       where: {
         property_id: { [Op.in]: propertyIds },
         createdAt: { [Op.gte]: last7Days },
+        payment_status: "paid",
       },
     });
 
+    const roomNights7d = bookings7d.reduce((sum, b) => {
+      const nights = Math.ceil(
+        (new Date(b.check_out_date) - new Date(b.check_in_date)) /
+          (1000 * 60 * 60 * 24)
+      );
+      return sum + nights;
+    }, 0);
+
+    const revenue7d = bookings7d.reduce(
+      (sum, b) => sum + (b.amount_paid || 0),
+      0
+    );
+
+    const asp7d = bookings7d.length ? revenue7d / bookings7d.length : 0;
+
+    const checkins7d = bookings7d.length;
+
+    // ---- Visits & Conversion ----
+    const visits = await Property_visits.sum("visits", {
+      where: {
+        vendor_id: req.user.id,
+        [Op.or]: [
+          { createdAt: { [Op.gte]: last7Days } },
+          { updatedAt: { [Op.gte]: last7Days } },
+        ],
+      },
+    });
+
+    const totalBookings7d = bookings7d.length;
     const conversion = visits > 0 ? (totalBookings7d / visits) * 100 : 0;
 
+    // ---- Response ----
     const metrics = [
       {
         title: "Today's Room Nights",
         value: todaysRoomNights,
-        subtitle: `FOR LAST 7 DAYS • ${totalBookings7d} ROOM NIGHTS`,
+        subtitle: `FOR LAST 7 DAYS • ${roomNights7d} ROOM NIGHTS`,
         hasViewMore: true,
       },
       {
         title: "Today's Revenue",
         value: todaysRevenue,
-        subtitle: `FOR LAST 7 DAYS • ₹ ${todaysRevenue}`, // you may want 7d revenue here
+        subtitle: `FOR LAST 7 DAYS • ₹ ${revenue7d}`,
         hasViewMore: true,
         currency: true,
       },
       {
         title: "Today's Average Selling Price",
         value: todaysASP,
-        subtitle: `FOR LAST 7 DAYS • ₹ ${todaysASP}`,
+        subtitle: `FOR LAST 7 DAYS • ₹ ${asp7d.toFixed(2)}`,
         hasViewMore: true,
         currency: true,
       },
       {
         title: "Today's Check-ins",
         value: todaysCheckIns,
-        subtitle: `FOR LAST 7 DAYS • ${totalBookings7d} CHECK-INS`,
+        subtitle: `FOR LAST 7 DAYS • ${checkins7d} CHECK-INS`,
         hasViewMore: true,
       },
       {
         title: "Property Visits",
-        value: visits,
-        subtitle: `FOR LAST 7 DAYS • ${visits} VISITS`,
+        value: visits || 0,
+        subtitle: `FOR LAST 7 DAYS • ${visits || 0} VISITS`,
         hasViewMore: true,
       },
       {

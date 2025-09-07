@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
+const propertyController = require("../controllers/property.controller");
 const wishlistController = require("../controllers/wishlist.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 // USER REGISTRATION not required
@@ -85,5 +86,16 @@ router.get(
   authorizedRoles("user"),
   userController.getCoinsTransactionsHistory
 );
-router.delete("/user/delete",isAuthorized,authorizedRoles("user","admin"),userController.deleteUserById)
+router.delete(
+  "/user/delete",
+  isAuthorized,
+  authorizedRoles("user", "admin"),
+  userController.deleteUserById
+);
+router.get(
+  "/dashboard/stats",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.getDashboardMetrics
+);
 module.exports = router;
