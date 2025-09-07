@@ -93,7 +93,7 @@ router.delete(
   userController.deleteUserById
 );
 router.get(
-  "/dashboard/stats",
+  "/merchant-dashboard/metrics",
   isAuthorized,
   authorizedRoles("vendor"),
   propertyController.getDashboardMetrics
