@@ -10,6 +10,7 @@ const {
   FestgoCoinSetting,
   FestgoCoinUsageLimit,
   property_booking,
+  Property_visits,
   sequelize,
 } = require("../models/services/index");
 const {
@@ -1531,6 +1532,27 @@ exports.getSelectedPropertyDetailed = async (req, res) => {
     }
 
     const plainProperty = property.get({ plain: true });
+    const vendorId = property.vendorId;
+    let visit = await Property_visits.findOne({
+      where: { vendor_id: vendorId },
+    });
+
+    if (visit) {
+      await visit.update({
+        visits: visit.visits + 1,
+        property_ids: Sequelize.fn(
+          "array_append",
+          Sequelize.col("property_ids"),
+          propertyId
+        ),
+      });
+    } else {
+      await Property_visits.create({
+        vendor_id: vendorId,
+        property_ids: [propertyId],
+        visits: 1,
+      });
+    }
 
     // Normalize property rules and amenities
     const propertyRules = normalizePropertyRules(plainProperty.policies || []);
@@ -2307,65 +2329,54 @@ exports.getPropertiesNames = async (req, res) => {
     });
   }
 };
-
 exports.getMerchantPropertyBookings = async (req, res) => {
   try {
-    const { propertyId } = req.params;
+    const vendorId = req.user.id;
 
-    // 1. Fetch property & its rooms
-    const property = await Property.findByPk(propertyId, {
+    // 1. Fetch all active properties of this vendor with rooms
+    const properties = await Property.findAll({
+      where: { vendorId, active: true },
       include: [{ model: Room, as: "rooms" }],
     });
 
-    if (!property) {
-      return res.status(404).json({ message: "Property not found" });
+    if (!properties || properties.length === 0) {
+      return res.json({ bookings: [] });
     }
 
-    // 2. Check vendor access
-    if (property.vendorId !== req.user.id) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to access this property" });
-    }
+    // 2. Collect all propertyIds
+    const propertyIds = properties.map((p) => p.id);
 
-    // 3. Get all bookings for this property
+    // 3. Fetch all bookings for these properties
     const bookings = await property_booking.findAll({
       where: {
-        property_id: propertyId,
-        payment_status: {
-          [Op.in]: ["paid", "pending"],
-        },
+        property_id: { [Op.in]: propertyIds },
+        payment_status: { [Op.in]: ["paid", "pending"] },
       },
     });
 
     if (bookings.length === 0) {
-      return res.json({
-        property: {
-          id: property.id,
-          name: property.name,
-          vendorId: property.vendorId,
-        },
-        rooms: property.rooms,
-        bookings: [],
-      });
+      return res.json({ bookings: [] });
     }
 
-    // 4. Fetch all users for bookings in one query
+    // 4. Fetch all users for these bookings
     const userIds = bookings.map((b) => b.user_id);
     const users = await User.findAll({
       where: { id: { [Op.in]: userIds } },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
 
-    // 5. Create a room lookup map for faster access
-    const roomMap = new Map(property.rooms.map((r) => [r.id, r]));
+    // 5. Prepare property + room lookup
+    const propertyMap = new Map(properties.map((p) => [p.id, p]));
+    const roomMap = new Map(
+      properties.flatMap((p) => p.rooms.map((r) => [r.id, r]))
+    );
 
-    // 6. Transform bookings
+    // 6. Transform all bookings directly into a single array
     const result = bookings.map((booking) => {
+      const property = propertyMap.get(booking.property_id);
       const user = userMap.get(booking.user_id);
       const room = roomMap.get(booking.room_id);
 
-      // format guest name
       let guestName = user
         ? user.firstname && user.lastname
           ? `${user.firstname} ${user.lastname}`
@@ -2373,35 +2384,31 @@ exports.getMerchantPropertyBookings = async (req, res) => {
         : "Guest";
 
       return {
+        propertyId: property.id,
+        propertyName: property.name,
+        propertyType: property.property_type,
         guestName,
         guests: booking.num_adults + booking.num_children,
-        checkIn: booking.check_in_date, // frontend can format if needed
+        checkIn: booking.check_in_date,
         checkOut: booking.check_out_date,
         roomType: room ? room.room_type : "Unknown",
-        mealPlan: room ? room.meal_plan : "EP", // ✅ now from room
+        mealPlan: room ? room.meal_plan : "EP",
         bookingId: booking.id,
-        guestContact: user.number,
-        guestEmail: user.email,
-
+        guestContact: user ? user.number : null,
+        guestEmail: user ? user.email : null,
         netAmount: booking.amount_paid,
         paymentStatus: booking.payment_status,
         bookingType: booking.zero_booking ? "zero booking" : "regular",
       };
     });
 
-    res.json({
-      property: {
-        id: property.id,
-        name: property.name,
-        vendorId: property.vendorId,
-      },
-      bookings: result,
-    });
+    res.json({ bookings: result });
   } catch (error) {
-    console.error("Error fetching property bookings:", error);
+    console.error("Error fetching merchant properties with bookings:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 exports.getDashboardMetrics = async (req, res) => {
   try {
     const properties = await Property.findAll({

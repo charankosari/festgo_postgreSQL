@@ -116,7 +116,7 @@ router.post(
   propertyController.getUpdatedRoomsForProperty
 );
 router.get(
-  "/merchant/history/:propertyId",
+  "/merchant/history/",
   isAuthorized,
   propertyController.getMerchantPropertyBookings
 );

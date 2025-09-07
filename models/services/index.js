@@ -58,6 +58,8 @@ const FestgoCoinUsageLimit = require("./festgo_coins_usage_limits.model")(
 );
 const TripsBooking = require("./trips_booking.model")(servicesSequelize);
 const Offers = require("./offers.model")(servicesSequelize);
+
+const Property_visits = require("./property_visit.model")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
   foreignKey: "categoryId",
   as: "category",
@@ -270,6 +272,7 @@ const db = {
   Trips,
   PlanMyTrips,
   TripsBooking,
+  Property_visits,
 };
 
 // Sync all models
