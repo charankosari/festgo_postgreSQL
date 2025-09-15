@@ -21,6 +21,7 @@ export function normalizePropertyData(data) {
     sameAsWhatsapp: data.sameAsWhatsapp || false,
     channelManagerName: data.channelManagerName || "",
     description: data.description || "",
+    price: data.price || null,
     // Policies block
     policies: data.policies || {
       checkInTime: data.checkInTime,
