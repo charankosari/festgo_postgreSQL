@@ -9,7 +9,8 @@ const {
   normalizePropertyData,
   normalizeRoomData,
 } = require("../utils/normalizePropertyData");
-
+const { Op, Sequelize } = require("sequelize");
+const moment = require("moment");
 function updateStrdata(existingStrdata, step, newStepData) {
   const updatedStrdata = { ...existingStrdata };
   updatedStrdata[`step_${step}`] = {
@@ -18,6 +19,92 @@ function updateStrdata(existingStrdata, step, newStepData) {
   };
   return updatedStrdata;
 }
+const checkBanquetAvailable = async (banquet, startDate, finalDate) => {
+  // Fetch booked entries for overlapping dates
+  const booked = await BanquetBookedDate.findAll({
+    where: {
+      banquetId: banquet.id,
+      checkIn: { [Op.lt]: finalDate }, // booking starts before end
+      checkOut: { [Op.gt]: startDate }, // booking ends after start
+      status: { [Op.in]: ["pending", "confirmed"] },
+    },
+  });
+
+  // If anything overlaps → banquet unavailable
+  if (booked.length > 0) return null;
+
+  return banquet; // available
+};
+
+const formatBanquetResponse = async (banquet, startDate) => {
+  const {
+    id,
+    vendorId,
+    name,
+    email,
+    description,
+    star_rating,
+    location,
+    photos,
+    review_count,
+    price, // ✅ base price stored in banquet
+  } = banquet;
+
+  let finalPrice = parseInt(price || 0);
+  let originalPrice = Math.round(finalPrice * 1.05);
+
+  // ✅ Override price if there is a banquet-specific rate for the given date
+  if (startDate) {
+    const rate = await BanquetRateInventory.findOne({
+      where: { banquetId: id, date: startDate },
+    });
+
+    if (rate?.price) {
+      finalPrice = parseInt(rate.price.offerBaseRate);
+      originalPrice = parseInt(rate.price.base);
+    }
+  }
+
+  const imageList = Array.isArray(photos)
+    ? photos.map((p) => p.imageURL || "")
+    : [];
+
+  return {
+    id,
+    vendorId,
+    name,
+    email,
+    description,
+    star_rating,
+    pricePerDay: finalPrice,
+    originalPrice,
+    review_count,
+    location,
+    imageList,
+  };
+};
+
+const enrichBanquets = async (banquets, startDate, finalDate) => {
+  const enriched = [];
+
+  for (const b of banquets) {
+    const plain = b.get ? b.get({ plain: true }) : b;
+
+    // Check availability before formatting
+    const available = await checkBanquetAvailable(plain, startDate, finalDate);
+    if (!available) continue;
+
+    delete plain.ownership_details;
+    delete plain.bank_details;
+    delete plain.tax_details;
+    delete plain.strdata;
+
+    const formatted = await formatBanquetResponse(plain, startDate);
+    if (formatted) enriched.push(formatted);
+  }
+
+  return enriched;
+};
 
 exports.createBanquet = async (req, res) => {
   try {
@@ -191,5 +278,142 @@ exports.updateBanquet = async (req, res) => {
   } catch (err) {
     console.error("Error in update banquet:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+exports.deleteBanquet = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Banquet = await Banquets.findByPk(id);
+    if (!Banquet) return res.status(404).json({ message: "Banquet not found" });
+
+    await Banquet.destroy();
+    res.json({ success: true, message: "Banquet deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getAllActiveBanquetsByRange = async (req, res) => {
+  try {
+    const { latitude, longitude, todate, enddate, location } = req.body;
+
+    // 🧹 Clean and normalize incoming params
+    const clean = (val) => (val === "" ? null : val);
+
+    const lat = clean(latitude);
+    const long = clean(longitude);
+    const startDate = clean(todate)
+      ? moment(todate, "DD-MM-YYYY").format("YYYY-MM-DD")
+      : null;
+    const finalDate = clean(enddate)
+      ? moment(enddate, "DD-MM-YYYY").format("YYYY-MM-DD")
+      : null;
+    const city = clean(location);
+
+    let availableBanquets = [];
+
+    // 🟢 Case 1: Only lat/long, no dates → just return active banquets within 10km
+    if (lat && long && !startDate && !finalDate) {
+      const whereNearby = {
+        active: true,
+        [Op.and]: [
+          Sequelize.literal(`
+            earth_distance(
+              ll_to_earth(${lat}, ${long}),
+              ll_to_earth(
+                (location->>'lat')::float, 
+                (location->>'lng')::float
+              )
+            ) <= 10000
+          `),
+        ],
+      };
+
+      const nearbyBanquets = await Banquets.findAll({ where: whereNearby });
+      const finalBanquets = await enrichBanquets(nearbyBanquets, null, null);
+
+      return res.json({
+        success: true,
+        status: 200,
+        properties: finalBanquets,
+      });
+    }
+
+    // 🟢 Case 2: Lat/long + dates → check availability + pricing
+    if (lat && long) {
+      const whereNearby = {
+        active: true,
+        [Op.and]: [
+          Sequelize.literal(`
+            earth_distance(
+              ll_to_earth(${lat}, ${long}),
+              ll_to_earth(
+                (location->>'lat')::float, 
+                (location->>'lng')::float
+              )
+            ) <= 10000
+          `),
+        ],
+      };
+
+      const nearbyBanquets = await Banquets.findAll({ where: whereNearby });
+
+      for (const banquet of nearbyBanquets) {
+        const available = await checkBanquetAvailable(
+          banquet,
+          startDate,
+          finalDate
+        );
+        if (available) availableBanquets.push(banquet);
+      }
+    }
+
+    // 🟢 Case 3: Fallback → search by city if <20 banquets found
+    if (availableBanquets.length < 20 && city) {
+      const whereCity = {
+        active: true,
+        [Op.and]: [
+          Sequelize.literal(`(
+            lower(location->>'city') = lower('${city}')
+            OR lower(location->>'locality') = lower('${city}')
+            OR lower(location->>'searchLocation') = lower('${city}')
+          )`),
+        ],
+        id: {
+          [Op.notIn]: availableBanquets.map((b) => b.id),
+        },
+      };
+
+      const cityBanquets = await Banquets.findAll({
+        where: whereCity,
+        limit: 20 - availableBanquets.length,
+      });
+
+      for (const banquet of cityBanquets) {
+        const available = await checkBanquetAvailable(
+          banquet,
+          startDate,
+          finalDate
+        );
+        if (available) availableBanquets.push(banquet);
+        if (availableBanquets.length === 20) break;
+      }
+    }
+
+    // 🟢 Final enrichment (pricing, photos, etc.)
+    const finalBanquets = await enrichBanquets(
+      availableBanquets,
+      startDate,
+      finalDate
+    );
+
+    return res.json({
+      success: true,
+      status: 200,
+      properties: finalBanquets,
+    });
+  } catch (err) {
+    console.error("Error fetching banquets:", err);
+    res.status(500).json({ message: err.message, status: 500 });
   }
 };
