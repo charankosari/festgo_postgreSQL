@@ -971,7 +971,7 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
       location,
       property_type,
     } = req.body;
-
+    const userId = req.user?.id;
     // 🧹 Clean and normalize incoming params
     const clean = (val) => (val === "" ? null : val);
 
@@ -1095,14 +1095,37 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
         if (availableProperties.length === 20) break;
       }
     }
-    // ✅ Final enrichment and response
-    const finalProperties = await enrichProperties(
-      availableProperties,
-      startDate,
-      requestedRooms,
-      adults,
-      children
-    );
+    let finalProperties = [];
+
+    if (availableProperties.length === 0) {
+      // fallback: return all active properties (respect property type if given)
+      const whereAll = {
+        active: true,
+        [Op.and]: [].filter(Boolean),
+      };
+
+      if (propertyTypeFilter) {
+        whereAll[Op.and].push(propertyTypeFilter);
+      }
+
+      const allActive = await Property.findAll({ where: whereAll });
+
+      finalProperties = await enrichProperties(
+        allActive,
+        startDate,
+        requestedRooms,
+        adults,
+        children
+      );
+    } else {
+      finalProperties = await enrichProperties(
+        availableProperties,
+        startDate,
+        requestedRooms,
+        adults,
+        children
+      );
+    }
 
     return res.json({
       success: true,
