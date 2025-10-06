@@ -20,7 +20,7 @@ const { Sequelize, where } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
 const sendEmail = require("../libs/mailgun/mailGun");
 const { sendSMS } = require("../libs/sms/sms");
-const { loginOtpTemplate } = require("../libs/sms/messageTemplates");
+
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
@@ -451,9 +451,7 @@ exports.sendMobileOtp = async (req, res) => {
     user.mobile_otp_expire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const message = loginOtpTemplate(otp);
-
-    const smsResponse = await sendSMS(req.body.number, message);
+    const smsResponse = await sendSMS(req.body.number, otp);
 
     if (smsResponse.status === "failed") {
       console.error("SMS sending failed:", smsResponse.error);
@@ -496,9 +494,7 @@ exports.loginViaOtp = async (req, res) => {
   user.mobile_otp_expire = Date.now() + 10 * 60 * 1000;
   await user.save();
 
-  const message = loginOtpTemplate(otp);
-
-  const smsResponse = await sendSMS(user.number, message);
+  const smsResponse = await sendSMS(req.body.number, otp);
   if (smsResponse.status === "failed") {
     console.error("SMS sending failed:", smsResponse.error);
     return res.status(500).json({ message: "Failed to send OTP via SMS" });
@@ -843,8 +839,7 @@ exports.loginWithEmailOrMobile = async (req, res) => {
         });
       }
       await checkAndIssueLoginBonus(user.id);
-      const message = loginOtpTemplate(otp);
-      const smsResponse = await sendSMS(user.number, message);
+      const smsResponse = await sendSMS(email, otp);
 
       if (smsResponse.status === "failed") {
         console.error("SMS sending failed:", smsResponse.error);
