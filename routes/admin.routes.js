@@ -98,4 +98,49 @@ router.post(
   authorizedRoles("admin"),
   adminController.updateTripStatus
 );
+router.post(
+  "/commission",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.upsertCommission
+);
+router.get(
+  "/commission",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getCommission
+);
+
+// ✅ Hotel Payment Routes
+router.get(
+  "/property-payments/unpaid",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getUnpaidHotelPayments
+);
+router.get(
+  "/property-payments/paid",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getPaidHotelPayments
+);
+router.get(
+  "/property-payments/export/unpaid",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.exportUnpaidHotelPayments
+);
+router.get(
+  "/property-payments/export/paid",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.exportPaidHotelPayments
+);
+router.post(
+  "/property-payments/mark-paid",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.markBookingsAsPaid
+);
+
 module.exports = router;

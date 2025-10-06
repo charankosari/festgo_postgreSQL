@@ -59,6 +59,8 @@ const FestgoCoinUsageLimit = require("./festgo_coins_usage_limits.model")(
 const TripsBooking = require("./trips_booking.model")(servicesSequelize);
 const Offers = require("./offers.model")(servicesSequelize);
 const Banquets = require("./banquets.model")(servicesSequelize);
+const Commission = require("./commision.model")(servicesSequelize);
+const HotelPayment = require("./hotel_payment.model")(servicesSequelize);
 
 const Property_visits = require("./property_visit.model")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
@@ -275,7 +277,21 @@ const db = {
   TripsBooking,
   Property_visits,
   Banquets,
+  Commission,
+  HotelPayment,
 };
+
+// Setup associations for HotelPayment
+Property.hasMany(HotelPayment, {
+  foreignKey: "propertyId",
+  as: "hotelPayments",
+  onDelete: "CASCADE",
+});
+HotelPayment.belongsTo(Property, {
+  foreignKey: "propertyId",
+  as: "property",
+  onDelete: "CASCADE",
+});
 
 // Sync all models
 servicesSequelize

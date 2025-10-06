@@ -6,6 +6,9 @@ const {
   PlanMyTrips,
   sequelize,
   Festbite,
+  Commission,
+  HotelPayment,
+  property_booking,
 } = require("../models/services");
 const {
   User,
@@ -15,7 +18,9 @@ const {
   FestGoCoinHistory,
 } = require("../models/users");
 const { Op } = require("sequelize");
-
+const XLSX = require("xlsx");
+const path = require("path");
+const fs = require("fs");
 // ✅ Get all vendors
 exports.getAllVendors = async (req, res) => {
   try {
@@ -921,6 +926,518 @@ exports.updateTripStatus = async (req, res) => {
     await service_tx.rollback();
     await user_tx.rollback();
     console.error("Error updating trip status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Create or Update Commission Settings (Only one commission record allowed)
+exports.upsertCommission = async (req, res) => {
+  try {
+    const { commission } = req.body;
+
+    // Validate commission value
+    if (commission === undefined || commission === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Commission value is required",
+      });
+    }
+
+    if (typeof commission !== "number" || commission < 0 || commission > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Commission must be a number between 0 and 100",
+      });
+    }
+
+    // Check if commission record already exists
+    let existingCommission = await Commission.findOne();
+
+    if (existingCommission) {
+      // Update existing commission
+      existingCommission.commission = commission;
+      await existingCommission.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Commission updated successfully",
+        data: existingCommission,
+      });
+    } else {
+      // Create new commission record
+      const newCommission = await Commission.create({
+        commission: commission,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Commission created successfully",
+        data: newCommission,
+      });
+    }
+  } catch (error) {
+    console.error("Error in upsertCommission:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Get Commission Settings
+exports.getCommission = async (req, res) => {
+  try {
+    const commission = await Commission.findOne();
+
+    if (!commission) {
+      return res.status(404).json({
+        success: false,
+        message: "Commission settings not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: commission,
+    });
+  } catch (error) {
+    console.error("Error fetching commission:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Get Unpaid Hotel Payments (from property_bookings not in hotel_payments)
+exports.getUnpaidHotelPayments = async (req, res) => {
+  try {
+    const { propertyId, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Build where clause for property_bookings
+    let bookingWhereClause = {
+      payment_status: "paid", // Only confirmed paid bookings
+      booking_status: { [Op.in]: ["confirmed", "completed"] }, // Only confirmed/completed bookings
+      check_in_date: { [Op.lte]: new Date() },
+    };
+    if (propertyId) {
+      bookingWhereClause.property_id = propertyId;
+    }
+
+    // Get all paid bookings from property_bookings
+    const allPaidBookings = await property_booking.findAll({
+      where: bookingWhereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    const commissionSettings = await Commission.findOne();
+    const commissionPercentage = commissionSettings
+      ? commissionSettings.commission
+      : 0;
+
+    // Get all booking IDs that are already in hotel_payments (already paid to hotels)
+    const paidBookingIds = await HotelPayment.findAll({
+      attributes: ["bookingId"],
+      raw: true,
+    });
+    const paidBookingIdSet = new Set(
+      paidBookingIds.map((item) => item.bookingId)
+    );
+
+    // Filter out bookings that are already paid to hotels
+    const unpaidBookings = allPaidBookings.filter(
+      (booking) => !paidBookingIdSet.has(booking.id)
+    );
+
+    // Apply pagination
+    const totalUnpaid = unpaidBookings.length;
+    const paginatedUnpaid = unpaidBookings.slice(
+      offset,
+      offset + parseInt(limit)
+    );
+
+    // Transform data to match expected format
+    const formattedUnpaid = paginatedUnpaid.map((booking) => {
+      const amountPaid = booking.amount_paid || 0;
+      const commission = (amountPaid * commissionPercentage) / 100;
+      const tds = commission * 0.02; // 2% TDS
+      const gst = commission * 0.18; // 18% GST
+      const netAmount = amountPaid - commission - tds - gst;
+
+      return {
+        id: booking.id,
+        bookingId: booking.id,
+        userId: booking.user_id,
+        propertyId: booking.property_id,
+        checkInDate: booking.check_in_date,
+        checkOutDate: booking.check_out_date,
+        numAdults: booking.num_adults,
+        numChildren: booking.num_children,
+        numRooms: booking.num_rooms,
+        amountPaid: amountPaid,
+        commission: parseFloat(commission.toFixed(2)),
+        commissionPercentage: commissionPercentage,
+        tds: parseFloat(tds.toFixed(2)),
+        gst: parseFloat(gst.toFixed(2)),
+        netAmount: parseFloat(netAmount.toFixed(2)),
+        property: booking.property,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedUnpaid,
+      pagination: {
+        total: totalUnpaid,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalUnpaid / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching unpaid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Get Paid Hotel Payments (from hotel_payments table)
+exports.getPaidHotelPayments = async (req, res) => {
+  try {
+    const { propertyId, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = {};
+    if (propertyId) {
+      whereClause.propertyId = propertyId;
+    }
+
+    const paidPayments = await HotelPayment.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      order: [["paymentDate", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: paidPayments.rows,
+      pagination: {
+        total: paidPayments.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(paidPayments.count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching paid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+exports.exportUnpaidHotelPayments = async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+
+    // Step 1: Filter bookings that are paid by user but not paid to hotels
+    let bookingWhereClause = {
+      payment_status: "paid", // user paid
+      booking_status: { [Op.in]: ["confirmed", "completed"] }, // confirmed/completed bookings
+      check_in_date: {
+        [Op.gt]: new Date(new Date().setDate(new Date().getDate() + 1)),
+      },
+    };
+    if (propertyId) {
+      bookingWhereClause.property_id = propertyId;
+    }
+    const commissionSettings = await Commission.findOne();
+    const commissionPercentage = commissionSettings
+      ? commissionSettings.commission
+      : 0;
+
+    // Step 2: Get all paid bookings
+    const allPaidBookings = await property_booking.findAll({
+      where: bookingWhereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      check_in_date: { [Op.lte]: new Date() },
+
+      order: [["createdAt", "DESC"]],
+    });
+
+    // Step 3: Get all booking IDs already in hotel_payments
+    const paidBookingIds = await HotelPayment.findAll({
+      attributes: ["bookingId"],
+      raw: true,
+    });
+    const paidBookingIdSet = new Set(
+      paidBookingIds.map((item) => item.bookingId)
+    );
+
+    // Step 4: Filter unpaid bookings (not yet paid to hotel)
+    const unpaidBookings = allPaidBookings.filter(
+      (booking) => !paidBookingIdSet.has(booking.id)
+    );
+    const excelData = unpaidBookings.map((booking, index) => {
+      const amountPaid = booking.amount_paid || 0;
+      const commission = (amountPaid * commissionPercentage) / 100;
+      const tds = commission * 0.02; // 2% TDS
+      const gst = commission * 0.18; // 18% GST
+      const netAmount = amountPaid - commission - tds - gst;
+
+      return {
+        "S.No": index + 1,
+        "Booking ID": booking.id,
+        "Property Name": booking.property?.name || "N/A",
+        "Property Email": booking.property?.email || "N/A",
+        "Property Mobile": booking.property?.mobile_number || "N/A",
+        "Check-in Date": booking.check_in_date,
+        "Check-out Date": booking.check_out_date,
+        Adults: booking.num_adults,
+        Children: booking.num_children,
+        Rooms: booking.num_rooms,
+        "Amount Paid (₹)": amountPaid,
+        "Commission Percentage (%)": commissionPercentage,
+        "Commission (₹)": parseFloat(commission.toFixed(2)),
+        "TDS (₹)": parseFloat(tds.toFixed(2)),
+        "GST (₹)": parseFloat(gst.toFixed(2)),
+        "Amount to be paid(₹)": parseFloat(netAmount.toFixed(2)),
+        "Created Date": booking.createdAt,
+      };
+    });
+    // Step 6: Create Excel workbook and write to buffer
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Unpaid Payments");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    const filename = `unpaid_hotel_payments_${
+      new Date().toISOString().split("T")[0]
+    }.xlsx`;
+
+    // Step 7: Send Excel file as response
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting unpaid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+// ✅ Export Paid Hotel Payments as Excel
+exports.exportPaidHotelPayments = async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+
+    let whereClause = { status: "paid" };
+    if (propertyId) {
+      whereClause.propertyId = propertyId;
+    }
+
+    const paidPayments = await HotelPayment.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      order: [["paymentDate", "DESC"]],
+    });
+
+    // Step 1: Create Excel-friendly data
+    const excelData = paidPayments.map((payment, index) => ({
+      "S.No": index + 1,
+      "Booking ID": payment.bookingId,
+      "Property Name": payment.property?.name || "N/A",
+      "Property Email": payment.property?.email || "N/A",
+      "Property Mobile": payment.property?.mobile_number || "N/A",
+      "Check-in Date": payment.checkInDate,
+      "Check-out Date": payment.checkOutDate,
+      Adults: payment.numAdults,
+      Children: payment.numChildren,
+      Rooms: payment.numRooms,
+      "Amount Paid (₹)": payment.amountPaid,
+      "Commission (₹)": payment.commission,
+      "TDS (₹)": payment.tds,
+      "GST (₹)": payment.gst,
+      "Amount paid to hotel (Net Amount ₹)": payment.netAmount,
+      "Payment Date": payment.paymentDate,
+      "Payment Reference": payment.paymentReference || "N/A",
+      "Created Date": payment.createdAt,
+    }));
+
+    // Step 2: Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Paid Payments");
+
+    // Step 3: Write workbook to buffer
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    const filename = `paid_hotel_payments_${
+      new Date().toISOString().split("T")[0]
+    }.xlsx`;
+
+    // Step 4: Send Excel directly as response
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting paid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Mark All Checked-In Bookings for a Property as Paid
+exports.markBookingsAsPaid = async (req, res) => {
+  try {
+    const { paymentReference, propertyId } = req.body;
+
+    if (!propertyId) {
+      return res.status(400).json({
+        success: false,
+        message: "propertyId is required",
+      });
+    }
+
+    // Get commission settings
+    const commissionSettings = await Commission.findOne();
+    const commissionPercentage = commissionSettings
+      ? commissionSettings.commission
+      : 0;
+
+    const createdPayments = [];
+    const errors = [];
+
+    // Step 1: Get all bookings that have already checked in
+    const today = new Date();
+    const checkedInBookings = await property_booking.findAll({
+      where: {
+        property_id: propertyId,
+        payment_status: "paid", // only paid by user
+        booking_status: { [Op.in]: ["confirmed", "completed"] },
+        check_in_date: { [Op.lte]: today }, // already checked in
+      },
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+    });
+
+    // Step 2: Process each booking
+    for (const booking of checkedInBookings) {
+      try {
+        // Skip if already paid to hotel
+        const existingPayment = await HotelPayment.findOne({
+          where: { bookingId: booking.id },
+        });
+        if (existingPayment) {
+          errors.push(
+            `Booking ${booking.id} is already marked as paid to hotel`
+          );
+          continue;
+        }
+
+        // Calculate financial details
+        const amountPaid = booking.amount_paid;
+        const commission = (amountPaid * commissionPercentage) / 100;
+        const tds = commission * 0.02;
+        const gst = commission * 0.18;
+        const netAmount = amountPaid - commission - tds - gst;
+
+        // Create hotel payment record
+        const hotelPayment = await HotelPayment.create({
+          bookingId: booking.id,
+          userId: booking.user_id,
+          propertyId: booking.property_id,
+          checkInDate: booking.check_in_date,
+          checkOutDate: booking.check_out_date,
+          numAdults: booking.num_adults,
+          numChildren: booking.num_children,
+          numRooms: booking.num_rooms,
+          amountPaid: amountPaid,
+          transactionId: booking.transaction_id,
+          tds: tds,
+          gst: gst,
+          commission: commission,
+          netAmount: netAmount,
+          status: "paid",
+          paymentDate: new Date(),
+          paymentReference: paymentReference,
+        });
+
+        createdPayments.push(hotelPayment);
+      } catch (error) {
+        console.error(`Error processing booking ${booking.id}:`, error);
+        errors.push(`Error processing booking ${booking.id}: ${error.message}`);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully processed ${createdPayments.length} bookings for property ${propertyId}`,
+      data: {
+        propertyId,
+        createdPayments: createdPayments.length,
+        totalRequested: checkedInBookings.length,
+        errors,
+      },
+    });
+  } catch (error) {
+    console.error("Error marking bookings as paid:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
