@@ -1097,36 +1097,42 @@ exports.getAllActivePropertiesByRange = async (req, res) => {
     }
     let finalProperties = [];
 
-    if (availableProperties.length === 0) {
-      // fallback: return all active properties (respect property type if given)
-      const whereAll = {
-        active: true,
-        [Op.and]: [].filter(Boolean),
-      };
+    // if (availableProperties.length === 0) {
+    //   // fallback: return all active properties (respect property type if given)
+    //   const whereAll = {
+    //     active: true,
+    //     [Op.and]: [].filter(Boolean),
+    //   };
 
-      if (propertyTypeFilter) {
-        whereAll[Op.and].push(propertyTypeFilter);
-      }
+    //   if (propertyTypeFilter) {
+    //     whereAll[Op.and].push(propertyTypeFilter);
+    //   }
 
-      const allActive = await Property.findAll({ where: whereAll });
+    //   const allActive = await Property.findAll({ where: whereAll });
 
-      finalProperties = await enrichProperties(
-        allActive,
-        startDate,
-        requestedRooms,
-        adults,
-        children
-      );
-    } else {
-      finalProperties = await enrichProperties(
-        availableProperties,
-        startDate,
-        requestedRooms,
-        adults,
-        children
-      );
-    }
-
+    //   finalProperties = await enrichProperties(
+    //     allActive,
+    //     startDate,
+    //     requestedRooms,
+    //     adults,
+    //     children
+    //   );
+    // } else {
+    //   finalProperties = await enrichProperties(
+    //     availableProperties,
+    //     startDate,
+    //     requestedRooms,
+    //     adults,
+    //     children
+    //   );
+    // }
+    finalProperties = await enrichProperties(
+      availableProperties,
+      startDate,
+      requestedRooms,
+      adults,
+      children
+    );
     return res.json({
       success: true,
       status: 200,
