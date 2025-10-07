@@ -61,6 +61,7 @@ const Offers = require("./offers.model")(servicesSequelize);
 const Banquets = require("./banquets.model")(servicesSequelize);
 const Commission = require("./commision.model")(servicesSequelize);
 const HotelPayment = require("./hotel_payment.model")(servicesSequelize);
+const HomeScreenBanner = require("./homescreenbanner.model")(servicesSequelize);
 
 const Property_visits = require("./property_visit.model")(servicesSequelize);
 amenity.belongsTo(amenity_category, {
@@ -279,6 +280,7 @@ const db = {
   Banquets,
   Commission,
   HotelPayment,
+  HomeScreenBanner,
 };
 
 // Setup associations for HotelPayment

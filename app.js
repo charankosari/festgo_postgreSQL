@@ -20,6 +20,7 @@ const RoomRatesRoutes = require("./routes/room_rates.routes");
 const TripRoutes = require("./routes/trip.routes");
 const offerRoutes = require("./routes/offers.routes");
 const hotelRoutes = require("./routes/hotel.routes");
+const homescreenBannerRoutes = require("./routes/homescreenbanner.routes");
 const errorMiddleware = require("./middlewares/error");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
@@ -56,6 +57,7 @@ app.use("/api/upload", upload);
 app.use("/api/property-booking", propertyBookingRoutes);
 app.use("/api/beachfest-booking", beachfestBookingRoutes);
 app.use("/api/cityfest-booking", cityfestBookingRoutes);
+app.use("/api/homescreen-banner", homescreenBannerRoutes);
 app.post("/api/payment/hook", captureHook);
 app.use(errorMiddleware);
 
