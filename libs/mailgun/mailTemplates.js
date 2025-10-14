@@ -449,7 +449,8 @@ exports.settlementAdmin = (
   tdsValue,
   gstPercentage,
   gstValue,
-  amountPaid
+  amountPaid,
+  totalBookings
 ) => {
   return `<!DOCTYPE html>
   <html>
@@ -486,8 +487,12 @@ exports.settlementAdmin = (
                       <td style="padding:10px; background-color:#f8f9fa;">${vendorNumber}</td>
                     </tr>
                     <tr>
-                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">Settlement Date</td>
-                      <td style="padding:10px; background-color:#ffffff;">${settlementDate}</td>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">Settlement Date</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${settlementDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">Total Bookings</td>
+                      <td style="padding:10px; background-color:#ffffff;">${totalBookings}</td>
                     </tr>
                   </table>
 
@@ -541,7 +546,8 @@ exports.settlementVendor = (
   tdsValue,
   gstPercentage,
   gstValue,
-  amountPaid
+  amountPaid,
+  totalBookings
 ) => {
   return `<!DOCTYPE html>
   <html>
@@ -581,6 +587,10 @@ exports.settlementVendor = (
                     <tr>
                       <td style="padding:10px; background-color:#ffffff; border-left:4px solid #4CAF50; font-weight:bold;">Settlement Date</td>
                       <td style="padding:10px; background-color:#ffffff;">${settlementDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #4CAF50; font-weight:bold;">Total Bookings</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${totalBookings}</td>
                     </tr>
                   </table>
 

@@ -869,7 +869,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
           user.email || "",
           user.number || "",
           property.name || "Property",
-          property.location || "",
+          property.location.city || "",
           checkInDate,
           checkOutDate
         );
@@ -899,7 +899,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
             checkInDate,
             checkOutDate,
             property.name || "Property",
-            property.location || ""
+            property.location.city || ""
           );
 
           await sendEmail(

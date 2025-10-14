@@ -21,6 +21,16 @@ const { Op } = require("sequelize");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
+const moment = require("moment");
+const sendEmail = require("../libs/mailgun/mailGun");
+const {
+  settlementAdmin,
+  settlementVendor,
+} = require("../libs/mailgun/mailTemplates");
+const dotenv = require("dotenv");
+
+// Load environment variables
+dotenv.config({ path: path.resolve("./config/config.env") });
 // ✅ Get all vendors
 exports.getAllVendors = async (req, res) => {
   try {
@@ -1423,6 +1433,129 @@ exports.markBookingsAsPaid = async (req, res) => {
       } catch (error) {
         console.error(`Error processing booking ${booking.id}:`, error);
         errors.push(`Error processing booking ${booking.id}: ${error.message}`);
+      }
+    }
+
+    // Send settlement emails if payments were created
+    if (createdPayments.length > 0) {
+      try {
+        // Group payments by property ID
+        const paymentsByProperty = {};
+        createdPayments.forEach((payment) => {
+          if (!paymentsByProperty[payment.propertyId]) {
+            paymentsByProperty[payment.propertyId] = [];
+          }
+          paymentsByProperty[payment.propertyId].push(payment);
+        });
+
+        // Process each property group
+        for (const [propertyId, propertyPayments] of Object.entries(
+          paymentsByProperty
+        )) {
+          try {
+            // Get property and vendor details
+            const property = await Property.findByPk(propertyId);
+            const vendor = await User.findByPk(property.vendorId);
+
+            if (vendor && property) {
+              // Calculate totals for this property's payments
+              const totalAmount = propertyPayments.reduce(
+                (sum, payment) => sum + payment.amountPaid,
+                0
+              );
+              const totalCommission = propertyPayments.reduce(
+                (sum, payment) => sum + payment.commission,
+                0
+              );
+              const totalTds = propertyPayments.reduce(
+                (sum, payment) => sum + payment.tds,
+                0
+              );
+              const totalGst = propertyPayments.reduce(
+                (sum, payment) => sum + payment.gst,
+                0
+              );
+              const totalNetAmount = propertyPayments.reduce(
+                (sum, payment) => sum + payment.netAmount,
+                0
+              );
+
+              // Calculate percentages
+              const tdsPercentage =
+                totalCommission > 0
+                  ? ((totalTds / totalCommission) * 100).toFixed(1)
+                  : "0.0";
+              const gstPercentage =
+                totalCommission > 0
+                  ? ((totalGst / totalCommission) * 100).toFixed(1)
+                  : "0.0";
+
+              const settlementDate = moment().format("DD MMM YYYY");
+              const vendorName =
+                `${vendor.firstname || ""} ${vendor.lastname || ""}`.trim() ||
+                vendor.username ||
+                "Vendor";
+              const totalBookings = propertyPayments.length;
+
+              // Send email to admin
+              const adminEmailHTML = settlementAdmin(
+                vendorName,
+                vendor.email || "",
+                vendor.number || "",
+                settlementDate,
+                totalAmount.toFixed(2),
+                tdsPercentage,
+                totalTds.toFixed(2),
+                gstPercentage,
+                totalGst.toFixed(2),
+                totalNetAmount.toFixed(2),
+                totalBookings
+              );
+
+              await sendEmail(
+                process.env.admin_mail,
+                `Vendor Settlement Details - ${property.name} - Festgo`,
+                adminEmailHTML
+              );
+              console.log(
+                `📧 Settlement email sent to admin for property ${property.name}: ${process.env.admin_mail}`
+              );
+
+              // Send email to vendor
+              const vendorEmailHTML = settlementVendor(
+                vendorName,
+                vendor.email || "",
+                vendor.number || "",
+                settlementDate,
+                totalAmount.toFixed(2),
+                tdsPercentage,
+                totalTds.toFixed(2),
+                gstPercentage,
+                totalGst.toFixed(2),
+                totalNetAmount.toFixed(2),
+                totalBookings
+              );
+
+              await sendEmail(
+                vendor.email,
+                `Settlement Payment Details - ${property.name} - Festgo`,
+                vendorEmailHTML
+              );
+              console.log(
+                `📧 Settlement email sent to vendor ${vendorName} for property ${property.name}: ${vendor.email}`
+              );
+            }
+          } catch (propertyError) {
+            console.error(
+              `❌ Error processing property ${propertyId}:`,
+              propertyError
+            );
+            // Continue with next property even if one fails
+          }
+        }
+      } catch (emailError) {
+        console.error("❌ Error sending settlement emails:", emailError);
+        // Don't fail the main operation if emails fail
       }
     }
 

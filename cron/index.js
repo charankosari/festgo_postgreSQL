@@ -7,6 +7,7 @@ const {
   issueTripsPendingCoins,
   issueCityFestPendingCoins,
 } = require("./issuePendingCoins");
+const sendCheckoutEmails = require("./sendCheckoutEmails");
 
 // 🕒 Run every 2 minutes: Expire stale room bookings
 cron.schedule("*/2 * * * *", () => {
@@ -35,4 +36,10 @@ cron.schedule("*/10 * * * *", () => {
 cron.schedule("*/10 * * * *", () => {
   console.log("🕒 Running cron to clean up zero  bookings...");
   expireZeroBookings();
+});
+
+// 📧 Run every day at 10:00 AM: Send checkout emails
+cron.schedule("0 10 * * *", () => {
+  console.log("📧 Running cron to send checkout emails...");
+  sendCheckoutEmails();
 });
