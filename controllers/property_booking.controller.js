@@ -30,6 +30,11 @@ const moment = require("moment");
 const cancelBookings = require("../utils/cancelBookings");
 const { upsertCronThing } = require("../utils/cronUtils");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
+const sendEmail = require("../libs/mailgun/mailGun");
+const {
+  bookingConfirmationUser,
+  bookingNotificationVendor,
+} = require("../libs/mailgun/mailTemplates");
 const handleUserReferralForPropertyBooking = async (
   referral_id,
   referredUserId,
@@ -837,6 +842,82 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         where: { property_booking_id: bookingId },
         transaction: t,
       });
+    }
+
+    // Send booking confirmation emails
+    try {
+      // Fetch user and property details for emails
+      const user = await User.findByPk(booking.user_id, {
+        transaction: user_tx,
+      });
+      const property = await Property.findByPk(booking.property_id, {
+        transaction: t,
+      });
+
+      if (user && property) {
+        // Format dates for display
+        const checkInDate = moment(booking.check_in_date).format("DD MMM YYYY");
+        const checkOutDate = moment(booking.check_out_date).format(
+          "DD MMM YYYY"
+        );
+
+        // Send email to user
+        const userEmailHTML = bookingConfirmationUser(
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+            user.username ||
+            "User",
+          user.email || "",
+          user.number || "",
+          property.name || "Property",
+          property.location || "",
+          checkInDate,
+          checkOutDate
+        );
+
+        await sendEmail(
+          user.email,
+          "Booking Confirmation - Festgo",
+          userEmailHTML
+        );
+        console.log(
+          `📧 Booking confirmation email sent to user: ${user.email}`
+        );
+
+        // Send email to vendor (property owner)
+        // First, get vendor details from User table
+        const vendor = await User.findByPk(property.vendorId, {
+          transaction: user_tx,
+        });
+
+        if (vendor && vendor.email) {
+          const vendorEmailHTML = bookingNotificationVendor(
+            `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+              user.username ||
+              "User",
+            user.email || "",
+            user.number || "",
+            checkInDate,
+            checkOutDate,
+            property.name || "Property",
+            property.location || ""
+          );
+
+          await sendEmail(
+            vendor.email,
+            "New Booking Notification - Festgo",
+            vendorEmailHTML
+          );
+          console.log(
+            `📧 Booking notification email sent to vendor: ${vendor.email}`
+          );
+        }
+      }
+    } catch (emailError) {
+      console.error(
+        "❌ Error sending booking confirmation emails:",
+        emailError
+      );
+      // Don't fail the booking if email sending fails
     }
 
     await t.commit();
