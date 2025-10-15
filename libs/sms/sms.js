@@ -54,3 +54,21 @@ export async function sendSMS(to, otp) {
     };
   }
 }
+
+export async function sendCustomSMS(to, message, templateId) {
+  try {
+    const encodedMessage = encodeURIComponent(message);
+    const tplId = templateId || process.env.SMS_TEMPLATE_ID;
+    const url = `https://smslogin.co/v3/api.php?username=${process.env.SMS_USERNAME}&apikey=${process.env.SMS_API_KEY}&senderid=${process.env.SMS_SENDER_ID}&mobile=${to}&message=${encodedMessage}&templateid=${tplId}`;
+    const response = await axios.get(url);
+    return {
+      status: "success",
+      response: response.data,
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      error: error.message,
+    };
+  }
+}

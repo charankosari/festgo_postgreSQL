@@ -9,3 +9,16 @@ export const loginOtpTemplate = (otp) => `Dear User,
 Your OTP for Login is ${otp} This OTP is valid for 3 minutes.
 Please do not share OTP with anyone.
 INTECH`;
+
+// Template 3 - Property Booking Confirmation (uses params)
+export const propertyBookingTemplate = ({
+  name,
+  propertyName,
+  checkIn,
+  guests,
+  bookingId,
+  supportPhone,
+}) => `Dear ${name}, your Room booking at ${propertyName} is confirmed!
+Check-in: ${checkIn} | Guests: ${guests}
+Booking ID: ${bookingId}
+Thank you for choosing FestGo! For queries, call ${supportPhone} or visit www.festgo.in`;

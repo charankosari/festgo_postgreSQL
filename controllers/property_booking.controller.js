@@ -845,7 +845,7 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
       });
     }
 
-    // Send booking confirmation emails
+    // Send booking confirmation emails and SMS
     try {
       // Fetch user and property details for emails
       const user = await User.findByPk(booking.user_id, {
@@ -883,6 +883,39 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
         console.log(
           `📧 Booking confirmation email sent to user: ${user.email}`
         );
+
+        // Send confirmation SMS to user using template
+        try {
+          const {
+            propertyBookingTemplate,
+          } = require("../libs/sms/messageTemplates.js");
+          const { sendCustomSMS } = require("../libs/sms/sms.js");
+          const vendor = await User.findByPk(property.vendorId, {
+            transaction: user_tx,
+          });
+          const supportPhone = vendor?.number;
+          const userDisplayName =
+            `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+            user.username ||
+            "User";
+          const message = propertyBookingTemplate({
+            name: userDisplayName,
+            propertyName: property.name || "Property",
+            checkIn: checkInDate,
+            guests: (booking.num_adults || 0) + (booking.num_children || 0),
+            bookingId: booking.reciept,
+            supportPhone,
+          });
+          if (user.number) {
+            await sendCustomSMS(
+              user.number,
+              message,
+              process.env.SMS_PROP_BOOK_TEMPLATE_ID
+            );
+          }
+        } catch (smsErr) {
+          console.error("❌ Error sending booking confirmation SMS:", smsErr);
+        }
 
         // Send email to vendor (property owner)
         // First, get vendor details from User table
