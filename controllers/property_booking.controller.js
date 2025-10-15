@@ -944,6 +944,44 @@ exports.handlePaymentSuccess = async (bookingId, transactionId) => {
           console.log(
             `📧 Booking notification email sent to vendor: ${vendor.email}`
           );
+
+          // Send SMS to vendor using vendor alert template
+          try {
+            const {
+              bookingAlertVendorTemplate,
+            } = require("../libs/sms/messageTemplates.js");
+            const {
+              sendCustomSMS: sendCustomSMSVendor,
+            } = require("../libs/sms/sms.js");
+            if (vendor.number) {
+              const vendorName =
+                `${vendor.firstname || ""} ${vendor.lastname || ""}`.trim() ||
+                vendor.username ||
+                "Partner";
+              const userName =
+                `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+                user.username ||
+                "User";
+              const smsToVendor = bookingAlertVendorTemplate({
+                vendorName,
+                userName,
+                propertyName: property.name || "Property",
+                checkIn: checkInDate,
+                guests: (booking.num_adults || 0) + (booking.num_children || 0),
+                bookingId: booking.reciept,
+              });
+              await sendCustomSMSVendor(
+                vendor.number,
+                smsToVendor,
+                process.env.SMS_VENDOR_BOOK_ALERT_TEMPLATE_ID
+              );
+            }
+          } catch (vendorSmsErr) {
+            console.error(
+              "❌ Error sending vendor booking alert SMS:",
+              vendorSmsErr
+            );
+          }
         }
       }
     } catch (emailError) {

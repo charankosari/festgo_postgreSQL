@@ -22,3 +22,15 @@ export const propertyBookingTemplate = ({
 Check-in: ${checkIn} | Guests: ${guests}
 Booking ID: ${bookingId}
 Thank you for choosing FestGo! For queries, call ${supportPhone} or visit www.festgo.in`;
+
+// Template 4 - Vendor Booking Alert (uses params)
+export const bookingAlertVendorTemplate = ({
+  vendorName,
+  userName,
+  propertyName,
+  checkIn,
+  guests,
+  bookingId,
+}) => `Dear ${vendorName}!
+Booking Alert: ${userName} has booked a room in ${propertyName} via FestGo. Check-in: ${checkIn} | Guests: ${guests} | Booking ID: ${bookingId}
+Get ready to welcome them and make their stay memorable!`;
