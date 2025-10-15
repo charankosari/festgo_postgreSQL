@@ -463,8 +463,9 @@ exports.bookProperty = async (req, res) => {
 
     console.log(amount_to_be_paid);
     let gst_rate = 0;
-    if (amount_to_be_paid >= 8000) gst_rate = 18;
-    else if (amount_to_be_paid >= 1000) gst_rate = 12;
+    if (amount_to_be_paid >= 7501) gst_rate = 18;
+    else if (amount_to_be_paid >= 1001 && amount_to_be_paid <= 7500)
+      gst_rate = 5;
 
     // Best method
     const gst_amount =
