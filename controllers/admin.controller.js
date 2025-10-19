@@ -1352,14 +1352,7 @@ exports.exportPaidHotelPayments = async (req, res) => {
 // ✅ Mark All Checked-In Bookings for a Property as Paid
 exports.markBookingsAsPaid = async (req, res) => {
   try {
-    const { paymentReference, propertyId } = req.body;
-
-    if (!propertyId) {
-      return res.status(400).json({
-        success: false,
-        message: "propertyId is required",
-      });
-    }
+    const { paymentReference, bookingIds } = req.body;
 
     // Get commission settings
     const commissionSettings = await Commission.findOne();
@@ -1372,24 +1365,27 @@ exports.markBookingsAsPaid = async (req, res) => {
 
     // Step 1: Get all bookings that have already checked in
     const today = new Date();
-    const checkedInBookings = await property_booking.findAll({
+    const bookingsToSettle = await property_booking.findAll({
       where: {
-        property_id: propertyId,
-        payment_status: "paid", // only paid by user
-        booking_status: { [Op.in]: ["confirmed", "completed"] },
-        check_in_date: { [Op.lte]: today }, // already checked in
+        id: { [Op.in]: bookingIds },
       },
       include: [
         {
           model: Property,
           as: "property",
-          attributes: ["name", "email", "mobile_number"],
+          attributes: ["name", "email", "mobile_number", "vendorId"], // Ensure vendorId is included
         },
       ],
     });
+    if (bookingsToSettle.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "None of the provided booking IDs were found or eligible.",
+      });
+    }
 
     // Step 2: Process each booking
-    for (const booking of checkedInBookings) {
+    for (const booking of bookingsToSettle) {
       try {
         // Skip if already paid to hotel
         const existingPayment = await HotelPayment.findOne({
@@ -1562,11 +1558,12 @@ exports.markBookingsAsPaid = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Successfully processed ${createdPayments.length} bookings for property ${propertyId}`,
+      // Use a more generic message since there might be multiple properties
+      message: `Successfully processed ${createdPayments.length} of ${bookingIds.length} requested bookings.`,
       data: {
-        propertyId,
         createdPayments: createdPayments.length,
-        totalRequested: checkedInBookings.length,
+        // Use bookingIds.length as the source of truth for what was requested
+        totalRequested: bookingIds.length,
         errors,
       },
     });
