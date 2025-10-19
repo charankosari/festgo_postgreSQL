@@ -1,26 +1,35 @@
 const { HomeScreenBanner } = require("../models/services");
 
 // Upsert homescreen banner (create or update)
+// ✅ Upsert homescreen banner (create or update with an array)
 exports.upsertHomeScreenBanner = async (req, res) => {
   try {
     const { content } = req.body;
 
-    // Validate required fields
-    if (!content || content.trim() === "") {
+    // --- VALIDATION FOR AN ARRAY ---
+    // Check if content is a non-empty array of non-empty strings
+    if (
+      !content ||
+      !Array.isArray(content) ||
+      content.length === 0 ||
+      content.some((item) => typeof item !== "string" || item.trim() === "")
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Content is required and cannot be empty",
+        message:
+          "Content is required and must be a non-empty array of strings.",
         status: 400,
       });
     }
 
-    // Check if a banner already exists
+    // --- UPSERT LOGIC ---
+    // This logic remains the same, but now handles an array.
+    // It assumes you only ever want one banner document in the collection.
     let banner = await HomeScreenBanner.findOne();
 
     if (banner) {
-      // Update existing banner
+      // Update the existing banner's content
       banner.content = content;
-
       await banner.save();
 
       return res.status(200).json({
@@ -30,7 +39,7 @@ exports.upsertHomeScreenBanner = async (req, res) => {
         status: 200,
       });
     } else {
-      // Create new banner
+      // Create a new banner since none exists
       banner = await HomeScreenBanner.create({
         content,
       });
@@ -48,10 +57,10 @@ exports.upsertHomeScreenBanner = async (req, res) => {
       success: false,
       message: "Internal server error",
       status: 500,
+      error: error.message,
     });
   }
 };
-
 // Get homescreen banner
 exports.getHomeScreenBanner = async (req, res) => {
   try {
