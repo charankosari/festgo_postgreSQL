@@ -12,7 +12,9 @@ const {
   Offers,
   zeroBookingInstance,
   sequelize,
-  Festbite, // your services sequelize instance
+  Festbite,
+  city_fest_booking,
+  city_fest, // your services sequelize instance
 } = require("../models/services");
 
 const {
@@ -1269,20 +1271,19 @@ exports.getMyBookings = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-    // const festbites = await Festbite.findAll({
-    //   where: { userId },
-    //   attributes: {
-    //     include: [[sequelize.col("Festbite.imageUrl"), "festbiteImage"]],
-    //   },
-    //   include: [
-    //     {
-    //       model: Festbite,
-    //       attributes: [], // Exclude nested object since we're pulling its value into eventTypeImage
-    //     },
-    //   ],
-    //   order: [["createdAt", "DESC"]],
-    // });
+    const cityfests = await city_fest_booking.findAll({
+      where: { user_id: userId },
+      include: [
+        {
+          model: city_fest,
+          as: "cityFest", // must match your association alias
 
+          attributes: [], // exclude nested cityFest object (flatten if needed)
+          required: true, // ensures only valid fests are returned
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
     // 📌 Final response
     res.status(200).json({
       status: 200,
@@ -1290,6 +1291,7 @@ exports.getMyBookings = async (req, res) => {
       message: "Your bookings fetched successfully.",
       propertyBookings: propertyBookingsWithDetails,
       beachfestBookings: beachfestBookingsWithDetails,
+      cityfests,
       events,
       user,
     });
