@@ -10,13 +10,9 @@ module.exports = (sequelize) => {
         primaryKey: true,
       },
       content: {
-        type: DataTypes.TEXT,
+        type: DataTypes.ARRAY(DataTypes.TEXT),
         allowNull: false,
-        validate: {
-          notEmpty: {
-            msg: "Content cannot be empty",
-          },
-        },
+        defaultValue: [], // It's good practice to provide a default value
       },
     },
     {
