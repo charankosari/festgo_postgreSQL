@@ -13,7 +13,7 @@ const {
 } = require("../models/users");
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const { handleUserReferralForCityFestBooking } = require("../utils/issueCoins"); // You'll need to implement this if not existing
-
+const { upsertCronThing } = require("../utils/cronUtils");
 exports.createCityFestBooking = async (req, res) => {
   // Make sure Op is imported from sequelize: const { Op } = require("sequelize");
   const t = await sequelize.transaction();

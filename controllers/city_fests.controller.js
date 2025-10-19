@@ -1,5 +1,5 @@
 const { city_fest, city_fest_category } = require("../models/services");
-
+const { Op } = require("sequelize");
 // 🎉 Create City Fest Category
 exports.createCityFestCategory = async (req, res) => {
   try {
@@ -211,7 +211,17 @@ exports.deleteCityFest = async (req, res) => {
 exports.getCityFestsByCategory = async (req, res) => {
   try {
     const id = req.params.id;
-    const fests = await city_fest.findAll({ where: { categoryId: id } });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fests = await city_fest.findAll({
+      where: {
+        categoryId: id,
+        event_start: {
+          [Op.gte]: today, // event_start >= today
+        },
+      },
+      order: [["event_start", "ASC"]], // soonest first
+    });
     res.status(200).json({ success: true, fests });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
