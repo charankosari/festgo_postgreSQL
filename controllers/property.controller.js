@@ -12,6 +12,8 @@ const {
   property_booking,
   Property_visits,
   sequelize,
+  Commission,
+  HotelPayment,
 } = require("../models/services/index");
 const {
   review,
@@ -2543,5 +2545,184 @@ exports.getDashboardMetrics = async (req, res) => {
   } catch (error) {
     console.error("Dashboard metrics error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+// ✅ Get Unpaid Hotel Payments (from property_bookings not in hotel_payments)
+exports.getUnpaidHotelPayments = async (req, res) => {
+  try {
+    const userid = req.user.id;
+    const { propertyId, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    const property = await Property.findOne({
+      where: { id: propertyId },
+      attributes: ["id", "vendorId"],
+    });
+
+    if (!property) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Property not found" });
+    }
+
+    if (property.vendorId !== userid) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Access denied. Not your property." });
+    }
+    // Build where clause for property_bookings
+    let bookingWhereClause = {
+      payment_status: "paid", // Only confirmed paid bookings
+      booking_status: { [Op.in]: ["confirmed", "completed"] }, // Only confirmed/completed bookings
+      check_in_date: { [Op.lte]: new Date() },
+    };
+    if (propertyId) {
+      bookingWhereClause.property_id = propertyId;
+    }
+
+    // Get all paid bookings from property_bookings
+    const allPaidBookings = await property_booking.findAll({
+      where: bookingWhereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    const commissionSettings = await Commission.findOne();
+    const commissionPercentage = commissionSettings
+      ? commissionSettings.commission
+      : 0;
+
+    // Get all booking IDs that are already in hotel_payments (already paid to hotels)
+    const paidBookingIds = await HotelPayment.findAll({
+      attributes: ["bookingId"],
+      raw: true,
+    });
+    const paidBookingIdSet = new Set(
+      paidBookingIds.map((item) => item.bookingId)
+    );
+
+    // Filter out bookings that are already paid to hotels
+    const unpaidBookings = allPaidBookings.filter(
+      (booking) => !paidBookingIdSet.has(booking.id)
+    );
+
+    // Apply pagination
+    const totalUnpaid = unpaidBookings.length;
+    const paginatedUnpaid = unpaidBookings.slice(
+      offset,
+      offset + parseInt(limit)
+    );
+
+    // Transform data to match expected format
+    const formattedUnpaid = paginatedUnpaid.map((booking) => {
+      const amountPaid = booking.amount_paid || 0;
+      const commission = (amountPaid * commissionPercentage) / 100;
+      const tds = commission * 0.02; // 2% TDS
+      const gst = commission * 0.18; // 18% GST
+      const netAmount = amountPaid - commission - tds - gst;
+
+      return {
+        id: booking.id,
+        bookingId: booking.id,
+        userId: booking.user_id,
+        propertyId: booking.property_id,
+        checkInDate: booking.check_in_date,
+        checkOutDate: booking.check_out_date,
+        numAdults: booking.num_adults,
+        numChildren: booking.num_children,
+        numRooms: booking.num_rooms,
+        amountPaid: amountPaid,
+        commission: parseFloat(commission.toFixed(2)),
+        commissionPercentage: commissionPercentage,
+        tds: parseFloat(tds.toFixed(2)),
+        gst: parseFloat(gst.toFixed(2)),
+        netAmount: parseFloat(netAmount.toFixed(2)),
+        property: booking.property,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedUnpaid,
+      pagination: {
+        total: totalUnpaid,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalUnpaid / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching unpaid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Get Paid Hotel Payments (from hotel_payments table)
+exports.getPaidHotelPayments = async (req, res) => {
+  try {
+    const { propertyId, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    const property = await Property.findOne({
+      where: { id: propertyId },
+      attributes: ["id", "vendorId"],
+    });
+
+    if (!property) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Property not found" });
+    }
+
+    if (property.vendorId !== userid) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Access denied. Not your property." });
+    }
+    let whereClause = {};
+    if (propertyId) {
+      whereClause.propertyId = propertyId;
+    }
+
+    const paidPayments = await HotelPayment.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Property,
+          as: "property",
+          attributes: ["name", "email", "mobile_number"],
+        },
+      ],
+      order: [["paymentDate", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: paidPayments.rows,
+      pagination: {
+        total: paidPayments.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(paidPayments.count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching paid hotel payments:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
