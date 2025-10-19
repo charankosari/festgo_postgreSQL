@@ -142,5 +142,11 @@ router.post(
   authorizedRoles("admin"),
   adminController.markBookingsAsPaid
 );
+router.get(
+  "/merchant/property-bookings/:id",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getMerchantPropertyBookingsForAdmin
+);
 
 module.exports = router;

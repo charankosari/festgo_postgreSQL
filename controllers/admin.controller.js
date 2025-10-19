@@ -6,6 +6,7 @@ const {
   PlanMyTrips,
   sequelize,
   Festbite,
+  Room,
   Commission,
   HotelPayment,
   property_booking,
@@ -1576,5 +1577,102 @@ exports.markBookingsAsPaid = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+exports.getMerchantPropertyBookingsForAdmin = async (req, res) => {
+  try {
+    const propertyid = req.params.id;
+
+    // 1) Fetch the property (with rooms) by PK
+    const property = await Property.findByPk(propertyid, {
+      include: [
+        {
+          model: Room,
+          as: "rooms",
+          attributes: ["id", "room_type", "meal_plan"],
+        },
+      ],
+      attributes: ["id", "name", "property_type"],
+    });
+
+    if (!property) {
+      return res.status(200).json({ bookings: [] });
+    }
+
+    // 2) Fetch bookings for this single property
+    const bookings = await property_booking.findAll({
+      where: {
+        property_id: property.id,
+        payment_status: { [Op.in]: ["paid", "pending"] },
+      },
+      order: [["check_in_date", "DESC"]],
+    });
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(200).json({ bookings: [] });
+    }
+
+    // 3) Fetch users in bulk
+    const userIds = [
+      ...new Set(bookings.map((b) => b.user_id).filter(Boolean)),
+    ];
+    const users = userIds.length
+      ? await User.findAll({
+          where: { id: { [Op.in]: userIds } },
+          attributes: [
+            "id",
+            "firstname",
+            "lastname",
+            "username",
+            "number",
+            "email",
+          ],
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    // 4) Build room map from the single property's rooms
+    const rooms = Array.isArray(property.rooms) ? property.rooms : [];
+    const roomMap = new Map(rooms.map((r) => [r.id, r]));
+
+    // 5) Transform bookings into desired shape with safe guards
+    const result = bookings.map((booking) => {
+      const user = userMap.get(booking.user_id);
+      const room = roomMap.get(booking.room_id);
+
+      // guest name fallback
+      let guestName = "Guest";
+      if (user) {
+        const first = user.firstname || "";
+        const last = user.lastname || "";
+        guestName =
+          first || last ? `${first} ${last}`.trim() : user.username || "Guest";
+      }
+
+      const numAdults = Number(booking.num_adults) || 0;
+      const numChildren = Number(booking.num_children) || 0;
+
+      return {
+        propertyId: property.id,
+        propertyName: property.name || "Unknown",
+        propertyType: property.property_type || null,
+        guestName,
+        guests: numAdults + numChildren,
+        checkIn: booking.check_in_date,
+        checkOut: booking.check_out_date,
+        roomType: room ? room.room_type : "Unknown",
+        bookingId: booking.id,
+        guestContact: user ? user.number : null,
+        guestEmail: user ? user.email : null,
+        netAmount: booking.amount_paid,
+        paymentStatus: booking.payment_status,
+        bookingType: booking.zero_booking ? "zero booking" : "regular",
+      };
+    });
+
+    return res.status(200).json({ bookings: result });
+  } catch (error) {
+    console.error("Error fetching merchant properties with bookings:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
