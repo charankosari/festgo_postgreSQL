@@ -120,5 +120,17 @@ router.get(
   isAuthorized,
   propertyController.getMerchantPropertyBookings
 );
+router.get(
+  "/payments/settled/",
+  isAuthorized,
+  authorizedRoles("vendor"),
+  propertyController.getPaidHotelPayments
+);
+router.get(
+  "/payments/unsettled/",
+  authorizedRoles("vendor"),
+  isAuthorized,
+  propertyController.getUnpaidHotelPayments
+);
 
 module.exports = router;
