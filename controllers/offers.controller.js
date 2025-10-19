@@ -111,7 +111,7 @@ exports.createOffer = async (req, res) => {
         });
       }
     }
-
+    const isActive = userRole === "vendor" ? false : true;
     const offer = await Offers.create({
       name,
       type,
@@ -128,6 +128,7 @@ exports.createOffer = async (req, res) => {
       description,
       from: userRole,
       vendorId: userId,
+      active: isActive,
     });
 
     return res.status(201).json({
@@ -194,6 +195,7 @@ exports.getOffersForUsers = async (req, res) => {
       where: {
         bookingWindowStart: { [Op.lte]: now },
         bookingWindowEnd: { [Op.gte]: now },
+        active: true,
       },
       raw: true,
     });
@@ -236,5 +238,77 @@ exports.getOffersForUsers = async (req, res) => {
   } catch (error) {
     console.error("Error fetching offers:", error);
     res.status(400).json({ error: "Failed to fetch offers." });
+  }
+};
+exports.activateOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user.role;
+
+    if (userRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can activate offers.",
+      });
+    }
+
+    // Find offer
+    const offer = await Offers.findByPk(id);
+
+    if (!offer) {
+      return res.status(404).json({
+        success: false,
+        message: "Offer not found.",
+      });
+    }
+
+    offer.active = true;
+    await offer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Offer activated successfully.",
+      data: offer,
+    });
+  } catch (error) {
+    console.error("Error activating offer:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to activate offer.",
+      error: error.message,
+    });
+  }
+};
+
+exports.deactivateOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find offer
+    const offer = await Offers.findByPk(id);
+
+    if (!offer) {
+      return res.status(404).json({
+        success: false,
+        message: "Offer not found.",
+      });
+    }
+
+    // Update active status
+    offer.active = false;
+    await offer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Offer deactivated successfully.",
+      data: offer,
+    });
+  } catch (error) {
+    console.error("Error deactivating offer:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to deactivate offer.",
+      error: error.message,
+    });
   }
 };

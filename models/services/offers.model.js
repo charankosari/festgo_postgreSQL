@@ -69,7 +69,10 @@ module.exports = (sequelize) => {
           isIn: [["property", "event", "beach_fests", "city_fests"]],
         },
       },
-
+      active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       description: {
         type: DataTypes.TEXT,
       },
