@@ -1673,3 +1673,163 @@ exports.getMerchantPropertyBookingsForAdmin = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+// ✅ Get all users with role "user"
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const users = await User.findAndCountAll({
+      where: { role: "user" },
+      attributes: [
+        "id",
+        "firstname",
+        "lastname",
+        "username",
+        "email",
+        "number",
+        "image_url",
+        "date_of_birth",
+        "gender",
+        "pincode",
+        "state",
+        "logintype",
+        "billing_address",
+        "referralCode",
+        "createdAt",
+        "updatedAt",
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    // Transform users to include fullName
+    const transformedUsers = users.rows.map((user) => {
+      let fullName = "User";
+
+      if (user.firstname || user.lastname) {
+        const first = user.firstname || "";
+        const last = user.lastname || "";
+        fullName = `${first} ${last}`.trim();
+      } else if (user.username) {
+        fullName = user.username;
+      }
+
+      return {
+        ...user.toJSON(),
+        fullName,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: transformedUsers,
+      pagination: {
+        total: users.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(users.count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ Get user coins and usage history
+exports.getUserCoinsAndHistory = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Check if user exists
+    const user = await User.findByPk(userId, {
+      attributes: ["id", "firstname", "lastname", "username", "email"],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Get all coin transactions for the user
+    const coinTransactions = await FestgoCoinTransaction.findAll({
+      where: { userId: userId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    // Calculate total coins and expired coins
+    const now = new Date();
+    let totalCoins = 0;
+    let expiredCoins = 0;
+
+    coinTransactions.forEach((transaction) => {
+      totalCoins += transaction.remaining;
+      if (transaction.expiresAt < now) {
+        expiredCoins += transaction.remaining;
+      }
+    });
+
+    const activeCoins = totalCoins - expiredCoins;
+
+    // Get coins usage history with pagination
+    const coinsHistory = await FestGoCoinHistory.findAndCountAll({
+      where: { userId: userId },
+      attributes: [
+        "status",
+        "type",
+        "reason",
+        "referenceId",
+        "coins",
+        "createdAt",
+        "updatedAt",
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          name:
+            user.firstname && user.lastname
+              ? `${user.firstname} ${user.lastname}`.trim()
+              : user.username || "User",
+          email: user.email,
+        },
+        coins: {
+          total: totalCoins,
+          active: activeCoins,
+          expired: expiredCoins,
+        },
+        history: coinsHistory.rows,
+        pagination: {
+          total: coinsHistory.count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(coinsHistory.count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user coins and history:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};

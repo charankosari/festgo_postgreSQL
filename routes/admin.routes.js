@@ -149,4 +149,18 @@ router.get(
   adminController.getMerchantPropertyBookingsForAdmin
 );
 
+// ✅ User Management Routes
+router.get(
+  "/users",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getAllUsers
+);
+router.get(
+  "/users/:userId/coins",
+  isAuthorized,
+  authorizedRoles("admin"),
+  adminController.getUserCoinsAndHistory
+);
+
 module.exports = router;
