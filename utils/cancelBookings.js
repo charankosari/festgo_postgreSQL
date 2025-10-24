@@ -4,6 +4,8 @@ const {
   RoomBookedDate,
   beachfests_booking,
   beach_fests,
+  city_fest_booking,
+  city_fest,
   Festbite,
   Event,
   sequelize, // your services sequelize instance
@@ -1017,10 +1019,202 @@ const cancelTripBooking = async (req, res) => {
   }
 };
 
+const cancelCityFestBooking = async (req, res) => {
+  const t = await sequelize.transaction();
+  const user_tx = await usersequel.transaction();
+  try {
+    const { id } = req.params;
+
+    const booking = await city_fest_booking.findByPk(id, { transaction: t });
+    if (!booking || booking.payment_status !== "paid") {
+      await t.rollback();
+      await user_tx.rollback();
+      return res.status(404).json({
+        success: false,
+        message: !booking
+          ? "Booking not found."
+          : "Booking is not eligible for cancellation (payment not completed).",
+      });
+    }
+
+    const fest = await city_fest.findByPk(booking.cityfest_id, {
+      transaction: t,
+    });
+    if (!fest) {
+      await t.rollback();
+      await user_tx.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "CityFest not found." });
+    }
+
+    const today = moment();
+    const eventStartDate = moment(booking.event_start);
+    const daysBeforeEvent = eventStartDate.diff(today, "days");
+
+    let refundPercentage = 0;
+    if (daysBeforeEvent >= 4) {
+      refundPercentage = 100;
+    } else if (daysBeforeEvent >= 2) {
+      refundPercentage = 50;
+    }
+
+    let refundAmount = 0;
+
+    if (refundPercentage > 0 && booking.transaction_id) {
+      const refundableAmount = booking.amount_paid - booking.service_fee;
+
+      refundAmount = Math.round(refundableAmount * (refundPercentage / 100));
+      if (refundAmount > 0) {
+        const refund = await refundPayment({
+          payment_id: booking.transaction_id,
+          amount: refundAmount,
+        });
+      }
+    }
+
+    // 👉 Update fest's available_passes (release the reserved passes)
+    fest.available_passes += booking.passes;
+    await fest.save({ transaction: t });
+
+    // 👉 Update booking status and payment status
+    await booking.update(
+      {
+        booking_status: "cancelled",
+        payment_status:
+          booking.payment_method === "online"
+            ? refundPercentage > 0
+              ? "refunded"
+              : "norefund"
+            : "norefund",
+      },
+      { transaction: t }
+    );
+
+    await FestgoCoinToIssue.update(
+      { status: "cancelled" },
+      {
+        where: {
+          booking_id: booking.id,
+          type: "cityfest_referral",
+          status: "pending",
+        },
+        transaction: user_tx,
+      }
+    );
+
+    await FestGoCoinHistory.update(
+      { status: "not valid" },
+      {
+        where: {
+          referenceId: booking.id,
+          status: "pending",
+          type: "earned",
+        },
+        transaction: user_tx,
+      }
+    );
+    const usedCoinHistory = await FestGoCoinHistory.findOne({
+      where: {
+        referenceId: booking.id,
+        type: "used",
+      },
+      transaction: user_tx,
+    });
+    let refundedCoins = 0;
+    if (usedCoinHistory) {
+      const totalUsedCoins = usedCoinHistory.coins;
+      refundedCoins = Math.floor(totalUsedCoins * (refundPercentage / 100));
+
+      if (refundedCoins > 0) {
+        const txnsToRestore = await FestgoCoinTransaction.findAll({
+          where: {
+            userId: booking.user_id,
+            expiresAt: {
+              [Op.gte]: new Date(),
+            },
+          },
+          order: [["expiresAt", "ASC"]],
+
+          transaction: user_tx,
+        });
+
+        let remainingToRefund = refundedCoins;
+
+        for (const txn of txnsToRestore) {
+          const originallyUsed = txn.amount - txn.remaining;
+          const refundable = Math.min(originallyUsed, remainingToRefund);
+
+          if (refundable <= 0) continue;
+
+          txn.remaining += refundable;
+          remainingToRefund -= refundable;
+
+          await txn.save({ transaction: user_tx });
+
+          if (remainingToRefund <= 0) break;
+        }
+        if (remainingToRefund > 0) {
+          await FestgoCoinTransaction.create(
+            {
+              userId: booking.user_id,
+              type: "refund_grace_period",
+              amount: remainingToRefund,
+              remaining: remainingToRefund,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            },
+            { transaction: user_tx }
+          );
+        }
+        // Mark original usage history as not valid
+        await usedCoinHistory.update(
+          { status: "not valid" },
+          { transaction: user_tx }
+        );
+
+        // Create new refund coin history
+        await FestGoCoinHistory.create(
+          {
+            userId: booking.user_id,
+            type: "refund",
+            reason: "booking_cancelled",
+            referenceId: booking.id,
+            coins: refundedCoins,
+            status: "issued",
+            metaData: {
+              booking_amount: booking.amount_paid,
+              refund_percentage: refundPercentage,
+            },
+          },
+          { transaction: user_tx }
+        );
+      }
+    }
+    await t.commit();
+    await user_tx.commit();
+
+    res.status(200).json({
+      success: true,
+      message:
+        refundPercentage > 0
+          ? `City Fest booking cancelled successfully. ₹${refundAmount} refunded (excluding service fee).`
+          : "City Fest booking cancelled successfully. No refund applicable.",
+      refundAmount,
+      refundPercentage,
+    });
+  } catch (error) {
+    console.error("Error cancelling city fest booking:", error);
+    await t.rollback();
+    await user_tx.rollback();
+    res.status(500).json({ success: false, message: "Something went wrong." });
+  }
+};
+
 module.exports = {
   cancelPropertyBooking,
   cancelEventBooking,
   cancelBeachFestBooking,
+  cancelCityFestBooking,
   cancelFestbite,
   cancelPlanmytrip,
   cancelTripBooking,
