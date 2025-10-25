@@ -15,6 +15,18 @@ exports.createTripBooking = async (req, res) => {
   const t = await sequelize.transaction();
   const user_tx = await usersequel.transaction();
 
+  // Helper to safely rollback if transaction not finished
+  const safeRollback = async (trx) => {
+    try {
+      if (trx && !trx.finished) {
+        await trx.rollback();
+      }
+    } catch (err) {
+      // log but don't throw - we are already handling an error case
+      console.warn("safeRollback warning:", err && err.message);
+    }
+  };
+
   try {
     const {
       id, // tripId
@@ -22,33 +34,83 @@ exports.createTripBooking = async (req, res) => {
       number,
       email,
       payment_method,
-      numberOfPersons,
+      numberOfPersons, // expecting a number (e.g. 4)
       referral_id,
       requestedCoins,
     } = req.body;
 
     const userId = req.user.id;
+
+    // Validate numberOfPersons — must be a positive integer and passed as a number (or numeric string)
+    const numPersons = parseInt(numberOfPersons, 10);
+    if (!Number.isInteger(numPersons) || numPersons <= 0) {
+      await safeRollback(t);
+      await safeRollback(user_tx);
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid numberOfPersons." });
+    }
+
     const trip = await Trips.findByPk(id, {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
+
     if (!trip) {
-      await t.rollback();
-      await user_tx.rollback();
+      await safeRollback(t);
+      await safeRollback(user_tx);
       return res
         .status(404)
         .json({ success: false, message: "Trip not found." });
     }
-    const baseAmount = trip.pricing?.price_per_person
-      ? trip.pricing.price_per_person * numberOfPersons
-      : 0;
+
+    // Require exact match in pricing JSONB for the requested numberOfPersons
+    const pricingObj = trip.pricing || {};
+    const tierKey = String(numPersons);
+    if (!Object.prototype.hasOwnProperty.call(pricingObj, tierKey)) {
+      await safeRollback(t);
+      await safeRollback(user_tx);
+      // Optionally include available tiers in the response to help clients
+      const availableTiers = Object.keys(pricingObj);
+      return res.status(400).json({
+        success: false,
+        message: `Selected group size (${numPersons}) not applicable for this trip.`,
+        availableTiers,
+      });
+    }
+
+    // extract price-per-person (support number or { price_per_person: X })
+    let pricePerPerson = 0;
+    const tierValue = pricingObj[tierKey];
+    if (typeof tierValue === "number") {
+      pricePerPerson = tierValue;
+    } else if (
+      tierValue &&
+      typeof tierValue === "object" &&
+      tierValue.price_per_person
+    ) {
+      pricePerPerson = parseFloat(tierValue.price_per_person) || 0;
+    } else {
+      // malformed tier value
+      await safeRollback(t);
+      await safeRollback(user_tx);
+      return res.status(500).json({
+        success: false,
+        message: `Pricing for group size ${numPersons} is malformed.`,
+      });
+    }
+
+    const baseAmount = pricePerPerson * numPersons;
+
     let coinResult = {
       usable_coins: 0,
       coins_discount_value: 0,
       amount_to_be_paid: baseAmount,
       coin_history_inputs: null,
     };
-    if (requestedCoins && requestedCoins > 0) {
+
+    if (requestedCoins && Number(requestedCoins) > 0) {
+      // applyUsableFestgoCoins might throw — let it bubble to catch where we safeRollback
       coinResult = await applyUsableFestgoCoins({
         userId,
         requestedCoins,
@@ -59,6 +121,7 @@ exports.createTripBooking = async (req, res) => {
         id: trip.id,
       });
     }
+
     let gstPercentage = 0;
     let serviceFee = 50;
     const afterCoinAmount = coinResult.amount_to_be_paid;
@@ -79,6 +142,7 @@ exports.createTripBooking = async (req, res) => {
 
     const gstAmount = ((afterCoinAmount + serviceFee) * gstPercentage) / 100;
     const totalPayable = afterCoinAmount + serviceFee + gstAmount;
+
     const newBooking = await TripsBooking.create(
       {
         userId,
@@ -87,7 +151,7 @@ exports.createTripBooking = async (req, res) => {
         number,
         email,
         payment_method,
-        numberOfPersons,
+        numberOfPersons: numPersons,
         startDate: trip.startDate,
         endDate: trip.endDate,
         service_fee: serviceFee,
@@ -133,6 +197,7 @@ exports.createTripBooking = async (req, res) => {
       });
     }
 
+    // commit both transactions
     await t.commit();
     await user_tx.commit();
 
@@ -142,9 +207,10 @@ exports.createTripBooking = async (req, res) => {
       data: { booking: newBooking, razorpayOrder },
     });
   } catch (error) {
+    // Safe rollbacks — will not attempt to rollback already finished transactions
     console.error("Error in createTripBooking:", error);
-    await t.rollback();
-    await user_tx.rollback();
+    await safeRollback(t);
+    await safeRollback(user_tx);
     return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
@@ -222,7 +288,7 @@ exports.handleTripPaymentSuccess = async (bookingId, transactionId) => {
         transaction: user_tx,
       }
     );
-    await upsertCronThing({ name: "trips_coins_issue", transaction: t });
+    await upsertCronThing({ entity: "trips_coins_issue", transaction: t });
 
     // Commit all changes
     await t.commit();
