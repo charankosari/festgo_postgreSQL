@@ -295,6 +295,18 @@ HotelPayment.belongsTo(Property, {
   onDelete: "CASCADE",
 });
 
+// Setup associations for Trips and TripsBooking
+Trips.hasMany(TripsBooking, {
+  foreignKey: "tripId",
+  as: "bookings",
+  onDelete: "CASCADE",
+});
+TripsBooking.belongsTo(Trips, {
+  foreignKey: "tripId",
+  as: "trip",
+  onDelete: "CASCADE",
+});
+
 // Sync all models
 servicesSequelize
   .sync({ alter: true })

@@ -14,7 +14,10 @@ const {
   sequelize,
   Festbite,
   city_fest_booking,
-  city_fest, // your services sequelize instance
+  city_fest,
+  TripsBooking,
+  Trips,
+  PlanMyTrips, // your services sequelize instance
 } = require("../models/services");
 
 const {
@@ -1284,6 +1287,75 @@ exports.getMyBookings = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
+
+    // 📌 Fetch trips bookings (paid/refunded)
+    const tripsBookings = await TripsBooking.findAll({
+      where: {
+        userId: userId,
+        payment_status: {
+          [Op.in]: ["paid", "refunded", "norefund"],
+        },
+      },
+      order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: Trips,
+          as: "trip",
+          attributes: [
+            "tripName",
+            "imageUrl",
+            "startDate",
+            "endDate",
+            "numberOfDays",
+            "highlights",
+            "pickupLocation",
+            "inclusions",
+          ],
+        },
+      ],
+    });
+
+    const tripsBookingsWithDetails = tripsBookings.map((booking) => {
+      return {
+        ...booking.toJSON(),
+        trip_name: booking.trip ? booking.trip.tripName : null,
+        trip_image: booking.trip ? booking.trip.imageUrl : null,
+        trip_startDate: booking.trip ? booking.trip.startDate : null,
+        trip_endDate: booking.trip ? booking.trip.endDate : null,
+        trip_numberOfDays: booking.trip ? booking.trip.numberOfDays : null,
+        trip_highlights: booking.trip ? booking.trip.highlights : null,
+        trip_pickupLocation: booking.trip ? booking.trip.pickupLocation : null,
+        trip_inclusions: booking.trip ? booking.trip.inclusions : null,
+      };
+    });
+
+    // 📌 Fetch planmytrips with a random trip image
+    const planmytrips = await PlanMyTrips.findAll({
+      where: { userId: userId },
+      order: [["createdAt", "DESC"]],
+    });
+    const tomorrow = moment()
+      .add(1, "days")
+      .startOf("day")
+      .format("YYYY-MM-DD");
+
+    const randomTrip = await Trips.findOne({
+      where: {
+        startDate: {
+          [Op.gte]: tomorrow,
+        },
+      },
+      attributes: ["imageUrl"],
+      order: sequelize.random(),
+    });
+
+    const planmytripsWithDetails = planmytrips.map((trip) => {
+      return {
+        ...trip.toJSON(),
+        image_url: randomTrip ? randomTrip.imageUrl : "",
+      };
+    });
+
     // 📌 Final response
     res.status(200).json({
       status: 200,
@@ -1292,6 +1364,8 @@ exports.getMyBookings = async (req, res) => {
       propertyBookings: propertyBookingsWithDetails,
       beachfestBookings: beachfestBookingsWithDetails,
       cityfests,
+      tripsBookings: tripsBookingsWithDetails,
+      planmytrips: planmytripsWithDetails,
       events,
       user,
     });
