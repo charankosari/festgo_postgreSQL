@@ -207,7 +207,7 @@ const handleUserReferralForPropertyBooking = async (
   }
 };
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const generateReferNo = customAlphabet(alphabet, 8);
+const generateReferNo = customAlphabet(alphabet, 12);
 exports.bookProperty = async (req, res) => {
   const t = await sequelize.transaction({
     isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
@@ -490,8 +490,22 @@ exports.bookProperty = async (req, res) => {
     // ✅ Gross amount to be paid before discounts or coins
     const gross_payable = amount_to_be_paid + gst_amount + service_fee;
     console.log("Gross Payable:", gross_payable);
+
+    // Generate unique receipt number
+    let reciept_no;
+    let isUnique = false;
+    while (!isUnique) {
+      reciept_no = generateReferNo();
+      const existingBooking = await property_booking.findOne({
+        where: { reciept: reciept_no },
+        transaction: t,
+      });
+      if (!existingBooking) {
+        isUnique = true;
+      }
+    }
+
     // Create booking
-    const reciept_no = generateReferNo();
     const newBooking = await property_booking.create(
       {
         user_id: userId,
