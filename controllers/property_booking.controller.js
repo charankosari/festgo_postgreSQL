@@ -1316,8 +1316,12 @@ exports.getMyBookings = async (req, res) => {
     });
 
     const tripsBookingsWithDetails = tripsBookings.map((booking) => {
+      const bookingData = booking.toJSON();
+      // Remove the nested trip object to avoid duplication
+      delete bookingData.trip;
+
       return {
-        ...booking.toJSON(),
+        ...bookingData,
         trip_name: booking.trip ? booking.trip.tripName : null,
         trip_image: booking.trip ? booking.trip.imageUrl : null,
         trip_startDate: booking.trip ? booking.trip.startDate : null,
