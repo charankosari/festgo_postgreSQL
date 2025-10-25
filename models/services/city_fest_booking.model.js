@@ -92,6 +92,10 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      reciept: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       payment_status: {
         type: DataTypes.ENUM(
           "pending",

@@ -14,6 +14,11 @@ const {
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const { handleUserReferralForCityFestBooking } = require("../utils/issueCoins"); // You'll need to implement this if not existing
 const { upsertCronThing } = require("../utils/cronUtils");
+const { customAlphabet } = require("nanoid");
+
+// Generate unique receipt number
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const generateReferNo = customAlphabet(alphabet, 12);
 exports.createCityFestBooking = async (req, res) => {
   // Make sure Op is imported from sequelize: const { Op } = require("sequelize");
   const t = await sequelize.transaction();
@@ -139,6 +144,20 @@ exports.createCityFestBooking = async (req, res) => {
     const gstAmount = ((afterCoinAmount + serviceFee) * gstPercentage) / 100;
     const totalPayable = afterCoinAmount + serviceFee + gstAmount;
 
+    // Generate unique receipt number
+    let reciept_no;
+    let isUnique = false;
+    while (!isUnique) {
+      reciept_no = generateReferNo();
+      const existingBooking = await city_fest_booking.findOne({
+        where: { reciept: reciept_no },
+        transaction: t,
+      });
+      if (!existingBooking) {
+        isUnique = true;
+      }
+    }
+
     const newBooking = await city_fest_booking.create(
       {
         user_id: userId,
@@ -162,6 +181,7 @@ exports.createCityFestBooking = async (req, res) => {
         amount_paid: parseFloat(totalPayable.toFixed(2)),
         payment_status: "pending",
         booking_status: "pending",
+        reciept: reciept_no,
       },
       { transaction: t }
     );

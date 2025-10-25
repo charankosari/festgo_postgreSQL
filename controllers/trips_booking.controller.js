@@ -11,6 +11,11 @@ const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const { handleReferralForTrips } = require("../utils/issueCoins");
 const { Op, Transaction } = require("sequelize");
 const { upsertCronThing } = require("../utils/cronUtils");
+const { customAlphabet } = require("nanoid");
+
+// Generate unique receipt number
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const generateReferNo = customAlphabet(alphabet, 12);
 exports.createTripBooking = async (req, res) => {
   const t = await sequelize.transaction();
   const user_tx = await usersequel.transaction();
@@ -143,6 +148,20 @@ exports.createTripBooking = async (req, res) => {
     const gstAmount = ((afterCoinAmount + serviceFee) * gstPercentage) / 100;
     const totalPayable = afterCoinAmount + serviceFee + gstAmount;
 
+    // Generate unique receipt number
+    let reciept_no;
+    let isUnique = false;
+    while (!isUnique) {
+      reciept_no = generateReferNo();
+      const existingBooking = await TripsBooking.findOne({
+        where: { reciept: reciept_no },
+        transaction: t,
+      });
+      if (!existingBooking) {
+        isUnique = true;
+      }
+    }
+
     const newBooking = await TripsBooking.create(
       {
         userId,
@@ -163,6 +182,7 @@ exports.createTripBooking = async (req, res) => {
         booking_status: "pending",
         festgo_coins_used: coinResult.usable_coins,
         coins_discount_value: coinResult.coins_discount_value,
+        reciept: reciept_no,
       },
       { transaction: t }
     );

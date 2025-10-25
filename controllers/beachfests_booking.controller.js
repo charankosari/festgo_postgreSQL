@@ -18,6 +18,11 @@ const {
 const { applyUsableFestgoCoins } = require("../utils/festgo_coins_apply");
 const { Op } = require("sequelize");
 const { upsertCronThing } = require("../utils/cronUtils");
+const { customAlphabet } = require("nanoid");
+
+// Generate unique receipt number
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const generateReferNo = customAlphabet(alphabet, 12);
 exports.createBeachFestBooking = async (req, res) => {
   const t = await sequelize.transaction();
   const user_tx = await usersequel.transaction();
@@ -138,6 +143,20 @@ exports.createBeachFestBooking = async (req, res) => {
     const gstAmount = ((afterCoinAmount + serviceFee) * gstPercentage) / 100;
     const totalPayable = afterCoinAmount + serviceFee + gstAmount;
 
+    // Generate unique receipt number
+    let reciept_no;
+    let isUnique = false;
+    while (!isUnique) {
+      reciept_no = generateReferNo();
+      const existingBooking = await beachfests_booking.findOne({
+        where: { reciept: reciept_no },
+        transaction: t,
+      });
+      if (!existingBooking) {
+        isUnique = true;
+      }
+    }
+
     // 3️⃣ Create Booking
     const newBooking = await beachfests_booking.create(
       {
@@ -162,6 +181,7 @@ exports.createBeachFestBooking = async (req, res) => {
         festgo_coin_discount: coinResult.coins_discount_value,
         offer_discount,
         coupon_code: applied_offer_id,
+        reciept: reciept_no,
       },
       { transaction: t }
     );

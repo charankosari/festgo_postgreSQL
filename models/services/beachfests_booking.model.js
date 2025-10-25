@@ -50,7 +50,10 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 1,
       },
-
+      reciept: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       event_start: {
         type: DataTypes.DATE,
         allowNull: false,
