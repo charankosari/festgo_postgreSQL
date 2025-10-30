@@ -29,6 +29,8 @@ exports.createBeachFest = async (req, res) => {
     }
     // Add vendor_id from authenticated user
     data.vendor_id = req.user.id;
+    // Add added_by from user's role
+    data.added_by = req.user.role;
     const newFest = await beach_fests.create(data);
 
     res.status(201).json({
@@ -60,6 +62,11 @@ exports.updateBeachFest = async (req, res) => {
         success: false,
         message: "Unauthorized: Only the owner vendor can edit this beach fest",
       });
+    }
+
+    // Prevent updating added_by field
+    if (data.added_by !== undefined) {
+      delete data.added_by;
     }
 
     // Validate dates if provided

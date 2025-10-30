@@ -72,9 +72,17 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      added_by: {
+        type: DataTypes.STRING,
+        validate: {
+          isIn: [["vendor", "admin"]],
+        },
+        defaultValue: "admin",
+      },
+
       vendor_id: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
       },
     },
     {

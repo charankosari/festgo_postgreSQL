@@ -11,4 +11,12 @@ router.post(
   rateController.submitRoomRates
 );
 
+// 📌 Get prices/inventory for a room on a specific date
+router.post(
+  "/get-room-rate",
+  isAuthorized,
+  authorizedRoles("admin", "vendor"),
+  rateController.getRoomRatesForDate
+);
+
 module.exports = router;
