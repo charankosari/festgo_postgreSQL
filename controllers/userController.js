@@ -251,7 +251,7 @@ exports.forgotPassword = async (req, res) => {
   await user.save();
 
   const resetUrl = `${process.env.RESET_URL}/?token=${resetToken}`;
-
+  console.log("Reset URL:", resetUrl);
   // Create HTML email template
   const displayName = user.username ? user.username : user;
   const htmlContent = changePasswordTemplate(displayName, resetUrl);

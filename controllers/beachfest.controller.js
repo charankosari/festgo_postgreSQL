@@ -27,6 +27,8 @@ exports.createBeachFest = async (req, res) => {
         message: "eventStart cannot be in the past",
       });
     }
+    // Add vendor_id from authenticated user
+    data.vendor_id = req.user.id;
     const newFest = await beach_fests.create(data);
 
     res.status(201).json({
@@ -50,6 +52,14 @@ exports.updateBeachFest = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Beach fest not found" });
+    }
+
+    // Only allow update by vendor who owns the fest
+    if (fest.vendor_id !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only the owner vendor can edit this beach fest",
+      });
     }
 
     // Validate dates if provided
@@ -200,20 +210,44 @@ exports.getBeachFestsByType = async (req, res) => {
   }
 };
 
+// ✅ Get Beach Fests by Merchant (Vendor)
+exports.getBeachFestsByMerchant = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const fests = await beach_fests.findAll({
+      where: { vendor_id: vendorId },
+      order: [["createdAt", "DESC"]],
+    });
+    res.status(200).json({
+      success: true,
+      message: "Beach fests fetched for merchant successfully",
+      data: fests,
+    });
+  } catch (error) {
+    console.error("Error fetching beach fests for merchant:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ✅ Delete a Beach Fest
 exports.deleteBeachFest = async (req, res) => {
   try {
     const { id } = req.params;
-
     const fest = await beach_fests.findByPk(id);
     if (!fest) {
       return res
         .status(404)
         .json({ success: false, message: "Beach fest not found" });
     }
-
+    // Only allow admin or owning vendor to delete
+    if (req.user.role !== "admin" && fest.vendor_id !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Unauthorized: Only admin or the owner vendor can delete this beach fest",
+      });
+    }
     await fest.destroy();
-
     res.status(200).json({
       success: true,
       message: "Beach fest deleted successfully",
