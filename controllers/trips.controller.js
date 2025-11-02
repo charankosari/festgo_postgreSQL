@@ -160,7 +160,64 @@ exports.getValidTrips = async (req, res) => {
       },
     });
 
-    res.json({ success: true, trips });
+    // Helper function to format price with Indian currency
+    const formatPrice = (price) => {
+      return `₹ ${price.toLocaleString("en-IN")} per person`;
+    };
+
+    // Transform trips to convert pricing object to array format (excluding image)
+    const transformedTrips = trips.map((trip) => {
+      const tripData = trip.toJSON();
+
+      // Transform pricing from object format { "4": 5000, "8": 3000, "16": 2000 } to array format
+      if (tripData.pricing) {
+        // If pricing is already an array, just remove image field
+        if (Array.isArray(tripData.pricing)) {
+          tripData.pricing = tripData.pricing.map((priceItem) => {
+            if (priceItem && typeof priceItem === "object") {
+              const { image, ...priceWithoutImage } = priceItem;
+              return priceWithoutImage;
+            }
+            return priceItem;
+          });
+        }
+        // If pricing is an object like { "4": 5000, "8": 3000, "16": 2000 }
+        else if (
+          tripData.pricing &&
+          typeof tripData.pricing === "object" &&
+          !Array.isArray(tripData.pricing)
+        ) {
+          const pricingArray = [];
+          let id = 1;
+
+          // Sort keys numerically to ensure consistent order
+          const sortedKeys = Object.keys(tripData.pricing).sort(
+            (a, b) => Number(a) - Number(b)
+          );
+
+          sortedKeys.forEach((memberCount) => {
+            const priceValue = tripData.pricing[memberCount];
+            const numMemberCount = Number(memberCount);
+
+            // Only include numeric price values
+            if (typeof priceValue === "number") {
+              pricingArray.push({
+                id: id++,
+                title: `For ${numMemberCount} member`,
+                price: formatPrice(priceValue),
+                // Note: image is excluded from response as requested
+              });
+            }
+          });
+
+          tripData.pricing = pricingArray;
+        }
+      }
+
+      return tripData;
+    });
+
+    res.json({ success: true, trips: transformedTrips });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

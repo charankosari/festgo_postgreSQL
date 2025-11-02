@@ -632,3 +632,277 @@ exports.settlementVendor = (
     </body>
   </html>`;
 };
+
+// Event Booking Cancellation - Customer Email
+exports.eventBookingCancellationCustomer = ({
+  customerName,
+  eventName,
+  venueName,
+  date,
+  bookingId,
+  numberOfGuests,
+}) => {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Event Booking Cancelled</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f4">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:20px 0; padding:20px; border-radius:8px;">
+              <tr>
+                <td align="center" style="padding: 20px 0;">
+                  <h1 style="font-family:Arial, sans-serif; color:#333333; margin:0;">FestGo 🌴</h1>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 20px; font-family:Arial, sans-serif; color:#333333; font-size:16px;">
+                  <p>Dear <strong>${customerName}</strong>,</p>
+                  <p>Your event booking for <strong>${eventName}</strong> at <strong>${venueName}</strong> scheduled on <strong>${date}</strong> has been successfully cancelled.</p>
+
+                  <table cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; width:100%;">
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">Booking ID</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${bookingId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">Tickets/Guests</td>
+                      <td style="padding:10px; background-color:#ffffff;">${numberOfGuests}</td>
+                    </tr>
+                  </table>
+
+                  <p>If you made a payment, your refund (if applicable) will be processed within 3–5 working days to your original payment method.</p>
+                  <p>We hope to see you at another exciting FestGo event soon! 🎉</p>
+                  <p>Thank you for using FestGo.</p>
+
+                  <p style="margin-top:30px;">Warm regards,<br/><strong>Team FestGo 🌴</strong></p>
+                  <p style="margin-top:10px;"><a href="http://www.festgo.in" style="color:#4CAF50; text-decoration:none;">www.festgo.in</a></p>
+                </td>
+              </tr>
+
+              <tr>
+                <td align="center" style="padding: 20px; font-family:Arial, sans-serif; color:#aaaaaa; font-size:12px;">
+                  © 2025 FestGo. All rights reserved.
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+};
+
+// Event Booking Cancellation - Organizer Email
+exports.eventBookingCancellationOrganizer = ({
+  organizerName,
+  customerName,
+  eventName,
+  venueName,
+  date,
+  bookingId,
+  numberOfGuests,
+}) => {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Event Booking Cancelled - Notification</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f4">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:20px 0; padding:20px; border-radius:8px;">
+              <tr>
+                <td align="center" style="padding: 20px 0;">
+                  <h1 style="font-family:Arial, sans-serif; color:#333333; margin:0;">FestGo Partner 🌴</h1>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 20px; font-family:Arial, sans-serif; color:#333333; font-size:16px;">
+                  <p>Dear <strong>${organizerName}</strong>,</p>
+                  <p>Please note that <strong>${customerName}</strong> has cancelled their event booking for <strong>${eventName}</strong> at <strong>${venueName}</strong> through FestGo.</p>
+
+                  <table cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; width:100%;">
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">📅 Date</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${date}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">🆔 Booking ID</td>
+                      <td style="padding:10px; background-color:#ffffff;">${bookingId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">👥 Guests/Tickets</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${numberOfGuests}</td>
+                    </tr>
+                  </table>
+
+                  <p>The cancelled slots are now open for new reservations.</p>
+                  <p>Please update your availability on the <strong>FestGo Partner Dashboard</strong> to receive new bookings.</p>
+                  <p>Thank you for being a valued FestGo partner!</p>
+
+                  <p style="margin-top:30px;">Best regards,<br/><strong>Team FestGo 🌴</strong></p>
+                  <p style="margin-top:10px;">
+                    <strong>Partner Support:</strong> <a href="mailto:support@festgo.in" style="color:#4CAF50; text-decoration:none;">support@festgo.in</a>
+                  </p>
+                  <p style="margin-top:5px;"><a href="http://www.festgo.in" style="color:#4CAF50; text-decoration:none;">www.festgo.in</a></p>
+                </td>
+              </tr>
+
+              <tr>
+                <td align="center" style="padding: 20px; font-family:Arial, sans-serif; color:#aaaaaa; font-size:12px;">
+                  © 2025 FestGo. All rights reserved.
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+};
+
+// Resort Booking Cancellation - Customer Email
+exports.resortBookingCancellationCustomer = ({
+  customerName,
+  resortName,
+  date,
+  bookingId,
+  numberOfGuests,
+}) => {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Resort Booking Cancelled</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f4">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:20px 0; padding:20px; border-radius:8px;">
+              <tr>
+                <td align="center" style="padding: 20px 0;">
+                  <h1 style="font-family:Arial, sans-serif; color:#333333; margin:0;">FestGo 🌴</h1>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 20px; font-family:Arial, sans-serif; color:#333333; font-size:16px;">
+                  <p>Dear <strong>${customerName}</strong>,</p>
+                  <p>Your booking at <strong>${resortName}</strong> scheduled for <strong>${date}</strong> has been successfully cancelled.</p>
+
+                  <table cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; width:100%;">
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">Booking ID</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${bookingId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">Guests</td>
+                      <td style="padding:10px; background-color:#ffffff;">${numberOfGuests}</td>
+                    </tr>
+                  </table>
+
+                  <p>If a payment was made, your refund (if applicable) will be processed within 3–5 working days to your original payment method.</p>
+                  <p>We're sorry to miss you this time, but we hope to host you soon at another great resort or event on FestGo!</p>
+
+                  <p style="margin-top:30px;">Warm regards,<br/><strong>Team FestGo 🌴</strong></p>
+                  <p style="margin-top:10px;"><a href="http://www.festgo.in" style="color:#4CAF50; text-decoration:none;">www.festgo.in</a></p>
+                </td>
+              </tr>
+
+              <tr>
+                <td align="center" style="padding: 20px; font-family:Arial, sans-serif; color:#aaaaaa; font-size:12px;">
+                  © 2025 FestGo. All rights reserved.
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+};
+
+// Resort Booking Cancellation - Owner Email
+exports.resortBookingCancellationOwner = ({
+  ownerName,
+  customerName,
+  resortName,
+  date,
+  bookingId,
+  numberOfGuests,
+}) => {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Resort Booking Cancelled - Notification</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f4">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin:20px 0; padding:20px; border-radius:8px;">
+              <tr>
+                <td align="center" style="padding: 20px 0;">
+                  <h1 style="font-family:Arial, sans-serif; color:#333333; margin:0;">FestGo Partner 🌴</h1>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 20px; font-family:Arial, sans-serif; color:#333333; font-size:16px;">
+                  <p>Dear <strong>${ownerName}</strong>,</p>
+                  <p>This is to inform you that <strong>${customerName}</strong> has cancelled their booking at <strong>${resortName}</strong> through FestGo.</p>
+
+                  <h3 style="color:#333333; margin:20px 0 10px 0; font-size:18px;">Booking Details:</h3>
+                  <table cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; width:100%;">
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">Booking ID</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${bookingId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#ffffff; border-left:4px solid #FF6B35; font-weight:bold;">Date</td>
+                      <td style="padding:10px; background-color:#ffffff;">${date}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px; background-color:#f8f9fa; border-left:4px solid #FF6B35; font-weight:bold;">Guests</td>
+                      <td style="padding:10px; background-color:#f8f9fa;">${numberOfGuests}</td>
+                    </tr>
+                  </table>
+
+                  <p>The booking slot is now open for new reservations.</p>
+                  <p>Please update your availability on your <strong>FestGo Partner Dashboard</strong> to accept new bookings.</p>
+                  <p>Thank you for your continued partnership with FestGo!</p>
+
+                  <p style="margin-top:30px;">Best regards,<br/><strong>Team FestGo 🌴</strong></p>
+                  <p style="margin-top:10px;">
+                    <strong>Partner Support:</strong> <a href="mailto:support@festgo.in" style="color:#4CAF50; text-decoration:none;">support@festgo.in</a>
+                  </p>
+                  <p style="margin-top:5px;"><a href="http://www.festgo.in" style="color:#4CAF50; text-decoration:none;">www.festgo.in</a></p>
+                </td>
+              </tr>
+
+              <tr>
+                <td align="center" style="padding: 20px; font-family:Arial, sans-serif; color:#aaaaaa; font-size:12px;">
+                  © 2025 FestGo. All rights reserved.
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+};
