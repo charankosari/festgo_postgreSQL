@@ -12,7 +12,7 @@ router.post(
 router.post("/categories/", cityFestsController.getCityFestCategories);
 router.get("/", cityFestsController.getAllCityFests);
 router.get("/:id", cityFestsController.getCityFestById);
-router.get("/types/:id", cityFestsController.getCityFestsByCategory);
+router.post("/types", cityFestsController.getCityFestsByCategory);
 router.put(
   "/:id",
   isAuthorized,

@@ -250,18 +250,39 @@ exports.deleteCityFest = async (req, res) => {
 
 exports.getCityFestsByCategory = async (req, res) => {
   try {
-    const id = req.params.id;
+    const { categoryid, location } = req.body;
+
+    // Validate required field
+    if (!categoryid) {
+      return res.status(400).json({
+        success: false,
+        message: "categoryid is required",
+      });
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const fests = await city_fest.findAll({
-      where: {
-        categoryId: id,
-        event_start: {
-          [Op.gte]: today, // event_start >= today
-        },
+
+    // Build where clause
+    const whereClause = {
+      categoryId: categoryid,
+      event_start: {
+        [Op.gte]: today, // event_start >= today
       },
+    };
+
+    // Add location filter if provided
+    if (location && location.trim() !== "") {
+      whereClause.location = {
+        [Op.iLike]: `%${location.trim()}%`, // Case-insensitive partial match
+      };
+    }
+
+    const fests = await city_fest.findAll({
+      where: whereClause,
       order: [["event_start", "ASC"]], // soonest first
     });
+
     res.status(200).json({ success: true, fests });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
