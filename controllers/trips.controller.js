@@ -205,7 +205,7 @@ exports.getValidTrips = async (req, res) => {
                 id: id++,
                 title: `For ${numMemberCount} member`,
                 price: formatPrice(priceValue),
-                // Note: image is excluded from response as requested
+                persons: numMemberCount,
               });
             }
           });

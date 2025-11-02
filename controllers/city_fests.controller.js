@@ -19,10 +19,50 @@ exports.createCityFestCategory = async (req, res) => {
   }
 };
 
-// 🎉 Get All City Fest Categories
+// 🎉 Get All City Fest Categories (filtered by location if provided)
 exports.getCityFestCategories = async (req, res) => {
   try {
-    const categories = await city_fest_category.findAll();
+    const { location } = req.body;
+
+    // If no location is provided, return all categories
+    if (!location || location.trim() === "") {
+      const categories = await city_fest_category.findAll();
+      return res.status(200).json({
+        success: true,
+        data: categories,
+      });
+    }
+
+    // If location is provided, find city fests matching that location
+    const cityFests = await city_fest.findAll({
+      where: {
+        location: {
+          [Op.iLike]: `%${location.trim()}%`, // Case-insensitive partial match
+        },
+      },
+      include: [
+        {
+          model: city_fest_category,
+          as: "festCategory",
+          attributes: ["id", "name", "image"],
+        },
+      ],
+    });
+
+    // Extract unique categories from the city fests
+    const categoryMap = new Map();
+    cityFests.forEach((fest) => {
+      if (fest.festCategory) {
+        const categoryId = fest.festCategory.id;
+        if (!categoryMap.has(categoryId)) {
+          categoryMap.set(categoryId, fest.festCategory.toJSON());
+        }
+      }
+    });
+
+    // Convert map values to array
+    const categories = Array.from(categoryMap.values());
+
     res.status(200).json({
       success: true,
       data: categories,
