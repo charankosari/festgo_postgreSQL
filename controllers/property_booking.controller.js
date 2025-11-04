@@ -1295,7 +1295,13 @@ exports.getMyBookings = async (req, res) => {
         {
           model: city_fest,
           as: "cityFest",
-          attributes: ["location"],
+          attributes: [
+            "location",
+            "image_urls",
+            "gmap_url",
+            "latitude",
+            "longitude",
+          ],
           required: true,
           include: [
             {
@@ -1317,6 +1323,12 @@ exports.getMyBookings = async (req, res) => {
       return {
         ...bookingData,
         cityfest_location: booking.cityFest ? booking.cityFest.location : null,
+        cityfest_image: Array.isArray(booking.cityFest?.image_urls)
+          ? booking.cityFest.image_urls[0] || null
+          : null,
+        gmap_url: booking.cityFest ? booking.cityFest.gmap_url : null,
+        latitude: booking.cityFest ? booking.cityFest.latitude : null,
+        longitude: booking.cityFest ? booking.cityFest.longitude : null,
         cityfest_category_name:
           booking.cityFest && booking.cityFest.festCategory
             ? booking.cityFest.festCategory.name
