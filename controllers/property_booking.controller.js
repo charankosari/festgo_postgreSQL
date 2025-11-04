@@ -15,6 +15,7 @@ const {
   Festbite,
   city_fest_booking,
   city_fest,
+  city_fest_category,
   TripsBooking,
   Trips,
   PlanMyTrips, // your services sequelize instance
@@ -1293,13 +1294,34 @@ exports.getMyBookings = async (req, res) => {
       include: [
         {
           model: city_fest,
-          as: "cityFest", // must match your association alias
-
-          attributes: [], // exclude nested cityFest object (flatten if needed)
-          required: true, // ensures only valid fests are returned
+          as: "cityFest",
+          attributes: ["location"],
+          required: true,
+          include: [
+            {
+              model: city_fest_category,
+              as: "festCategory",
+              attributes: ["name"],
+            },
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
+    });
+
+    const cityfestsWithDetails = cityfests.map((booking) => {
+      const bookingData = booking.toJSON();
+      delete bookingData.cityFest;
+      delete bookingData.category_id; // remove stray association field from response
+
+      return {
+        ...bookingData,
+        cityfest_location: booking.cityFest ? booking.cityFest.location : null,
+        cityfest_category_name:
+          booking.cityFest && booking.cityFest.festCategory
+            ? booking.cityFest.festCategory.name
+            : null,
+      };
     });
 
     // 📌 Fetch trips bookings (paid/refunded)
@@ -1381,7 +1403,7 @@ exports.getMyBookings = async (req, res) => {
       message: "Your bookings fetched successfully.",
       propertyBookings: propertyBookingsWithDetails,
       beachfestBookings: beachfestBookingsWithDetails,
-      cityfests,
+      cityfests: cityfestsWithDetails,
       tripsBookings: tripsBookingsWithDetails,
       planmytrips: planmytripsWithDetails,
       events,
