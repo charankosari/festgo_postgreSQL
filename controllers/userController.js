@@ -15,6 +15,9 @@ const {
   Offers,
   Property,
   beach_fests,
+  TripsBooking,
+  PlanMyTrips,
+  city_fest_booking,
 } = require("../models/services");
 const { Sequelize, where } = require("sequelize");
 const sendToken = require("../utils/jwttokenSend");
@@ -570,12 +573,34 @@ exports.getUserDetails = async (req, res) => {
       const beachfestBookingsCount = await beachfests_booking.count({
         where: { user_id: userId, booking_status: "confirmed" },
       });
+
+      // 📌 Fetch trips bookings count (confirmed only)
+      const tripsBookingsCount = await TripsBooking.count({
+        where: { userId: userId, booking_status: "confirmed" },
+      });
+
+      // 📌 Fetch planmytrips requests count (accepted only)
+      const planMyTripsCount = await PlanMyTrips.count({
+        where: { userId: userId },
+      });
+
+      // 📌 Fetch city fests bookings count (confirmed only)
+      const cityFestsBookingsCount = await city_fest_booking.count({
+        where: { user_id: userId, booking_status: "confirmed" },
+      });
+
       const eventsCount = await Event.count({
         where: { userId: userId },
       });
+
       // 📌 Sum total bookings count
       const bookingsCount =
-        propertyBookingsCount + beachfestBookingsCount + eventsCount;
+        propertyBookingsCount +
+        beachfestBookingsCount +
+        eventsCount +
+        tripsBookingsCount +
+        planMyTripsCount +
+        cityFestsBookingsCount;
       const loginHistory = await LoginHistory.findAll({
         where: { userId: userId },
         order: [["loginTime", "DESC"]],
