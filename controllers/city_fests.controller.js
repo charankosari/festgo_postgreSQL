@@ -22,7 +22,8 @@ exports.createCityFestCategory = async (req, res) => {
 // 🎉 Get All City Fest Categories (filtered by location if provided)
 exports.getCityFestCategories = async (req, res) => {
   try {
-    const { location } = req.body;
+    const location =
+      (req.body && req.body.location) || req.query.location || "";
 
     // If no location is provided, return all categories
     if (!location || location.trim() === "") {

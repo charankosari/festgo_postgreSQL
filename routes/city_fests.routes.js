@@ -4,7 +4,7 @@ const cityFestsController = require("../controllers/city_fests.controller");
 const { isAuthorized, authorizedRoles } = require("../middlewares/auth");
 // 📌 City Fests CRUD
 router.post(
-  "/",
+  "/create",
   isAuthorized,
   authorizedRoles("admin"),
   cityFestsController.createCityFest
