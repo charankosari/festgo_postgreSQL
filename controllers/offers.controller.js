@@ -263,6 +263,7 @@ exports.activateOffer = async (req, res) => {
     }
 
     offer.active = true;
+    offer.status = "active";
     await offer.save();
 
     return res.status(200).json({
@@ -296,6 +297,7 @@ exports.deactivateOffer = async (req, res) => {
 
     // Update active status
     offer.active = false;
+    offer.status = "inactive";
     await offer.save();
 
     return res.status(200).json({
