@@ -29,4 +29,12 @@ router.get(
   offerController.deactivateOffer
 );
 
+// Delete an offer: admins can delete any, vendors can delete their own
+router.delete(
+  "/delete/:id",
+  isAuthorized,
+  authorizedRoles("admin", "vendor"),
+  offerController.deleteOffer
+);
+
 module.exports = router;

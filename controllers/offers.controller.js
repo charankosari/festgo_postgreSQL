@@ -314,3 +314,50 @@ exports.deactivateOffer = async (req, res) => {
     });
   }
 };
+// Delete offer (admin can delete any; vendor can delete only their own)
+exports.deleteOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    const offer = await Offers.findByPk(id);
+    if (!offer) {
+      return res.status(404).json({
+        success: false,
+        message: "Offer not found.",
+      });
+    }
+
+    // If vendor, ensure they own the offer; admins can delete any offer
+    if (userRole === "vendor") {
+      if (String(offer.vendorId) !== String(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Vendors can only delete their own offers.",
+        });
+      }
+    } else if (userRole !== "admin") {
+      // only admin or the owning vendor may delete
+      return res.status(403).json({
+        success: false,
+        message: "Only admins or the vendor owning the offer can delete it.",
+      });
+    }
+
+    await offer.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: "Offer deleted successfully.",
+      data: { id },
+    });
+  } catch (error) {
+    console.error("Error deleting offer:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete offer.",
+      error: error.message,
+    });
+  }
+};
