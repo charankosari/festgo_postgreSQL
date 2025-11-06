@@ -23,6 +23,13 @@ const {
 const { refundPayment } = require("../libs/payments/razorpay");
 const moment = require("moment");
 const axios = require("axios");
+const { sendCustomSMS } = require("../libs/sms/sms.js");
+const {
+  resortBookingCancellationTemplate,
+  eventBookingCancellationTemplate,
+  refundInitiatedTemplate,
+} = require("../libs/sms/messageTemplates.js");
+const { User } = require("../models/users");
 
 const cancelPropertyBooking = async (req, res) => {
   const user_tx = await usersequel.transaction();
@@ -216,6 +223,45 @@ const cancelPropertyBooking = async (req, res) => {
       }
     }
     await user_tx.commit();
+    // Send SMS notifications for property booking cancellation
+    try {
+      const user = await User.findByPk(booking.user_id);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        // Property cancellation SMS
+        const cancelMsg = resortBookingCancellationTemplate({
+          name: userName,
+          resortName: property?.name || "Property",
+          bookingId: booking.reciept || booking.id,
+          date: moment(booking.check_in_date).format("DD MMM YYYY"),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_PROP_CANCEL_TEMPLATE_ID
+        );
+        // Refund initiated SMS (only if refund is applicable)
+        if (refundAmount > 0) {
+          const refundMsg = refundInitiatedTemplate({
+            name: userName,
+            bookingId: booking.reciept || booking.id,
+          });
+          await sendCustomSMS(
+            user.number,
+            refundMsg,
+            process.env.SMS_REFUND_INIT_TEMPLATE_ID
+          );
+        }
+      }
+    } catch (smsErr) {
+      console.error(
+        "❌ Error sending property cancellation/refund SMS:",
+        smsErr
+      );
+    }
     res.status(200).json({
       success: true,
       message:
@@ -363,6 +409,29 @@ const cancelEventBooking = async (req, res) => {
     await event.destroy();
 
     await user_tx.commit();
+    // Send SMS notification for event booking cancellation
+    try {
+      const user = await User.findByPk(event.userId);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName: event.eventType || "Event",
+          bookingId: event.id,
+          date: moment(event.startDate || new Date()).format("DD MMM YYYY"),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending event cancellation SMS:", smsErr);
+    }
     res.status(200).json({
       success: true,
       message: "Event booking cancelled successfully.",
@@ -548,6 +617,31 @@ const cancelBeachFestBooking = async (req, res) => {
     }
     await t.commit();
     await user_tx.commit();
+    // Send SMS notification for beach fest booking cancellation
+    try {
+      const user = await User.findByPk(booking.user_id);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName: fest?.type || "Beach Fest",
+          bookingId: booking.id,
+          date: moment(booking.event_start || fest?.event_start).format(
+            "DD MMM YYYY"
+          ),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending beach fest cancellation SMS:", smsErr);
+    }
 
     res.status(200).json({
       success: true,
@@ -696,6 +790,31 @@ const cancelFestbite = async (req, res) => {
     await festbite.destroy();
 
     await user_tx.commit();
+    // Send SMS notification for festbite cancellation using event template
+    try {
+      const user = await User.findByPk(festbite.userId);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName: festbite.occasionName || "Festbite",
+          bookingId: festbite.id,
+          date: moment(
+            festbite.preferredDate || festbite.createdAt || new Date()
+          ).format("DD MMM YYYY"),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending festbite cancellation SMS:", smsErr);
+    }
     res.status(200).json({
       success: true,
       message: "Festbite cancelled successfully.",
@@ -720,7 +839,7 @@ const cancelPlanmytrip = async (req, res) => {
     if (!planmytrip) {
       return res
         .status(404)
-        .json({ success: false, message: "Festbite not found." });
+        .json({ success: false, message: "planmytrip not found." });
     }
 
     if (planmytrip.userId !== userId) {
@@ -840,16 +959,46 @@ const cancelPlanmytrip = async (req, res) => {
     await planmytrip.destroy();
 
     await user_tx.commit();
+    // Send SMS notification for PlanMyTrip cancellation using event template
+    try {
+      const user = await User.findByPk(planmytrip.userId);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const eventName = planmytrip.destination
+          ? `${planmytrip.travelType || "Trip"}: ${planmytrip.from || ""} to ${
+              planmytrip.destination
+            }`
+          : planmytrip.travelType || "Plan My Trip";
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName,
+          bookingId: planmytrip.id,
+          date: moment(planmytrip.date || planmytrip.createdAt).format(
+            "DD MMM YYYY"
+          ),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending planmytrip cancellation SMS:", smsErr);
+    }
     res.status(200).json({
       success: true,
-      message: "Festbite cancelled successfully.",
+      message: "planmytrip cancelled successfully.",
     });
   } catch (error) {
     await user_tx.rollback();
-    console.error("Error cancelling festbite:", error);
+    console.error("Error cancelling planmytrip:", error);
     res.status(500).json({
       success: false,
-      message: "Something went wrong while cancelling festbite.",
+      message: "Something went wrong while cancelling planmytrip.",
     });
   }
 };
@@ -1005,6 +1154,32 @@ const cancelTripBooking = async (req, res) => {
       payment_status: refundPercentage > 0 ? "refunded" : "norefund",
     });
     await user_tx.commit();
+    // Send SMS notification for Trip booking cancellation
+    try {
+      const user = await User.findByPk(trip_booking.userId);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const trip = await Trips.findByPk(trip_booking.tripId);
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName: trip?.tripName || "Trip",
+          bookingId: trip_booking.reciept || trip_booking.id,
+          date: moment(trip_booking.startDate || trip?.startDate).format(
+            "DD MMM YYYY"
+          ),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending trip booking cancellation SMS:", smsErr);
+    }
     res.status(200).json({
       success: true,
       message: "Trip cancelled successfully.",
@@ -1192,6 +1367,32 @@ const cancelCityFestBooking = async (req, res) => {
     }
     await t.commit();
     await user_tx.commit();
+
+    // Send SMS notification for city fest booking cancellation
+    try {
+      const user = await User.findByPk(booking.user_id);
+      if (user?.number) {
+        const userName =
+          `${user.firstname || ""} ${user.lastname || ""}`.trim() ||
+          user.username ||
+          "User";
+        const cancelMsg = eventBookingCancellationTemplate({
+          name: userName,
+          eventName: fest?.name || "City Fest",
+          bookingId: booking.id,
+          date: moment(booking.event_start || fest?.event_start).format(
+            "DD MMM YYYY"
+          ),
+        });
+        await sendCustomSMS(
+          user.number,
+          cancelMsg,
+          process.env.SMS_EVENT_CANCEL_TEMPLATE_ID
+        );
+      }
+    } catch (smsErr) {
+      console.error("❌ Error sending city fest cancellation SMS:", smsErr);
+    }
 
     res.status(200).json({
       success: true,
