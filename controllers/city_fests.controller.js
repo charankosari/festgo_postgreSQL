@@ -1,5 +1,5 @@
 const { city_fest, city_fest_category } = require("../models/services");
-const { Op } = require("sequelize");
+const { Op, col } = require("sequelize");
 // 🎉 Create City Fest Category
 exports.createCityFestCategory = async (req, res) => {
   try {
@@ -334,27 +334,23 @@ exports.getAllCityFests = async (req, res) => {
       },
     };
 
-    // include only name and image from category
-    const festsRaw = await city_fest.findAll({
+    // Use attributes.include with col() to pull category fields into top-level
+    const fests = await city_fest.findAll({
       where: whereClause,
       include: [
         {
           model: city_fest_category,
           as: "festCategory",
-          attributes: ["name", "image"],
+          attributes: [], // don't return nested object
         },
       ],
+      attributes: {
+        include: [
+          [col("festCategory.name"), "cityfest_category_name"],
+          [col("festCategory.image"), "cityfest_category_image"],
+        ],
+      },
       order: [["event_start", "ASC"]], // soonest first
-    });
-
-    // Map results to include flattened category fields
-    const fests = festsRaw.map((f) => {
-      const obj = f.toJSON();
-      const cat = obj.festCategory || {};
-      obj.cityfest_category_name = cat.name || null;
-      obj.cityfest_category_image = cat.image || null;
-      delete obj.festCategory; // remove nested object per request
-      return obj;
     });
 
     res.status(200).json({ success: true, fests });
