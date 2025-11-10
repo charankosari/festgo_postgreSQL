@@ -326,16 +326,37 @@ exports.getAllCityFests = async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     // Build where clause
     const whereClause = {
       event_start: {
         [Op.gte]: today, // event_start >= today
       },
     };
-    const fests = await city_fest.findAll({
+
+    // include only name and image from category
+    const festsRaw = await city_fest.findAll({
       where: whereClause,
+      include: [
+        {
+          model: city_fest_category,
+          as: "festCategory",
+          attributes: ["name", "image"],
+        },
+      ],
       order: [["event_start", "ASC"]], // soonest first
     });
+
+    // Map results to include flattened category fields
+    const fests = festsRaw.map((f) => {
+      const obj = f.toJSON();
+      const cat = obj.festCategory || {};
+      obj.cityfest_category_name = cat.name || null;
+      obj.cityfest_category_image = cat.image || null;
+      delete obj.festCategory; // remove nested object per request
+      return obj;
+    });
+
     res.status(200).json({ success: true, fests });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
