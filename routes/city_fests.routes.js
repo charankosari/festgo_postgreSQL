@@ -46,5 +46,10 @@ router.delete(
   authorizedRoles("admin"),
   cityFestsController.deleteCityFestCategory
 );
+router.get(
+  "/getall/cityfests",
+  isAuthorized,
+  cityFestsController.getAllCityFests
+);
 
 module.exports = router;

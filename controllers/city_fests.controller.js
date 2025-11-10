@@ -138,7 +138,39 @@ exports.createCityFest = async (req, res) => {
       latitude,
       longitude,
     } = req.body;
+    const startDate = new Date(event_start);
+    // normalize startDate to midnight for date-only comparisons
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(event_end);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid event_start or event_end." });
+    }
+    if (startDate >= endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "event_start must be before event_end.",
+      });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // require startDate to be strictly greater than today (no same-day starts)
+    if (startDate <= today) {
+      return res.status(400).json({
+        success: false,
+        message: "event_start must be a future date (greater than today).",
+      });
+    }
 
+    // Validation: price_per_pass must be a number and not negative
+    const price = parseFloat(price_per_pass);
+    if (isNaN(price) || price < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "price_per_pass must be a non-negative number.",
+      });
+    }
     const fest = await city_fest.create({
       categoryId,
       location,
@@ -284,6 +316,26 @@ exports.getCityFestsByCategory = async (req, res) => {
       order: [["event_start", "ASC"]], // soonest first
     });
 
+    res.status(200).json({ success: true, fests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getAllCityFests = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Build where clause
+    const whereClause = {
+      event_start: {
+        [Op.gte]: today, // event_start >= today
+      },
+    };
+    const fests = await city_fest.findAll({
+      where: whereClause,
+      order: [["event_start", "ASC"]], // soonest first
+    });
     res.status(200).json({ success: true, fests });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
