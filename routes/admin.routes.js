@@ -41,6 +41,36 @@ router.get(
   propertyController.getPropertiesByVendor
 );
 
+// ✅ Edit Property Direct (PUT /property/:id/edit)
+router.get(
+  "/property/:id/get-plain",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.getPlainProperty
+);
+router.put(
+  "/property/:id/edit",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.editPropertyDirect
+);
+
+// ✅ Get All Plain Rooms by Property ID
+router.get(
+  "/rooms/:propertyId/plain",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.getAPlainRoomData
+);
+
+// ✅ Edit Room Direct (PUT /room/:id/edit)
+router.put(
+  "/rooms/:id/edit",
+  isAuthorized,
+  authorizedRoles("admin"),
+  propertyController.editRoomDirect
+);
+
 // ✅ Delete vendor
 router.delete(
   "/vendors/:id",

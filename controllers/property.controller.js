@@ -2726,3 +2726,178 @@ exports.getPaidHotelPayments = async (req, res) => {
     });
   }
 };
+
+// ✅ Edit Property - Direct Update (PUT /:id)
+// Takes body data and updates property directly to DB without normalization
+exports.editPropertyDirect = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    console.log("📝 Edit Property Direct - Received updates:", {
+      id,
+      updateKeys: Object.keys(updates),
+      hasPhotos: !!updates.photos,
+      photosLength: updates.photos?.length,
+    });
+
+    // Find property by ID
+    const property = await Property.findByPk(id);
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    // Remove id and vendorId from updates to prevent changing them
+    if (updates.hasOwnProperty("id")) {
+      delete updates.id;
+    }
+    if (updates.hasOwnProperty("vendorId")) {
+      delete updates.vendorId;
+    }
+
+    // Remove fields that don't exist in the model schema
+    // Get model attributes to filter out invalid fields
+    const modelAttributes = Object.keys(Property.rawAttributes);
+    const validUpdates = {};
+
+    for (const key in updates) {
+      if (modelAttributes.includes(key)) {
+        validUpdates[key] = updates[key];
+      } else {
+        console.warn(`⚠️ Skipping field '${key}' - not in model schema`);
+      }
+    }
+
+    console.log("✅ Valid update fields:", Object.keys(validUpdates));
+
+    // Use instance update method and explicitly save
+    // This ensures JSONB fields are properly handled
+    for (const key in validUpdates) {
+      property.set(key, validUpdates[key]);
+    }
+
+    // Save the changes explicitly
+    await property.save();
+
+    console.log("📊 Property saved successfully");
+
+    // Reload to get fresh data
+    await property.reload();
+
+    console.log("✅ Property updated successfully");
+    console.log("📸 Photos after update:", property.photos?.length || 0);
+
+    return res.status(200).json({
+      success: true,
+      message: "Property updated successfully",
+      data: property,
+    });
+  } catch (error) {
+    console.error("❌ Error updating property:", error);
+    console.error("Error stack:", error.stack);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while updating property",
+      error: error.message,
+    });
+  }
+};
+exports.getPlainProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const property = await Property.findByPk(id);
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    res.json({ success: true, property, status: 200 }).status(200);
+  } catch (err) {
+    res.status(500).json({ message: err.message, status: 500 }).status(500);
+  }
+};
+// ✅ Get All Plain Rooms by Property ID
+exports.getAPlainRoomData = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    if (!propertyId) {
+      return res.status(400).json({
+        success: false,
+        message: "propertyId is required",
+        status: 400,
+      });
+    }
+
+    // Fetch all rooms for the property
+    const rooms = await Room.findAll({
+      where: { propertyId },
+    });
+
+    return res.status(200).json({
+      success: true,
+      rooms,
+      count: rooms.length,
+      status: 200,
+    });
+  } catch (err) {
+    console.error("Error fetching rooms:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+      status: 500,
+    });
+  }
+};
+// ✅ Edit Room - Direct Update (PUT /r/:id)
+// Takes body data and updates room directly to DB without normalization
+exports.editRoomDirect = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Find room by ID
+    const room = await Room.findByPk(id);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    // Remove id and propertyId from updates to prevent changing them
+    if (updates.hasOwnProperty("id")) {
+      delete updates.id;
+    }
+    if (updates.hasOwnProperty("propertyId")) {
+      delete updates.propertyId;
+    }
+
+    // Update room directly using Model.update() for better reliability
+    // This ensures the update is persisted to the database
+    await Room.update(updates, {
+      where: { id },
+    });
+
+    // Fetch updated room fresh from database
+    const updatedRoom = await Room.findByPk(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Room updated successfully",
+      data: updatedRoom,
+    });
+  } catch (error) {
+    console.error("Error updating room:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while updating room",
+      error: error.message,
+    });
+  }
+};

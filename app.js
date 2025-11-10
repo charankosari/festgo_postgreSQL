@@ -38,7 +38,9 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 app.use(logger("tiny", { stream: accessLogStream })); // Save to file
 app.use(logger("tiny")); // Optional: also log to console
-app.use(express.json());
+// Increase payload size limit to 50MB for JSON and URL-encoded data
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api", users);
 app.use("/api/update-rates", RoomRatesRoutes);
 app.use("/api/contact", ContactRoutes);
